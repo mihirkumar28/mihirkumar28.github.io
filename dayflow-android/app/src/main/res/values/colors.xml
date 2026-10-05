@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dayflow_bg">#0B0D12</color>
+    <color name="dayflow_panel">#131722</color>
+    <color name="dayflow_panel2">#191E2B</color>
+    <color name="dayflow_text">#F5F7FB</color>
+    <color name="dayflow_muted">#8E98AA</color>
+    <color name="dayflow_accent">#8B7CFF</color>
+    <color name="dayflow_good">#47D18C</color>
+    <color name="dayflow_danger">#FF6B7A</color>
+</resources>
