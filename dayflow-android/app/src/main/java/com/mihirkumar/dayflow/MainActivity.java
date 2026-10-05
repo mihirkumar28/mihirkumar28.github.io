@@ -135,7 +135,7 @@ public class MainActivity extends Activity {
         nextLabel.setText(current!=null?"Current block":"Next block");
         nextTitle.setText(target!=null?target.title:"Day complete 🎉");
         nextMeta.setText(target!=null?time12(target.start)+"–"+time12(target.end):"");
-        if(target){ int delta=current!=null?mins(target.end)-nm:mins(target.start)-nm; countdown.setText((current!=null?fmt(Math.max(0,delta))+" left":"in "+fmt(Math.max(0,delta)))); } else countdown.setText("—");
+        if(target!=null){ int delta=current!=null?mins(target.end)-nm:mins(target.start)-nm; countdown.setText((current!=null?fmt(Math.max(0,delta))+" left":"in "+fmt(Math.max(0,delta)))); } else countdown.setText("—");
 
         timeline.removeAllViews();
         if(blocks.isEmpty()){ TextView empty=tv("No blocks yet. Add one or load a template.",14,color("#8E98AA"),false); empty.setGravity(Gravity.CENTER); timeline.addView(empty,new LinearLayout.LayoutParams(-1,dp(90))); return; }
