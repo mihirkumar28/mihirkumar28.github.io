@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="description" content="DayFlow — daily time blocking made practical.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>DayFlow — Daily Timetable</title>
+<style>
+:root{--bg:#0b0d12;--panel:#131722;--panel2:#191e2b;--text:#f5f7fb;--muted:#8e98aa;--line:#252c3b;--accent:#8b7cff;--good:#47d18c;--warn:#ffbd5a;--danger:#ff6b7a}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(900px 500px at 80% -10%,#25204a 0,transparent 55%),var(--bg);color:var(--text);font:15px/1.4 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}
+.app{max-width:1180px;margin:auto;padding:22px 18px 60px}
+.top{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:22px}
+.brand{font-weight:800;letter-spacing:-.5px;font-size:22px}.brand span{color:var(--accent)}
+.date{color:var(--muted);font-size:13px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:10px 13px;border-radius:11px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.grid{display:grid;grid-template-columns:1.7fr .8fr;gap:18px}
+.card{background:rgba(19,23,34,.9);border:1px solid var(--line);border-radius:18px;box-shadow:0 16px 50px rgba(0,0,0,.2)}
+.hero{padding:20px}.herohead{display:flex;justify-content:space-between;align-items:end;gap:15px}
+.eyebrow{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1.2px}
+.hero h1{margin:3px 0 0;font-size:30px;letter-spacing:-1px}
+.progress{margin-top:17px;height:8px;background:#222838;border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#b0a7ff);width:0}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.metric{background:var(--panel2);padding:12px;border-radius:12px}.metric b{display:block;font-size:18px}.metric small{color:var(--muted)}
+.timeline{padding:0 8px 10px}.block{display:grid;grid-template-columns:78px 1fr 94px;gap:10px;align-items:stretch;padding:10px 4px}
+.time{color:var(--muted);font-size:12px;padding-top:12px;text-align:right}
+.blockbody{border-left:3px solid var(--accent);background:#151a27;border:1px solid var(--line);border-left-width:3px;border-radius:12px;padding:12px 13px;transition:.2s}
+.block.current .blockbody{background:linear-gradient(100deg,#24213e,#151a27);border-color:#4e466e}
+.block.done .blockbody{opacity:.55;border-left-color:var(--good)}.block.skipped .blockbody{opacity:.4;border-left-color:var(--danger);text-decoration:line-through}
+.title{font-weight:750}.meta{color:var(--muted);font-size:12px;margin-top:3px}
+.state{margin-top:9px;color:var(--accent);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.blockactions{display:flex;flex-direction:column;gap:6px;justify-content:center}
+.mini{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:9px;padding:7px 6px;font-size:12px}.mini:hover{color:#fff;background:var(--panel2)}
+.side{padding:17px}.side h3{margin:2px 0 12px}.sidebox{background:var(--panel2);border-radius:13px;padding:14px;margin-bottom:12px}
+.currentTitle{font-size:20px;font-weight:800;margin:4px 0}.count{font-size:30px;font-weight:800;letter-spacing:-1px}.muted{color:var(--muted)}
+.template{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.template:first-of-type{border-top:0}
+.add{width:100%;margin-top:6px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:18px;z-index:10}.modal.open{display:flex}
+.modalbox{width:min(520px,100%);background:#131722;border:1px solid var(--line);border-radius:18px;padding:18px}.modalbox h2{margin-top:0}
+.form{display:grid;gap:10px}.form input,.form select{width:100%;background:#0e121a;color:#fff;border:1px solid var(--line);padding:11px;border-radius:10px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.footer{margin-top:18px;color:var(--muted);font-size:12px;text-align:center}
+@media(max-width:850px){.grid{grid-template-columns:1fr}.side{order:-1}.block{grid-template-columns:58px 1fr}.blockactions{grid-column:2;flex-direction:row}.hero h1{font-size:25px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div><div class="brand">Day<span>Flow</span></div><div class="date" id="date"></div></div>
+  <div class="actions">
+    <button class="btn" onclick="openModal()">＋ Add block</button>
+    <button class="btn primary" onclick="recover()">⚡ Recovery mode</button>
+  </div>
+</header>
+
+<section class="card hero">
+  <div class="herohead">
+    <div><div class="eyebrow">Today</div><h1>Your day, under control.</h1></div>
+    <div class="muted" id="completion">0 / 0 complete</div>
+  </div>
+  <div class="progress"><i id="progress"></i></div>
+  <div class="metrics">
+    <div class="metric"><b id="planned">0h 00m</b><small>planned</small></div>
+    <div class="metric"><b id="doneTime">0h 00m</b><small>completed</small></div>
+    <div class="metric"><b id="eff">0%</b><small>execution</small></div>
+  </div>
+</section>
+
+<div class="grid" style="margin-top:18px">
+<main class="card timeline" id="timeline"></main>
+<aside class="card side">
+  <div class="eyebrow">Right now</div>
+  <div class="sidebox">
+    <div class="muted" id="nextLabel">Next block</div>
+    <div class="currentTitle" id="nextTitle">—</div>
+    <div class="count" id="countdown">—</div>
+    <div class="muted" id="nextMeta"></div>
+  </div>
+  <h3>Templates</h3>
+  <div class="template"><span>WFH day</span><button class="mini" onclick="loadTemplate('wfh')">Load</button></div>
+  <div class="template"><span>Office day</span><button class="mini" onclick="loadTemplate('office')">Load</button></div>
+  <div class="template"><span>Weekend</span><button class="mini" onclick="loadTemplate('weekend')">Load</button></div>
+  <button class="btn add" onclick="clearDay()">Clear today's plan</button>
+</aside>
+</div>
+
+<div class="footer">DayFlow · browser-local data · installable PWA</div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modalbox">
+    <h2>Add time block</h2>
+    <div class="form">
+      <input id="fTitle" placeholder="e.g. Maths Optional">
+      <div class="row"><input id="fStart" type="time" value="19:00"><input id="fEnd" type="time" value="20:00"></div>
+      <select id="fPriority">
+        <option value="fixed">Fixed</option><option value="important" selected>Important</option>
+        <option value="flexible">Flexible</option><option value="optional">Optional</option>
+      </select>
+      <div class="actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="addBlock()">Add block</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var KEY = "dayflow-v1";
+var templates = {
+  wfh: [
+    ["06:00","06:20","Wake up","fixed"],["06:20","07:00","Morning routine","flexible"],
+    ["07:00","09:00","GS study","important"],["09:00","09:30","Breakfast","flexible"],
+    ["09:30","13:00","Work","fixed"],["13:00","14:00","Lunch","fixed"],
+    ["14:00","18:30","Work","fixed"],["18:30","19:15","Exercise","important"],
+    ["19:30","21:30","Maths Optional","important"],["21:30","22:15","Dinner","fixed"],
+    ["22:15","23:00","Interview preparation","important"],["23:00","23:30","Wind down","flexible"]
+  ],
+  office: [
+    ["06:00","06:30","Wake up + routine","fixed"],["06:30","08:00","Maths Optional","important"],
+    ["08:00","09:00","Breakfast + commute","fixed"],["09:00","18:30","Work + commute","fixed"],
+    ["18:30","19:15","Reset","flexible"],["19:15","21:15","GS study","important"],
+    ["21:15","22:00","Dinner","fixed"],["22:00","23:00","Interview preparation","important"],
+    ["23:00","23:30","Wind down","flexible"]
+  ],
+  weekend: [
+    ["06:30","07:00","Morning routine","fixed"],["07:00","10:00","GS study","important"],
+    ["10:00","11:00","Breakfast + break","flexible"],["11:00","14:00","Maths Optional","important"],
+    ["14:00","15:00","Lunch","fixed"],["15:00","17:00","Maths / revision","important"],
+    ["17:00","18:00","Exercise","important"],["18:00","20:00","Personal time","flexible"],
+    ["20:00","21:00","Dinner","fixed"],["21:00","22:30","Interview preparation","important"]
+  ]
+};
+
+function mins(t){var p=t.split(":").map(Number);return p[0]*60+p[1]}
+function pad(n){return String(n).padStart(2,"0")}
+function fmt(n){var h=Math.floor(n/60),m=n%60;return h?(h+"h "+pad(m)+"m"):m+"m"}
+function toTime(n){n=Math.max(0,Math.min(1439,n));return pad(Math.floor(n/60))+":"+pad(n%60)}
+function time12(t){var p=t.split(":").map(Number),h=p[0]%12||12;return h+":"+pad(p[1])+(p[0]>=12?" PM":" AM")}
+function esc(s){return s.replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",""":"&quot;","'":"&#039;"}[c]})}
+
+var blocks = JSON.parse(localStorage.getItem(KEY) || "null");
+if(!blocks) blocks = templates.wfh.map(function(x,i){return {id:i,start:x[0],end:x[1],title:x[2],priority:x[3],status:"pending"}});
+
+function save(){localStorage.setItem(KEY,JSON.stringify(blocks));render()}
+function render(){
+  blocks.sort(function(a,b){return mins(a.start)-mins(b.start)});
+  var now=new Date(), nm=now.getHours()*60+now.getMinutes();
+  var current=blocks.find(function(b){return mins(b.start)<=nm && nm<mins(b.end) && b.status==="pending"});
+  var next=blocks.find(function(b){return mins(b.start)>nm && b.status==="pending"});
+  document.getElementById("date").textContent=now.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"});
+
+  var done=blocks.filter(function(b){return b.status==="done"}), total=blocks.length;
+  var pct=total?Math.round(done.length/total*100):0;
+  document.getElementById("completion").textContent=done.length+" / "+total+" complete";
+  document.getElementById("progress").style.width=pct+"%";
+
+  var planned=blocks.reduce(function(s,b){return s+mins(b.end)-mins(b.start)},0);
+  var doneM=done.reduce(function(s,b){return s+mins(b.end)-mins(b.start)},0);
+  document.getElementById("planned").textContent=fmt(planned);
+  document.getElementById("doneTime").textContent=fmt(doneM);
+  document.getElementById("eff").textContent=(planned?Math.round(doneM/planned*100):0)+"%";
+
+  document.getElementById("timeline").innerHTML=blocks.map(function(b){
+    var currentClass=current && current.id===b.id?"current":"";
+    var actions=b.status==="pending"
+      ?'<button class="mini" onclick="complete('+b.id+')">✓ Done</button><button class="mini" onclick="skip('+b.id+')">Skip</button>'
+      :'<button class="mini" onclick="undo('+b.id+')">Undo</button>';
+    return '<div class="block '+b.status+' '+currentClass+'"><div class="time">'+time12(b.start)+'<br>'+time12(b.end)+'</div>'+
+      '<div class="blockbody"><div class="title">'+esc(b.title)+'</div><div class="meta">'+b.priority+' · '+fmt(mins(b.end)-mins(b.start))+'</div>'+
+      ((current&&current.id===b.id)?'<div class="state">● In progress</div>':"")+
+      '</div><div class="blockactions">'+actions+'</div></div>';
+  }).join("") || '<div style="padding:30px;text-align:center;color:#8e98aa">No blocks yet. Add one or load a template.</div>';
+
+  var target=current||next;
+  document.getElementById("nextLabel").textContent=current?"Current block":"Next block";
+  document.getElementById("nextTitle").textContent=target?target.title:"Day complete 🎉";
+  document.getElementById("nextMeta").textContent=target?time12(target.start)+"–"+time12(target.end):"";
+  if(target){
+    var delta=current?mins(current.end)-nm:mins(target.start)-nm;
+    document.getElementById("countdown").textContent=(current?fmt(Math.max(0,delta))+" left":"in "+fmt(Math.max(0,delta)));
+  }else document.getElementById("countdown").textContent="—";
+}
+
+function complete(id){var b=blocks.find(function(x){return x.id===id});if(b){b.status="done";save()}}
+function skip(id){var b=blocks.find(function(x){return x.id===id});if(b){b.status="skipped";save()}}
+function undo(id){var b=blocks.find(function(x){return x.id===id});if(b){b.status="pending";save()}}
+
+function recover(){
+  var now=new Date(),nm=now.getHours()*60+now.getMinutes();
+  var active=blocks.find(function(b){return mins(b.start)<nm && nm<mins(b.end) && b.status==="pending"});
+  if(!active){alert("No active block right now. Nothing to recover.");return}
+  var late=nm-mins(active.start);
+  if(late<=0){alert("You are on schedule. No recovery needed.");return}
+  var idx=blocks.indexOf(active);
+  for(var i=idx+1;i<blocks.length;i++){
+    var b=blocks[i];
+    if(b.status!=="pending" || b.priority==="fixed") continue;
+    var ns=mins(b.start)+late, ne=mins(b.end)+late;
+    if(ne<1440){b.start=toTime(ns);b.end=toTime(ne)}
+  }
+  save();
+  alert("Recovery mode applied: "+late+" minutes recovered while protecting fixed blocks.");
+}
+
+function loadTemplate(name){
+  blocks=templates[name].map(function(x,i){return {id:Date.now()+i,start:x[0],end:x[1],title:x[2],priority:x[3],status:"pending"}});
+  save();
+}
+function clearDay(){if(confirm("Clear today’s timetable?")){blocks=[];save()}}
+function openModal(){document.getElementById("modal").classList.add("open")}
+function closeModal(){document.getElementById("modal").classList.remove("open")}
+function addBlock(){
+  var title=document.getElementById("fTitle").value.trim(), start=document.getElementById("fStart").value, end=document.getElementById("fEnd").value;
+  if(!title){alert("Give the block a name.");return}
+  if(mins(end)<=mins(start)){alert("End time must be after start time.");return}
+  blocks.push({id:Date.now(),title:title,start:start,end:end,priority:document.getElementById("fPriority").value,status:"pending"});
+  closeModal();document.getElementById("fTitle").value="";save();
+}
+
+render();
+setInterval(render,30000);
+if("serviceWorker" in navigator) window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})});
+</script>
+</body>
+</html>
