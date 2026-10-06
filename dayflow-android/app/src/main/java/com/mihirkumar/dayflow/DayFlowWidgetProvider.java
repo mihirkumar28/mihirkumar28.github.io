@@ -31,14 +31,14 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         super.onReceive(context, intent);
         if (ACTION_TOGGLE.equals(intent.getAction())) {
             toggleAttendance(context);
-            updateAll(context);
+            refreshAll(context);
         } else if ("com.mihirkumar.dayflow.COMMUTE".equals(intent.getAction())) {
             toggleCommute(context);
             updateAll(context);
         }
     }
 
-    private static void updateAll(Context context) {
+    public static void refreshAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         ComponentName component = new ComponentName(context, DayFlowWidgetProvider.class);
         for (int id : manager.getAppWidgetIds(component)) {
