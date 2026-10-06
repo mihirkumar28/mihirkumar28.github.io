@@ -34,7 +34,7 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
             refreshAll(context);
         } else if ("com.mihirkumar.dayflow.COMMUTE".equals(intent.getAction())) {
             toggleCommute(context);
-            updateAll(context);
+            refreshAll(context);
         }
     }
 
