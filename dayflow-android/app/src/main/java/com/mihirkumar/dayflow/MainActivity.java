@@ -440,7 +440,7 @@ public class MainActivity extends Activity {
                 save();
             });
         } else if ("done".equals(b.status)) {
-            TextView check = text("✓", color("#47D18C"), true);
+            TextView check = text("✓", 20, color("#47D18C"), true);
             check.setTextSize(20);
             check.setGravity(Gravity.CENTER);
             card.addView(check, new LinearLayout.LayoutParams(dp(44), dp(44)));
