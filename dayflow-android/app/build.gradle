@@ -1,5 +1,9 @@
 plugins { id "com.android.application" }
 
+def ciRun = System.getenv("GITHUB_RUN_NUMBER")
+def resolvedVersionCode = ciRun != null ? ciRun.toInteger() : 1
+def resolvedVersionName = "1.0." + (ciRun != null ? ciRun : "dev")
+
 android {
     namespace "com.mihirkumar.dayflow"
     compileSdk 35
@@ -8,7 +12,31 @@ android {
         applicationId "com.mihirkumar.dayflow"
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
+    }
+
+    signingConfigs {
+        release {
+            def storePasswordValue = System.getenv("DAYFLOW_STORE_PASSWORD")
+            def keyPasswordValue = System.getenv("DAYFLOW_KEY_PASSWORD")
+            if (storePasswordValue != null && keyPasswordValue != null) {
+                storeFile file("dayflow-release.jks")
+                storePassword storePasswordValue
+                keyAlias System.getenv("DAYFLOW_KEY_ALIAS") ?: "dayflow"
+                keyPassword keyPasswordValue
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (file("dayflow-release.jks").exists()
+                    && System.getenv("DAYFLOW_STORE_PASSWORD") != null
+                    && System.getenv("DAYFLOW_KEY_PASSWORD") != null) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 }
