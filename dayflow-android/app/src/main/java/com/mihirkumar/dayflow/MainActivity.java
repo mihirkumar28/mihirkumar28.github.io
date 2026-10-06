@@ -882,7 +882,6 @@ public class MainActivity extends Activity {
                     mode = key;
                     getPrefs().edit().putString(MODE_KEY, mode).apply();
                     loadTemplate(key);
-                    if (!"office".equals(key)) clearOfficeTracking();
                 })
                 .setNegativeButton("Keep today", null)
                 .show();
@@ -911,7 +910,6 @@ public class MainActivity extends Activity {
                     mode = key;
                     getPrefs().edit().putString(MODE_KEY, mode).apply();
                     loadTemplate(key);
-                    if (!"office".equals(key)) clearOfficeTracking();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
