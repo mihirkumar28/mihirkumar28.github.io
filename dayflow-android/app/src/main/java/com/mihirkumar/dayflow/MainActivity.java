@@ -785,6 +785,35 @@ public class MainActivity extends Activity {
             });
         }
 
+        TextView repeatLabel = text("REPEAT", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams repeatLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        repeatLabelLp.topMargin = dp(12);
+        form.addView(repeatLabel, repeatLabelLp);
+
+        LinearLayout repeats = horizontal();
+        form.addView(repeats, new LinearLayout.LayoutParams(-1, dp(42)));
+        String[] repeatNames = {"Never", "Weekdays", "Daily"};
+        String[] repeatValues = {"never", "weekdays", "daily"};
+        String[] selectedRepeat = {"never"};
+        for (int i = 0; i < repeatNames.length; i++) {
+            final int idx = i;
+            Button b = chip(repeatNames[i]);
+            if (i == 0) {
+                b.setTextColor(Color.WHITE);
+                b.setBackground(bg("#413B73", 12));
+            }
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1);
+            if (i > 0) lp.leftMargin = dp(6);
+            repeats.addView(b, lp);
+            b.setOnClickListener(v -> {
+                selectedRepeat[0] = repeatValues[idx];
+                for (int j = 0; j < repeats.getChildCount(); j++) {
+                    ((Button) repeats.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    ((Button) repeats.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
+
         AlertDialog addDialog = new AlertDialog.Builder(this)
                 .setTitle("Add to your day")
                 .setView(form)
