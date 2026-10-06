@@ -18,6 +18,7 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
     private static final String PREFS = "dayflow";
     private static final String OFFICE_LOG_KEY = "officeLog";
     private static final String BLOCKS_KEY = "blocks";
+    private static final String MODE_KEY = "mode";
     private static final String ACTION_TOGGLE = "com.mihirkumar.dayflow.CHECK_IN_OUT";
 
     @Override
@@ -30,6 +31,9 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         super.onReceive(context, intent);
         if (ACTION_TOGGLE.equals(intent.getAction())) {
             toggleAttendance(context);
+            updateAll(context);
+        } else if ("com.mihirkumar.dayflow.COMMUTE".equals(intent.getAction())) {
+            toggleCommute(context);
             updateAll(context);
         }
     }
@@ -46,6 +50,8 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         RemoteViews views = new RemoteViews(context.getPackageName(), com.mihirkumar.dayflow.R.layout.widget_dayflow);
 
         JSONObject day = getTodayDay(context, false);
+        String mode = getTodayMode(context);
+        boolean officeMode = "office".equals(mode);
         boolean inOffice = hasOpenSession(day);
         long officeMs = officeDuration(day, System.currentTimeMillis());
         long commuteMs = commuteDuration(day, System.currentTimeMillis());
@@ -84,12 +90,30 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         } catch (Exception ignored) {
         }
 
-        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_status,
-                inOffice ? "IN OFFICE  •  " + fmtMillis(officeMs) : "OUT  •  OFFICE " + fmtMillis(officeMs));
+        String statusText;
+        if (!officeMode) {
+            statusText = mode.equals("weekend") ? "WEEKEND" : "WFH";
+        } else {
+            statusText = inOffice ? "IN OFFICE • " + fmtMillis(officeMs)
+                                  : "OUT • OFFICE " + fmtMillis(officeMs);
+        }
+        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_status, statusText);
         views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_task, current);
         views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_timing,
-                timing + "  •  Commute " + fmtMillis(commuteMs));
-        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, inOffice ? "OUT" : "IN");
+                timing + " • Commute " + fmtMillis(commuteMs));
+
+        views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_action,
+                officeMode ? android.view.View.VISIBLE : android.view.View.GONE);
+        views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_commute,
+                officeMode ? android.view.View.VISIBLE : android.view.View.GONE);
+
+        if (officeMode) {
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, inOffice ? "OUT" : "IN");
+
+            String commuteAction = commuteAction(day);
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_commute, commuteAction);
+            views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_commute, commutePendingIntent(context));
+        }
 
         Intent toggle = new Intent(context, DayFlowWidgetProvider.class).setAction(ACTION_TOGGLE);
         PendingIntent togglePi = PendingIntent.getBroadcast(
@@ -102,6 +126,48 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_container, openPi);
 
         manager.updateAppWidget(id, views);
+    }
+
+    private static PendingIntent commutePendingIntent(Context context) {
+        Intent intent = new Intent(context, DayFlowWidgetProvider.class)
+                .setAction("com.mihirkumar.dayflow.COMMUTE");
+        return PendingIntent.getBroadcast(context, 1003, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private static String getTodayMode(Context context) {
+        String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return p.getString("mode_" + key, p.getString(MODE_KEY, "wfh"));
+    }
+
+    private static String commuteAction(JSONObject day) {
+        if (day == null) return "START";
+        long a = day.optLong("commuteInStart", 0);
+        long b = day.optLong("commuteInEnd", 0);
+        long c = day.optLong("commuteOutStart", 0);
+        long d = day.optLong("commuteOutEnd", 0);
+        if (a > 0 && b == 0) return "END";
+        if (b > 0 && c == 0) return "START";
+        if (c > 0 && d == 0) return "END";
+        return "DONE";
+    }
+
+    private static void toggleCommute(Context context) {
+        try {
+            long now = System.currentTimeMillis();
+            JSONObject day = getTodayDay(context, true);
+            long a = day.optLong("commuteInStart", 0);
+            long b = day.optLong("commuteInEnd", 0);
+            long c = day.optLong("commuteOutStart", 0);
+            long d = day.optLong("commuteOutEnd", 0);
+            if (a == 0) day.put("commuteInStart", now);
+            else if (b == 0) day.put("commuteInEnd", now);
+            else if (c == 0) day.put("commuteOutStart", now);
+            else if (d == 0) day.put("commuteOutEnd", now);
+            saveDay(context, day);
+        } catch (Exception ignored) {
+        }
     }
 
     private static JSONArray getTodayBlocks(Context context) {
