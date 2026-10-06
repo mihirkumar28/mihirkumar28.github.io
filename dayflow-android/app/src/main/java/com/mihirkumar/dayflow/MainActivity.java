@@ -458,10 +458,13 @@ public class MainActivity extends Activity {
             int lastEnd = -1;
             for (Block b : blocks) {
                 if (lastEnd >= 0 && mins(b.start) - lastEnd >= 10) {
+                    final int gapStart = lastEnd;
                     LinearLayout gap = horizontal();
-                    TextView gapText = text("·  " + fmtShort(mins(b.start) - lastEnd) + " free", 10, color("#566176"), false);
+                    gap.setPadding(dp(8), 0, dp(8), 0);
+                    TextView gapText = text("＋  " + fmtShort(mins(b.start) - lastEnd) + " free  •  Add", 11, color("#7F899D"), false);
                     gapText.setGravity(Gravity.CENTER);
-                    gap.addView(gapText, new LinearLayout.LayoutParams(-1, dp(24)));
+                    gap.addView(gapText, new LinearLayout.LayoutParams(-1, dp(32)));
+                    gap.setOnClickListener(v -> openAddDialogAt(gapStart));
                     timeline.addView(gap);
                 }
                 addBlockView(b, current != null && current.id == b.id, nowMins);
@@ -626,6 +629,10 @@ public class MainActivity extends Activity {
     }
 
     private void openAddDialog() {
+        openAddDialogAt(-1);
+    }
+
+    private void openAddDialogAt(int suggestedStart) {
         LinearLayout form = vertical();
         form.setPadding(dp(20), dp(4), dp(20), dp(2));
 
@@ -644,7 +651,7 @@ public class MainActivity extends Activity {
         LinearLayout starts = horizontal();
         form.addView(starts, new LinearLayout.LayoutParams(-1, dp(42)));
         String[] startNames = {"Next free", "Now", "Pick time"};
-        int[] startChoice = {0};
+        int[] startChoice = {suggestedStart >= 0 ? 2 : 0};
         for (int i = 0; i < startNames.length; i++) {
             final int idx = i;
             Button b = chip(startNames[i]);
@@ -659,6 +666,13 @@ public class MainActivity extends Activity {
                     ((Button) starts.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
                 }
             });
+        }
+
+        if (suggestedStart >= 0 && starts.getChildCount() >= 3) {
+            for (int j = 0; j < starts.getChildCount(); j++) {
+                ((Button) starts.getChildAt(j)).setTextColor(j == 2 ? Color.WHITE : color("#AEB7C9"));
+                ((Button) starts.getChildAt(j)).setBackground(bg(j == 2 ? "#413B73" : "#151A27", 12));
+            }
         }
 
         TextView durationLabel = text("DURATION", 10, color("#6F7C91"), true);
@@ -722,13 +736,14 @@ public class MainActivity extends Activity {
             });
         }
 
-        new AlertDialog.Builder(this)
+        AlertDialog addDialog = new AlertDialog.Builder(this)
                 .setTitle("Add to your day")
                 .setView(form)
                 .setPositiveButton("Add block", null)
                 .setNegativeButton("Cancel", null)
-                .create()
-                .setOnShowListener(dialog -> {
+                .create();
+
+        addDialog.setOnShowListener(dialog -> {
                     AlertDialog d = (AlertDialog) dialog;
                     d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
                         String name = title.getText().toString().trim();
@@ -741,9 +756,10 @@ public class MainActivity extends Activity {
                                 startChoice[0] == 1 ? currentMinutes() : -1;
                         if (startChoice[0] == 2) {
                             d.dismiss();
+                            int defaultStart = suggestedStart >= 0 ? suggestedStart : currentMinutes();
                             TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
                                 finishAddBlock(name, h * 60 + m, durationChoice[0], selectedBehavior[0]);
-                            }, currentHour(), currentMinute(), true);
+                            }, defaultStart / 60, defaultStart % 60, true);
                             picker.setTitle("Start time");
                             picker.show();
                             return;
@@ -762,8 +778,11 @@ public class MainActivity extends Activity {
                         finishAddBlock(name, start, durationChoice[0], selectedBehavior[0]);
                     });
                     title.requestFocus();
-                    d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+                    if (d.getWindow() != null) {
+                        d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+                    }
                 });
+        addDialog.show();
     }
 
     private void finishAddBlock(String name, int start, int duration, String behavior) {
@@ -1269,6 +1288,12 @@ public class MainActivity extends Activity {
                 TextView marker = text((day != null && office > 0) ? "●" : "○",
                         17, (day != null && office > 0) ? color("#47D18C") : color("#4A5364"), true);
                 row.addView(marker, new LinearLayout.LayoutParams(dp(26), -2));
+
+                if (day != null) {
+                    final JSONObject detailDay = day;
+                    final String detailDate = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(c.getTime());
+                    row.setOnClickListener(v -> showAttendanceDayDetail(detailDate, detailDay));
+                }
                 c.add(Calendar.DAY_OF_YEAR, -1);
             }
 
@@ -1281,6 +1306,51 @@ public class MainActivity extends Activity {
                     .show();
         } catch (Exception ignored) {
             Toast.makeText(this, "Couldn't load attendance history.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showAttendanceDayDetail(String date, JSONObject day) {
+        try {
+            LinearLayout content = vertical();
+            content.setPadding(dp(20), dp(2), dp(20), dp(2));
+
+            long now = System.currentTimeMillis();
+            long office = officeDuration(day, date.equals(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(new Date())) ? now : 0);
+            long commute = commuteDuration(day, date.equals(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(new Date())) ? now : 0);
+
+            TextView summary = text("Office " + fmtMillis(office) + "  •  Commute " + fmtMillis(commute),
+                    15, Color.WHITE, true);
+            content.addView(summary);
+
+            JSONArray sessions = day.optJSONArray("sessions");
+            if (sessions != null) {
+                for (int i = 0; i < sessions.length(); i++) {
+                    JSONObject s = sessions.optJSONObject(i);
+                    if (s == null) continue;
+                    long in = s.optLong("in", 0);
+                    long out = s.optLong("out", 0);
+                    String value = "Office session " + (i + 1) + ": " + (in > 0 ? clock(in) : "—")
+                            + " → " + (out > 0 ? clock(out) : "Active");
+                    TextView t = text(value, 12, color("#AEB7C9"), false);
+                    t.setPadding(0, dp(10), 0, dp(2));
+                    content.addView(t);
+                }
+            }
+
+            long ciS = day.optLong("commuteInStart", 0);
+            long ciE = day.optLong("commuteInEnd", 0);
+            long coS = day.optLong("commuteOutStart", 0);
+            long coE = day.optLong("commuteOutEnd", 0);
+            if (ciS > 0 || ciE > 0) content.addView(text("To office: " + clock(ciS) + " → " + (ciE > 0 ? clock(ciE) : "Active"), 12, color("#AEB7C9"), false));
+            if (coS > 0 || coE > 0) content.addView(text("Home: " + clock(coS) + " → " + (coE > 0 ? clock(coE) : "Active"), 12, color("#AEB7C9"), false));
+
+            new AlertDialog.Builder(this)
+                    .setTitle(date)
+                    .setView(content)
+                    .setPositiveButton("Done", null)
+                    .show();
+        } catch (Exception ignored) {
+            Toast.makeText(this, "Couldn't load that day.", Toast.LENGTH_SHORT).show();
         }
     }
 
