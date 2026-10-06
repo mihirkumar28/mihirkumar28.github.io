@@ -29,6 +29,7 @@ public class MainActivity extends Activity {
     private static final String OFFICE_OUT = "officeOut";
     private static final String COMMUTE_OUT_START = "commuteOutStart";
     private static final String COMMUTE_OUT_END = "commuteOutEnd";
+    private static final String OFFICE_LOG_KEY = "officeLog";
 
     private final ArrayList<Block> blocks = new ArrayList<>();
     private final Handler handler = new Handler();
@@ -37,7 +38,7 @@ public class MainActivity extends Activity {
     private TextView dateView, modeView, completionView, progressPercent;
     private TextView currentTitle, currentTime, currentCountdown, plannedView, doneView;
     private TextView officeStatus, officeTimes, commuteView;
-    private Button officeAction;
+    private Button officeAction, commuteAction;
     private String mode = "wfh";
 
     private static class Block {
@@ -329,36 +330,44 @@ public class MainActivity extends Activity {
         LinearLayout titleRow = horizontal();
         TextView title = text("OFFICE DAY", 12, color("#9FAFC4"), true);
         titleRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView editHint = text("One tap per step", 10, color("#627087"), false);
-        titleRow.addView(editHint);
+
+        Button history = actionButton("History", color("#C7D3E6"), "#202936");
+        history.setTextSize(11);
+        titleRow.addView(history, new LinearLayout.LayoutParams(dp(76), dp(34)));
+        history.setOnClickListener(v -> showAttendanceHistory());
         officeCard.addView(titleRow);
 
-        officeStatus = text("Ready to leave home", 19, Color.WHITE, true);
+        officeStatus = text("Ready", 20, Color.WHITE, true);
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
-        sp.topMargin = dp(6);
+        sp.topMargin = dp(8);
         officeCard.addView(officeStatus, sp);
 
-        officeTimes = text("No office timestamps yet", 11, color("#8E98AA"), false);
+        officeTimes = text("No office time logged today", 11, color("#8E98AA"), false);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
         tp.topMargin = dp(5);
         officeCard.addView(officeTimes, tp);
 
-        commuteView = text("Commute 0m  •  Office 0m", 11, color("#8E98AA"), false);
+        commuteView = text("Today • Office 0m  •  Commute 0m", 11, color("#8E98AA"), false);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.topMargin = dp(7);
         officeCard.addView(commuteView, cp);
 
-        officeAction = actionButton("Start commute", Color.WHITE, "#334B63");
-        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(44));
+        officeAction = actionButton("CHECK IN", Color.WHITE, "#8B7CFF");
+        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(48));
         ap.topMargin = dp(14);
         officeCard.addView(officeAction, ap);
-        officeAction.setOnClickListener(v -> advanceOfficeState());
+        officeAction.setOnClickListener(v -> toggleOfficeAttendance());
 
-        Button already = actionButton("I’m already at the office", color("#C7D3E6"), "#202936");
-        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(38));
-        bp.topMargin = dp(7);
-        officeCard.addView(already, bp);
-        already.setOnClickListener(v -> markAlreadyAtOffice());
+        commuteAction = actionButton("Start commute", color("#C7D3E6"), "#202936");
+        LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, dp(38));
+        cmp.topMargin = dp(7);
+        officeCard.addView(commuteAction, cmp);
+        commuteAction.setOnClickListener(v -> toggleCommute());
+
+        TextView hint = text("Tap CHECK IN when you enter. Tap CHECK OUT when you leave.", 10, color("#627087"), false);
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
+        hp.topMargin = dp(8);
+        officeCard.addView(hint, hp);
     }
 
     private void buildScheduleHeader() {
@@ -964,112 +973,304 @@ public class MainActivity extends Activity {
         officeCard.setVisibility("office".equals(mode) ? View.VISIBLE : View.GONE);
         if (!"office".equals(mode)) return;
 
-        SharedPreferences p = getPrefs();
-        long ciS = p.getLong(COMMUTE_IN_START, 0);
-        long ciE = p.getLong(COMMUTE_IN_END, 0);
-        long in = p.getLong(OFFICE_IN, 0);
-        long out = p.getLong(OFFICE_OUT, 0);
-        long coS = p.getLong(COMMUTE_OUT_START, 0);
-        long coE = p.getLong(COMMUTE_OUT_END, 0);
+        try {
+            JSONObject day = getOfficeDay(todayKey(), false);
+            long now = System.currentTimeMillis();
+            long office = officeDuration(day, now);
+            long commute = commuteDuration(day, now);
+            boolean open = hasOpenOfficeSession(day);
+            boolean commuteOpen = hasOpenCommute(day);
 
-        String status;
-        String action;
-        if (ciS > 0 && ciE == 0) {
-            status = "On the way to office";
-            action = "Arrived at office";
-        } else if (ciE > 0 && in == 0) {
-            status = "At office";
-            action = "Check in";
-        } else if (in > 0 && out == 0) {
-            status = "Checked in";
-            action = "Check out";
-        } else if (out > 0 && coS == 0) {
-            status = "Workday finished";
-            action = "Start home commute";
-        } else if (coS > 0 && coE == 0) {
-            status = "On the way home";
-            action = "Arrived home";
-        } else if (coE > 0) {
-            status = "Home";
-            action = "Day tracked";
-        } else {
-            status = "Ready to leave home";
-            action = "Start commute";
+            if (open) {
+                officeStatus.setText("IN OFFICE");
+                officeAction.setText("CHECK OUT");
+                officeAction.setBackground(bg("#B84B5C", 12));
+            } else {
+                officeStatus.setText(day == null ? "Ready for office" : "OUT OF OFFICE");
+                officeAction.setText("CHECK IN");
+                officeAction.setBackground(bg("#8B7CFF", 12));
+            }
+
+            StringBuilder times = new StringBuilder();
+            if (day != null) {
+                JSONArray sessions = day.optJSONArray("sessions");
+                if (sessions != null) {
+                    for (int i = 0; i < sessions.length(); i++) {
+                        JSONObject s = sessions.optJSONObject(i);
+                        if (s == null) continue;
+                        long in = s.optLong("in", 0);
+                        long out = s.optLong("out", 0);
+                        if (in > 0) {
+                            if (times.length() > 0) times.append("  •  ");
+                            times.append("IN ").append(clock(in));
+                        }
+                        if (out > 0) {
+                            times.append("  OUT ").append(clock(out));
+                        } else if (in > 0) {
+                            times.append("  •  active");
+                        }
+                    }
+                }
+            }
+            officeTimes.setText(times.length() == 0
+                    ? "No office time logged today"
+                    : times.toString());
+
+            officeViewText = null;
+            commuteView.setText("Today • Office " + fmtMillis(office)
+                    + "  •  Commute " + fmtMillis(commute));
+
+            if (commuteOpen) commuteAction.setText("Finish commute");
+            else if (hasCommuteStart(day)) commuteAction.setText("Start home commute");
+            else commuteAction.setText("Start commute");
+        } catch (Exception ignored) {
+            officeStatus.setText("Ready");
+            officeAction.setText("CHECK IN");
+            commuteAction.setText("Start commute");
         }
-
-        officeStatus.setText(status);
-        officeAction.setText(action);
-        officeAction.setEnabled(!"Day tracked".equals(action));
-        officeAction.setAlpha("Day tracked".equals(action) ? 0.55f : 1f);
-
-        StringBuilder times = new StringBuilder();
-        if (ciS > 0) times.append("Left ").append(clock(ciS));
-        if (ciE > 0) times.append("  •  Office arrival ").append(clock(ciE));
-        if (in > 0) times.append("  •  Check-in ").append(clock(in));
-        if (out > 0) times.append("  •  Check-out ").append(clock(out));
-        if (coE > 0) times.append("  •  Home ").append(clock(coE));
-        officeTimes.setText(times.length() == 0 ? "No office timestamps yet" : times.toString());
-
-        long commute = duration(ciS, ciE) + duration(coS, coE);
-        long office = in > 0 ? (out > 0 ? out - in : System.currentTimeMillis() - in) : 0;
-        commuteView.setText("Commute " + fmtMillis(commute) + "  •  Office " + fmtMillis(office));
     }
 
-    private void advanceOfficeState() {
-        SharedPreferences p = getPrefs();
-        long now = System.currentTimeMillis();
-        long ciS = p.getLong(COMMUTE_IN_START, 0);
-        long ciE = p.getLong(COMMUTE_IN_END, 0);
-        long in = p.getLong(OFFICE_IN, 0);
-        long out = p.getLong(OFFICE_OUT, 0);
-        long coS = p.getLong(COMMUTE_OUT_START, 0);
-        long coE = p.getLong(COMMUTE_OUT_END, 0);
+    private String officeViewText;
 
-        SharedPreferences.Editor e = p.edit();
-        if (ciS == 0) e.putLong(COMMUTE_IN_START, now);
-        else if (ciE == 0) e.putLong(COMMUTE_IN_END, now);
-        else if (in == 0) e.putLong(OFFICE_IN, now);
-        else if (out == 0) e.putLong(OFFICE_OUT, now);
-        else if (coS == 0) e.putLong(COMMUTE_OUT_START, now);
-        else if (coE == 0) e.putLong(COMMUTE_OUT_END, now);
-        e.apply();
-        render();
+    private String todayKey() {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
     }
 
-    private void markAlreadyAtOffice() {
-        SharedPreferences p = getPrefs();
-        long now = System.currentTimeMillis();
-        p.edit()
-                .putLong(COMMUTE_IN_START, 0)
-                .putLong(COMMUTE_IN_END, 0)
-                .putLong(OFFICE_IN, now)
-                .apply();
-        Toast.makeText(this, "Office check-in started.", Toast.LENGTH_SHORT).show();
-        render();
+    private String dateKey(long timestamp) {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date(timestamp));
     }
 
-    private long duration(long start, long end) {
-        return start > 0 && end > start ? end - start : 0;
+    private JSONObject getOfficeDay(String key, boolean create) {
+        try {
+            SharedPreferences p = getPrefs();
+            String raw = p.getString(OFFICE_LOG_KEY, "[]");
+            JSONArray arr = new JSONArray(raw);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o != null && key.equals(o.optString("date"))) return o;
+            }
+            if (!create) return null;
+            JSONObject fresh = new JSONObject();
+            fresh.put("date", key);
+            fresh.put("sessions", new JSONArray());
+            fresh.put("commuteInStart", 0);
+            fresh.put("commuteInEnd", 0);
+            fresh.put("commuteOutStart", 0);
+            fresh.put("commuteOutEnd", 0);
+            arr.put(fresh);
+            p.edit().putString(OFFICE_LOG_KEY, arr.toString()).apply();
+            return fresh;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
-    private String fmtMillis(long ms) {
-        long minutes = Math.max(0, ms / 60000L);
-        return fmtShort((int) Math.min(minutes, Integer.MAX_VALUE));
+    private void saveOfficeDay(JSONObject day) {
+        try {
+            if (day == null) return;
+            String key = day.optString("date");
+            JSONArray arr = new JSONArray(getPrefs().getString(OFFICE_LOG_KEY, "[]"));
+            boolean replaced = false;
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o != null && key.equals(o.optString("date"))) {
+                    arr.put(i, day);
+                    replaced = true;
+                    break;
+                }
+            }
+            if (!replaced) arr.put(day);
+            getPrefs().edit().putString(OFFICE_LOG_KEY, arr.toString()).apply();
+        } catch (Exception ignored) {
+        }
     }
 
-    private String clock(long timestamp) {
-        return new SimpleDateFormat("h:mm a", Locale.getDefault()).format(new Date(timestamp));
+    private boolean hasOpenOfficeSession(JSONObject day) {
+        if (day == null) return false;
+        JSONArray sessions = day.optJSONArray("sessions");
+        if (sessions == null || sessions.length() == 0) return false;
+        JSONObject last = sessions.optJSONObject(sessions.length() - 1);
+        return last != null && last.optLong("in", 0) > 0 && last.optLong("out", 0) == 0;
     }
 
-    private void clearOfficeTracking() {
-        getPrefs().edit()
-                .remove(COMMUTE_IN_START)
-                .remove(COMMUTE_IN_END)
-                .remove(OFFICE_IN)
-                .remove(OFFICE_OUT)
-                .remove(COMMUTE_OUT_START)
-                .remove(COMMUTE_OUT_END)
-                .apply();
+    private boolean hasCommuteStart(JSONObject day) {
+        return day != null && day.optLong("commuteOutStart", 0) == 0
+                && day.optLong("commuteInStart", 0) > 0;
+    }
+
+    private boolean hasOpenCommute(JSONObject day) {
+        if (day == null) return false;
+        return (day.optLong("commuteInStart", 0) > 0 && day.optLong("commuteInEnd", 0) == 0)
+                || (day.optLong("commuteOutStart", 0) > 0 && day.optLong("commuteOutEnd", 0) == 0);
+    }
+
+    private long officeDuration(JSONObject day, long now) {
+        if (day == null) return 0;
+        long total = 0;
+        JSONArray sessions = day.optJSONArray("sessions");
+        if (sessions == null) return 0;
+        for (int i = 0; i < sessions.length(); i++) {
+            JSONObject s = sessions.optJSONObject(i);
+            if (s == null) continue;
+            long in = s.optLong("in", 0);
+            long out = s.optLong("out", 0);
+            if (in > 0) total += (out > in ? out : now) - in;
+        }
+        return Math.max(0, total);
+    }
+
+    private long commuteDuration(JSONObject day, long now) {
+        if (day == null) return 0;
+        long total = 0;
+        long a = day.optLong("commuteInStart", 0);
+        long b = day.optLong("commuteInEnd", 0);
+        if (a > 0) total += (b > a ? b : now) - a;
+        a = day.optLong("commuteOutStart", 0);
+        b = day.optLong("commuteOutEnd", 0);
+        if (a > 0) total += (b > a ? b : now) - a;
+        return Math.max(0, total);
+    }
+
+    private void toggleOfficeAttendance() {
+        try {
+            long now = System.currentTimeMillis();
+            JSONObject day = getOfficeDay(todayKey(), true);
+            JSONArray sessions = day.optJSONArray("sessions");
+            if (sessions == null) {
+                sessions = new JSONArray();
+                day.put("sessions", sessions);
+            }
+
+            if (hasOpenOfficeSession(day)) {
+                JSONObject last = sessions.optJSONObject(sessions.length() - 1);
+                last.put("out", now);
+                Toast.makeText(this, "Checked out at " + clock(now), Toast.LENGTH_SHORT).show();
+            } else {
+                JSONObject session = new JSONObject();
+                session.put("in", now);
+                session.put("out", 0);
+                sessions.put(session);
+                Toast.makeText(this, "Checked in at " + clock(now), Toast.LENGTH_SHORT).show();
+            }
+            saveOfficeDay(day);
+            render();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void toggleCommute() {
+        try {
+            long now = System.currentTimeMillis();
+            JSONObject day = getOfficeDay(todayKey(), true);
+
+            long inStart = day.optLong("commuteInStart", 0);
+            long inEnd = day.optLong("commuteInEnd", 0);
+            long outStart = day.optLong("commuteOutStart", 0);
+            long outEnd = day.optLong("commuteOutEnd", 0);
+
+            if (inStart == 0) {
+                day.put("commuteInStart", now);
+                Toast.makeText(this, "Commute started.", Toast.LENGTH_SHORT).show();
+            } else if (inEnd == 0) {
+                day.put("commuteInEnd", now);
+                Toast.makeText(this, "Office commute logged.", Toast.LENGTH_SHORT).show();
+            } else if (outStart == 0) {
+                day.put("commuteOutStart", now);
+                Toast.makeText(this, "Home commute started.", Toast.LENGTH_SHORT).show();
+            } else if (outEnd == 0) {
+                day.put("commuteOutEnd", now);
+                Toast.makeText(this, "Home commute logged.", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Today's commute is already complete.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            saveOfficeDay(day);
+            render();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void showAttendanceHistory() {
+        try {
+            LinearLayout content = vertical();
+            content.setPadding(dp(18), dp(4), dp(18), dp(4));
+
+            TextView summary = text("", 14, Color.WHITE, true);
+            content.addView(summary);
+
+            ScrollView scroll = new ScrollView(this);
+            scroll.setFillViewport(false);
+            LinearLayout days = vertical();
+            days.setPadding(0, dp(10), 0, dp(12));
+            scroll.addView(days);
+
+            long totalWeek = 0;
+            int weekDays = 0;
+            Calendar cursor = Calendar.getInstance();
+            int dow = cursor.get(Calendar.DAY_OF_WEEK);
+            cursor.add(Calendar.DAY_OF_YEAR, -(dow - Calendar.MONDAY + (dow == Calendar.SUNDAY ? 7 : 0)));
+            // Move to Monday of the current week.
+            if (dow == Calendar.SUNDAY) cursor.add(Calendar.DAY_OF_YEAR, -6);
+            else cursor.add(Calendar.DAY_OF_YEAR, -(dow - Calendar.MONDAY));
+
+            for (int i = 0; i < 7; i++) {
+                String k = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cursor.getTime());
+                JSONObject day = getOfficeDay(k, false);
+                long d = officeDuration(day, i == 6 ? System.currentTimeMillis() : cursor.getTimeInMillis());
+                if (d > 0) {
+                    totalWeek += d;
+                    weekDays++;
+                }
+                cursor.add(Calendar.DAY_OF_YEAR, 1);
+            }
+            summary.setText("This week  •  " + weekDays + " office days  •  " + fmtMillis(totalWeek));
+
+            Calendar c = Calendar.getInstance();
+            for (int i = 0; i < 31; i++) {
+                String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
+                JSONObject day = getOfficeDay(key, false);
+                long office = officeDuration(day, c.getTimeInMillis() > System.currentTimeMillis()
+                        ? c.getTimeInMillis() : System.currentTimeMillis());
+                long commute = commuteDuration(day, c.getTimeInMillis() > System.currentTimeMillis()
+                        ? c.getTimeInMillis() : System.currentTimeMillis());
+
+                LinearLayout row = horizontal();
+                row.setPadding(dp(10), dp(10), dp(10), dp(10));
+                row.setBackground(bg(i == 0 ? "#20213A" : "#151A27", 14));
+                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+                rp.bottomMargin = dp(7);
+                days.addView(row, rp);
+
+                LinearLayout info = vertical();
+                TextView date = text(new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(c.getTime()), 13, Color.WHITE, true);
+                info.addView(date);
+
+                String detail = "No office record";
+                if (day != null && office > 0) {
+                    detail = fmtMillis(office) + " in office";
+                    if (commute > 0) detail += "  •  " + fmtMillis(commute) + " commute";
+                    if (hasOpenOfficeSession(day)) detail += "  •  active";
+                }
+                info.addView(text(detail, 10, color("#8792A6"), false));
+                row.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+
+                TextView marker = text((day != null && office > 0) ? "●" : "○",
+                        17, (day != null && office > 0) ? color("#47D18C") : color("#4A5364"), true);
+                row.addView(marker, new LinearLayout.LayoutParams(dp(26), -2));
+                c.add(Calendar.DAY_OF_YEAR, -1);
+            }
+
+            content.addView(scroll, new LinearLayout.LayoutParams(-1, dp(500)));
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Office attendance")
+                    .setView(content)
+                    .setPositiveButton("Done", null)
+                    .show();
+        } catch (Exception ignored) {
+            Toast.makeText(this, "Couldn't load attendance history.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void clearDay() {
