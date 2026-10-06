@@ -108,6 +108,15 @@ public class MainActivity extends Activity {
         return h + "h " + m + "m";
     }
 
+    private String fmtMillis(long ms) {
+        long minutes = Math.max(0, ms / 60000L);
+        return fmtShort((int) Math.min(minutes, Integer.MAX_VALUE));
+    }
+
+    private String clock(long timestamp) {
+        return new SimpleDateFormat("h:mm a", Locale.getDefault()).format(new Date(timestamp));
+    }
+
     private String toTime(int n) {
         n = Math.max(0, Math.min(1439, n));
         return String.format(Locale.US, "%02d:%02d", n / 60, n % 60);
