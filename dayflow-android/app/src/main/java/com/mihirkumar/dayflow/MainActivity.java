@@ -1081,13 +1081,24 @@ public class MainActivity extends Activity {
     }
 
     private void openManageDialog() {
-        String[] items = {"Load WFH template", "Load Office template", "Load Weekend template", "Clear today's plan"};
+        String[] items = {
+                "Load WFH template",
+                "Load Office template",
+                "Load Weekend template",
+                "Edit WFH template",
+                "Edit Office template",
+                "Edit Weekend template",
+                "Clear selected day's plan"
+        };
         new AlertDialog.Builder(this)
                 .setTitle("Manage day")
                 .setItems(items, (d, which) -> {
                     if (which == 0) chooseTemplateDirect("wfh");
                     else if (which == 1) chooseTemplateDirect("office");
                     else if (which == 2) chooseTemplateDirect("weekend");
+                    else if (which == 3) openTemplateEditor("wfh");
+                    else if (which == 4) openTemplateEditor("office");
+                    else if (which == 5) openTemplateEditor("weekend");
                     else clearDay();
                 })
                 .setNegativeButton("Close", null)
@@ -1098,654 +1109,74 @@ public class MainActivity extends Activity {
         String label = key.equals("office") ? "Office" : key.equals("weekend") ? "Weekend" : "WFH";
         new AlertDialog.Builder(this)
                 .setTitle("Load " + label + " template?")
-                .setMessage("Your current timeline will be replaced.")
+                .setMessage("Your current timeline will be replaced with your saved " + label + " template.")
                 .setPositiveButton("Load", (d, w) -> {
                     mode = key;
-                    getPrefs().edit().putString(MODE_KEY, mode).apply();
+                    getPrefs().edit().putString(modeKey(selectedDateKey), mode).putString(MODE_KEY, mode).apply();
                     loadTemplate(key);
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void loadTemplate(String key) {
-        String[][] t;
-        if ("office".equals(key)) {
-            t = new String[][]{
-                    {"06:00","06:30","Wake up + routine","fixed"},
-                    {"06:30","08:00","Maths Optional","important"},
-                    {"08:00","09:00","Breakfast + commute","fixed"},
-                    {"09:00","18:30","Work","fixed"},
-                    {"18:30","19:15","Reset","flexible"},
-                    {"19:15","21:15","GS study","important"},
-                    {"21:15","22:00","Dinner","fixed"},
-                    {"22:00","23:00","Interview preparation","important"},
-                    {"23:00","23:30","Wind down","flexible"}
-            };
-        } else if ("weekend".equals(key)) {
-            t = new String[][]{
-                    {"06:30","07:00","Morning routine","fixed"},
-                    {"07:00","10:00","GS study","important"},
-                    {"10:00","11:00","Breakfast + break","flexible"},
-                    {"11:00","14:00","Maths Optional","important"},
-                    {"14:00","15:00","Lunch","fixed"},
-                    {"15:00","17:00","Maths / revision","important"},
-                    {"17:00","18:00","Exercise","important"},
-                    {"18:00","20:00","Personal time","flexible"},
-                    {"20:00","21:00","Dinner","fixed"},
-                    {"21:00","22:30","Interview preparation","important"}
-            };
-        } else {
-            t = new String[][]{
-                    {"06:00","06:20","Wake up","fixed"},
-                    {"06:20","07:00","Morning routine","flexible"},
-                    {"07:00","09:00","GS study","important"},
-                    {"09:00","09:30","Breakfast","flexible"},
-                    {"09:30","13:00","Work","fixed"},
-                    {"13:00","14:00","Lunch","fixed"},
-                    {"14:00","18:30","Work","fixed"},
-                    {"18:30","19:15","Exercise","important"},
-                    {"19:30","21:30","Maths Optional","important"},
-                    {"21:30","22:15","Dinner","fixed"},
-                    {"22:15","23:00","Interview preparation","important"},
-                    {"23:00","23:30","Wind down","flexible"}
-            };
-        }
-
-        blocks.clear();
-        for (int i = 0; i < t.length; i++) {
-            blocks.add(new Block(System.currentTimeMillis() + i, t[i][0], t[i][1], t[i][2], t[i][3], "pending"));
-        }
-        save();
+    private String templateKey(String key) {
+        return "template_" + key;
     }
 
-    private void renderOfficeCard() {
-        if (officeCard == null) return;
-        officeCard.setVisibility("office".equals(mode) ? View.VISIBLE : View.GONE);
-        if (!"office".equals(mode)) return;
+    private String templateLabel(String key) {
+        return "office".equals(key) ? "Office" : "weekend".equals(key) ? "Weekend" : "WFH";
+    }
 
+    private ArrayList<Block> getTemplateBlocks(String key) {
+        ArrayList<Block> result = new ArrayList<>();
+        String raw = getPrefs().getString(templateKey(key), null);
         try {
-            JSONObject day = getOfficeDay(selectedDateKey, false);
-            long now = System.currentTimeMillis();
-            long office = officeDuration(day, now);
-            long commute = commuteDuration(day, now);
-            boolean open = hasOpenOfficeSession(day);
-            boolean commuteOpen = hasOpenCommute(day);
-
-            boolean viewingToday = selectedDateKey.equals(todayKey());
-            if (viewingToday && open) {
-                officeStatus.setText("IN OFFICE");
-                officeAction.setText("CHECK OUT");
-                officeAction.setBackground(bg("#B84B5C", 12));
-                officeAction.setEnabled(true);
-            } else if (viewingToday) {
-                officeStatus.setText(day == null ? "Ready for office" : "OUT OF OFFICE");
-                officeAction.setText("CHECK IN");
-                officeAction.setBackground(bg("#8B7CFF", 12));
-                officeAction.setEnabled(true);
-            } else {
-                officeStatus.setText(day == null ? "No office record" : "OFFICE RECORD");
-                officeAction.setText("EDIT TIMES");
-                officeAction.setBackground(bg("#334B63", 12));
-                officeAction.setEnabled(true);
-            }
-
-            StringBuilder times = new StringBuilder();
-            if (day != null) {
-                JSONArray sessions = day.optJSONArray("sessions");
-                if (sessions != null) {
-                    for (int i = 0; i < sessions.length(); i++) {
-                        JSONObject s = sessions.optJSONObject(i);
-                        if (s == null) continue;
-                        long in = s.optLong("in", 0);
-                        long out = s.optLong("out", 0);
-                        if (in > 0) {
-                            if (times.length() > 0) times.append("  •  ");
-                            times.append("IN ").append(clock(in));
-                        }
-                        if (out > 0) {
-                            times.append("  OUT ").append(clock(out));
-                        } else if (in > 0) {
-                            times.append("  •  active");
-                        }
-                    }
+            if (raw == null) {
+                String[][] defaults = defaultTemplate(key);
+                for (int i = 0; i < defaults.length; i++) {
+                    result.add(new Block(System.currentTimeMillis() + i, defaults[i][0], defaults[i][1],
+                            defaults[i][2], defaults[i][3], "pending"));
                 }
-            }
-            officeTimes.setText(times.length() == 0
-                    ? "No office time logged today"
-                    : times.toString());
-
-            commuteView.setText("Today • Office " + fmtMillis(office)
-                    + "  •  Commute " + fmtMillis(commute));
-
-            if (!selectedDateKey.equals(todayKey())) {
-                commuteAction.setText("View commute details");
-                commuteAction.setEnabled(day != null);
-                commuteAction.setAlpha(day != null ? 1f : 0.5f);
+                saveTemplate(key, result);
+                return result;
             }
 
-            long ciS = day == null ? 0 : day.optLong("commuteInStart", 0);
-            long ciE = day == null ? 0 : day.optLong("commuteInEnd", 0);
-            long coS = day == null ? 0 : day.optLong("commuteOutStart", 0);
-            long coE = day == null ? 0 : day.optLong("commuteOutEnd", 0);
-            if (ciS > 0 && ciE == 0) commuteAction.setText("Finish commute");
-            else if (ciE > 0 && coS == 0) commuteAction.setText("Start home commute");
-            else if (coS > 0 && coE == 0) commuteAction.setText("Finish home commute");
-            else if (coE > 0) commuteAction.setText("Commute complete");
-            else commuteAction.setText("Start commute");
-            if (selectedDateKey.equals(todayKey())) {
-                commuteAction.setEnabled(!(coE > 0));
-                commuteAction.setAlpha(coE > 0 ? 0.55f : 1f);
-            }
-        } catch (Exception ignored) {
-            officeStatus.setText("Ready");
-            officeAction.setText("CHECK IN");
-            commuteAction.setText("Start commute");
-        }
-    }
-
-    private String todayKey() {
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-    }
-
-    private String dateKey(long timestamp) {
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date(timestamp));
-    }
-
-    private JSONObject getOfficeDay(String key, boolean create) {
-        try {
-            SharedPreferences p = getPrefs();
-            String raw = p.getString(OFFICE_LOG_KEY, "[]");
             JSONArray arr = new JSONArray(raw);
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.optJSONObject(i);
-                if (o != null && key.equals(o.optString("date"))) return o;
+                if (o == null) continue;
+                result.add(new Block(o.optLong("id", System.currentTimeMillis() + i),
+                        o.optString("start", "06:00"),
+                        o.optString("end", "07:00"),
+                        o.optString("title", "Block"),
+                        o.optString("priority", "flexible"),
+                        "pending"));
             }
-            if (!create) return null;
-            JSONObject fresh = new JSONObject();
-            fresh.put("date", key);
-            fresh.put("sessions", new JSONArray());
-            fresh.put("commuteInStart", 0);
-            fresh.put("commuteInEnd", 0);
-            fresh.put("commuteOutStart", 0);
-            fresh.put("commuteOutEnd", 0);
-            arr.put(fresh);
-            p.edit().putString(OFFICE_LOG_KEY, arr.toString()).apply();
-            return fresh;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private void saveOfficeDay(JSONObject day) {
-        try {
-            if (day == null) return;
-            String key = day.optString("date");
-            JSONArray arr = new JSONArray(getPrefs().getString(OFFICE_LOG_KEY, "[]"));
-            boolean replaced = false;
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.optJSONObject(i);
-                if (o != null && key.equals(o.optString("date"))) {
-                    arr.put(i, day);
-                    replaced = true;
-                    break;
-                }
-            }
-            if (!replaced) arr.put(day);
-            getPrefs().edit().putString(OFFICE_LOG_KEY, arr.toString()).apply();
         } catch (Exception ignored) {
         }
+        return result;
     }
 
-    private boolean hasOpenOfficeSession(JSONObject day) {
-        if (day == null) return false;
-        JSONArray sessions = day.optJSONArray("sessions");
-        if (sessions == null || sessions.length() == 0) return false;
-        JSONObject last = sessions.optJSONObject(sessions.length() - 1);
-        return last != null && last.optLong("in", 0) > 0 && last.optLong("out", 0) == 0;
-    }
-
-    private boolean hasCommuteStart(JSONObject day) {
-        return day != null && day.optLong("commuteOutStart", 0) == 0
-                && day.optLong("commuteInStart", 0) > 0;
-    }
-
-    private boolean hasOpenCommute(JSONObject day) {
-        if (day == null) return false;
-        return (day.optLong("commuteInStart", 0) > 0 && day.optLong("commuteInEnd", 0) == 0)
-                || (day.optLong("commuteOutStart", 0) > 0 && day.optLong("commuteOutEnd", 0) == 0);
-    }
-
-    private long officeDuration(JSONObject day, long now) {
-        if (day == null) return 0;
-        long total = 0;
-        JSONArray sessions = day.optJSONArray("sessions");
-        if (sessions == null) return 0;
-        for (int i = 0; i < sessions.length(); i++) {
-            JSONObject s = sessions.optJSONObject(i);
-            if (s == null) continue;
-            long in = s.optLong("in", 0);
-            long out = s.optLong("out", 0);
-            if (in > 0) total += (out > in ? out : now) - in;
-        }
-        return Math.max(0, total);
-    }
-
-    private long commuteDuration(JSONObject day, long now) {
-        if (day == null) return 0;
-        long total = 0;
-        long a = day.optLong("commuteInStart", 0);
-        long b = day.optLong("commuteInEnd", 0);
-        if (a > 0) total += (b > a ? b : now) - a;
-        a = day.optLong("commuteOutStart", 0);
-        b = day.optLong("commuteOutEnd", 0);
-        if (a > 0) total += (b > a ? b : now) - a;
-        return Math.max(0, total);
-    }
-
-    private void toggleOfficeAttendance() {
-        try {
-            long now = System.currentTimeMillis();
-            JSONObject day = getOfficeDay(todayKey(), true);
-            JSONArray sessions = day.optJSONArray("sessions");
-            if (sessions == null) {
-                sessions = new JSONArray();
-                day.put("sessions", sessions);
-            }
-
-            if (hasOpenOfficeSession(day)) {
-                JSONObject last = sessions.optJSONObject(sessions.length() - 1);
-                last.put("out", now);
-                Toast.makeText(this, "Checked out at " + clock(now), Toast.LENGTH_SHORT).show();
-            } else {
-                JSONObject session = new JSONObject();
-                session.put("in", now);
-                session.put("out", 0);
-                sessions.put(session);
-                Toast.makeText(this, "Checked in at " + clock(now), Toast.LENGTH_SHORT).show();
-            }
-            saveOfficeDay(day);
-            render();
-        } catch (Exception ignored) {
-        }
-    }
-
-    private void toggleCommute() {
-        try {
-            long now = System.currentTimeMillis();
-            JSONObject day = getOfficeDay(todayKey(), true);
-
-            long inStart = day.optLong("commuteInStart", 0);
-            long inEnd = day.optLong("commuteInEnd", 0);
-            long outStart = day.optLong("commuteOutStart", 0);
-            long outEnd = day.optLong("commuteOutEnd", 0);
-
-            if (inStart == 0) {
-                day.put("commuteInStart", now);
-                Toast.makeText(this, "Commute started.", Toast.LENGTH_SHORT).show();
-            } else if (inEnd == 0) {
-                day.put("commuteInEnd", now);
-                Toast.makeText(this, "Office commute logged.", Toast.LENGTH_SHORT).show();
-            } else if (outStart == 0) {
-                day.put("commuteOutStart", now);
-                Toast.makeText(this, "Home commute started.", Toast.LENGTH_SHORT).show();
-            } else if (outEnd == 0) {
-                day.put("commuteOutEnd", now);
-                Toast.makeText(this, "Home commute logged.", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "Today's commute is already complete.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            saveOfficeDay(day);
-            render();
-        } catch (Exception ignored) {
-        }
-    }
-
-    private void showAttendanceHistory() {
-        try {
-            LinearLayout content = vertical();
-            content.setPadding(dp(18), dp(4), dp(18), dp(4));
-
-            TextView summary = text("", 14, Color.WHITE, true);
-            content.addView(summary);
-
-            ScrollView scroll = new ScrollView(this);
-            scroll.setFillViewport(false);
-            LinearLayout days = vertical();
-            days.setPadding(0, dp(10), 0, dp(12));
-            scroll.addView(days);
-
-            long totalWeek = 0;
-            int weekDays = 0;
-            Calendar cursor = Calendar.getInstance();
-            int dow = cursor.get(Calendar.DAY_OF_WEEK);
-            // Move to Monday of the current week.
-            int daysSinceMonday = dow == Calendar.SUNDAY ? 6 : dow - Calendar.MONDAY;
-            cursor.add(Calendar.DAY_OF_YEAR, -daysSinceMonday);
-
-            for (int i = 0; i < 7; i++) {
-                String k = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cursor.getTime());
-                JSONObject day = getOfficeDay(k, false);
-                long ref = k.equals(todayKey()) ? System.currentTimeMillis() : cursor.getTimeInMillis();
-                long d = officeDuration(day, ref);
-                if (d > 0) {
-                    totalWeek += d;
-                    weekDays++;
-                }
-                cursor.add(Calendar.DAY_OF_YEAR, 1);
-            }
-            summary.setText("This week  •  " + weekDays + " office days  •  " + fmtMillis(totalWeek));
-
-            Calendar c = Calendar.getInstance();
-            for (int i = 0; i < 31; i++) {
-                String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
-                JSONObject day = getOfficeDay(key, false);
-                long ref = key.equals(todayKey()) ? System.currentTimeMillis() : c.getTimeInMillis();
-                long office = officeDuration(day, ref);
-                long commute = commuteDuration(day, ref);
-
-                LinearLayout row = horizontal();
-                row.setPadding(dp(10), dp(10), dp(10), dp(10));
-                row.setBackground(bg(i == 0 ? "#20213A" : "#151A27", 14));
-                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
-                rp.bottomMargin = dp(7);
-                days.addView(row, rp);
-
-                LinearLayout info = vertical();
-                TextView date = text(new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(c.getTime()), 13, Color.WHITE, true);
-                info.addView(date);
-
-                String detail = "No office record";
-                if (day != null && office > 0) {
-                    detail = fmtMillis(office) + " in office";
-                    if (commute > 0) detail += "  •  " + fmtMillis(commute) + " commute";
-                    if (hasOpenOfficeSession(day)) detail += "  •  active";
-                }
-                info.addView(text(detail, 10, color("#8792A6"), false));
-                row.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
-
-                TextView marker = text((day != null && office > 0) ? "●" : "○",
-                        17, (day != null && office > 0) ? color("#47D18C") : color("#4A5364"), true);
-                row.addView(marker, new LinearLayout.LayoutParams(dp(26), -2));
-
-                if (day != null) {
-                    final JSONObject detailDay = day;
-                    final String detailDate = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(c.getTime());
-                    final String detailKey = key;
-                    row.setOnClickListener(v -> showAttendanceDayDetail(detailDate, detailKey, detailDay));
-                }
-                c.add(Calendar.DAY_OF_YEAR, -1);
-            }
-
-            content.addView(scroll, new LinearLayout.LayoutParams(-1, dp(500)));
-
-            new AlertDialog.Builder(this)
-                    .setTitle("Office attendance")
-                    .setView(content)
-                    .setPositiveButton("Done", null)
-                    .show();
-        } catch (Exception ignored) {
-            Toast.makeText(this, "Couldn't load attendance history.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void showAttendanceDayDetail(String date, String dayKey, JSONObject day) {
-        try {
-            LinearLayout content = vertical();
-            content.setPadding(dp(20), dp(2), dp(20), dp(2));
-
-            if (day == null) {
-                Toast.makeText(this, "No attendance record for this day.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            long now = System.currentTimeMillis();
-            long office = officeDuration(day, dayKey.equals(todayKey()) ? now : 0);
-            long commute = commuteDuration(day, dayKey.equals(todayKey()) ? now : 0);
-
-            TextView summary = text("Office " + fmtMillis(office) + "  •  Commute " + fmtMillis(commute),
-                    15, Color.WHITE, true);
-            content.addView(summary);
-
-            JSONArray sessions = day.optJSONArray("sessions");
-            if (sessions != null) {
-                for (int i = 0; i < sessions.length(); i++) {
-                    JSONObject s = sessions.optJSONObject(i);
-                    if (s == null) continue;
-                    long in = s.optLong("in", 0);
-                    long out = s.optLong("out", 0);
-                    String value = "Office session " + (i + 1) + ": " + (in > 0 ? clock(in) : "—")
-                            + " → " + (out > 0 ? clock(out) : "Active");
-                    TextView t = text(value, 12, color("#AEB7C9"), false);
-                    t.setPadding(0, dp(10), 0, dp(2));
-                    content.addView(t);
-                }
-            }
-
-            long ciS = day.optLong("commuteInStart", 0);
-            long ciE = day.optLong("commuteInEnd", 0);
-            long coS = day.optLong("commuteOutStart", 0);
-            long coE = day.optLong("commuteOutEnd", 0);
-            if (ciS > 0 || ciE > 0) content.addView(text("To office: " + clock(ciS) + " → " + (ciE > 0 ? clock(ciE) : "Active"), 12, color("#AEB7C9"), false));
-            if (coS > 0 || coE > 0) content.addView(text("Home: " + clock(coS) + " → " + (coE > 0 ? clock(coE) : "Active"), 12, color("#AEB7C9"), false));
-
-            new AlertDialog.Builder(this)
-                    .setTitle(date)
-                    .setView(content)
-                    .setNeutralButton("Edit times", (d, w) -> editAttendanceDay(dayKey))
-                    .setPositiveButton("Done", null)
-                    .show();
-        } catch (Exception ignored) {
-            Toast.makeText(this, "Couldn't load that day.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void clearDay() {
-        new AlertDialog.Builder(this)
-                .setTitle("Clear today's plan?")
-                .setMessage("All blocks for today will be removed from this device.")
-                .setPositiveButton("Clear", (d, w) -> {
-                    blocks.clear();
-                    save();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private Date parseDateKey(String key) {
-        try {
-            return new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(key);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private String keyForDate(Date date) {
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date);
-    }
-
-    private boolean isBeforeToday(String key) {
-        return key.compareTo(todayKey()) < 0;
-    }
-
-    private void changeSelectedDate(int delta) {
-        save();
-        Calendar c = Calendar.getInstance();
-        Date d = parseDateKey(selectedDateKey);
-        if (d == null) d = new Date();
-        c.setTime(d);
-        c.add(Calendar.DAY_OF_YEAR, delta);
-        selectedDateKey = keyForDate(c.getTime());
-        loadSelectedDate();
-        render();
-    }
-
-    private void openDatePicker() {
-        Date d = parseDateKey(selectedDateKey);
-        Calendar c = Calendar.getInstance();
-        if (d != null) c.setTime(d);
-        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
-            Calendar chosen = Calendar.getInstance();
-            chosen.set(Calendar.YEAR, year);
-            chosen.set(Calendar.MONTH, month);
-            chosen.set(Calendar.DAY_OF_MONTH, day);
-            save();
-            selectedDateKey = keyForDate(chosen.getTime());
-            loadSelectedDate();
-            render();
-        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
-        picker.show();
-    }
-
-    private String blocksKey(String dayKey) {
-        return "blocks_" + dayKey;
-    }
-
-    private String modeKey(String dayKey) {
-        return "mode_" + dayKey;
-    }
-
-    private void loadSelectedDate() {
-        blocks.clear();
-        SharedPreferences p = getPrefs();
-        mode = p.getString(modeKey(selectedDateKey), p.getString(MODE_KEY, "wfh"));
-        String raw = p.getString(blocksKey(selectedDateKey), null);
-
-        try {
-            if (raw == null && selectedDateKey.equals(todayKey())) {
-                raw = p.getString(KEY, null);
-                if (raw != null) {
-                    p.edit().putString(blocksKey(selectedDateKey), raw).putString(modeKey(selectedDateKey), mode).apply();
-                }
-            }
-
-            if (raw != null) {
-                JSONArray arr = new JSONArray(raw);
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject o = arr.getJSONObject(i);
-                    blocks.add(new Block(o.getLong("id"), o.getString("start"), o.getString("end"),
-                            o.getString("title"), o.getString("priority"), o.getString("status")));
-                }
-            } else if (!isBeforeToday(selectedDateKey)) {
-                loadTemplateSilent();
-                save();
-            }
-        } catch (Exception e) {
-            blocks.clear();
-        }
-    }
-
-    private void editAttendanceDay(String dayKey) {
-        try {
-            JSONObject day = getOfficeDay(dayKey, true);
-            JSONArray sessions = day.optJSONArray("sessions");
-            if (sessions == null) {
-                sessions = new JSONArray();
-                day.put("sessions", sessions);
-            }
-            JSONObject session;
-            if (sessions.length() == 0) {
-                session = new JSONObject();
-                session.put("in", 0);
-                session.put("out", 0);
-                sessions.put(session);
-            } else {
-                session = sessions.optJSONObject(0);
-            }
-
-            LinearLayout content = vertical();
-            content.setPadding(dp(18), dp(2), dp(18), dp(2));
-            TextView note = text("Correct the recorded times. DayFlow stores the exact date + time.", 11, color("#7F899D"), false);
-            content.addView(note);
-
-            Button inBtn = actionButton("Office in  •  " + (session.optLong("in", 0) > 0 ? clock(session.optLong("in", 0)) : "Not set"), Color.WHITE, "#202638");
-            Button outBtn = actionButton("Office out  •  " + (session.optLong("out", 0) > 0 ? clock(session.optLong("out", 0)) : "Not set"), Color.WHITE, "#202638");
-            Button ciBtn = actionButton("Commute to office  •  " + timeLabel(day.optLong("commuteInStart", 0)) + " → " + timeLabel(day.optLong("commuteInEnd", 0)), Color.WHITE, "#202638");
-            Button coBtn = actionButton("Commute home  •  " + timeLabel(day.optLong("commuteOutStart", 0)) + " → " + timeLabel(day.optLong("commuteOutEnd", 0)), Color.WHITE, "#202638");
-            content.addView(inBtn, new LinearLayout.LayoutParams(-1, dp(42)));
-            LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(outBtn, ml);
-            ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(ciBtn, ml);
-            ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(coBtn, ml);
-
-            AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Edit attendance")
-                    .setView(content).setPositiveButton("Done", (d, w) -> { saveOfficeDay(day); render(); })
-                    .show();
-
-            inBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "officeIn", session, inBtn));
-            outBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "officeOut", session, outBtn));
-            ciBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteInStart", day, ciBtn));
-            coBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteOutStart", day, coBtn));
-        } catch (Exception ignored) {
-            Toast.makeText(this, "Couldn't edit attendance.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private String timeLabel(long value) {
-        return value > 0 ? clock(value) : "Not set";
-    }
-
-    private void pickAttendanceTime(String dayKey, String field, JSONObject target, Button button) {
-        long existing = target.optLong(field, 0);
-        Calendar c = Calendar.getInstance();
-        Date d = parseDateKey(dayKey);
-        if (d != null) c.setTime(d);
-        if (existing > 0) c.setTimeInMillis(existing);
-        TimePickerDialog picker = new TimePickerDialog(this, (v, h, m) -> {
-            Calendar chosen = Calendar.getInstance();
-            chosen.set(Calendar.YEAR, c.get(Calendar.YEAR));
-            chosen.set(Calendar.MONTH, c.get(Calendar.MONTH));
-            chosen.set(Calendar.DAY_OF_MONTH, c.get(Calendar.DAY_OF_MONTH));
-            chosen.set(Calendar.HOUR_OF_DAY, h);
-            chosen.set(Calendar.MINUTE, m);
-            chosen.set(Calendar.SECOND, 0);
-            chosen.set(Calendar.MILLISECOND, 0);
-            try {
-                target.put(field, chosen.getTimeInMillis());
-                button.setText(button.getText().toString().split("  •  ")[0] + "  •  " + clock(chosen.getTimeInMillis()));
-                saveOfficeDay(getOfficeDay(dayKey, false));
-            } catch (Exception ignored) {
-            }
-        }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true);
-        picker.show();
-    }
-
-    private SharedPreferences getPrefs() {
-        return getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-    }
-
-    private void save() {
+    private void saveTemplate(String key, ArrayList<Block> template) {
         try {
             JSONArray arr = new JSONArray();
-            for (Block b : blocks) {
+            for (Block b : template) {
                 JSONObject o = new JSONObject();
                 o.put("id", b.id);
                 o.put("start", b.start);
                 o.put("end", b.end);
                 o.put("title", b.title);
                 o.put("priority", b.priority);
-                o.put("status", b.status);
                 arr.put(o);
             }
-            getPrefs().edit()
-                    .putString(blocksKey(selectedDateKey), arr.toString())
-                    .putString(modeKey(selectedDateKey), mode)
-                    .putString(KEY, selectedDateKey.equals(todayKey()) ? arr.toString() : getPrefs().getString(KEY, arr.toString()))
-                    .putString(MODE_KEY, mode)
-                    .apply();
+            getPrefs().edit().putString(templateKey(key), arr.toString()).apply();
         } catch (Exception ignored) {
         }
-        render();
     }
 
-    private void load() {
-        loadSelectedDate();
-    }
-
-    private void loadTemplateSilent() {
-        String[][] t;
-        if ("office".equals(mode)) {
-            t = new String[][]{
+    private String[][] defaultTemplate(String key) {
+        if ("office".equals(key)) {
+            return new String[][]{
                     {"06:00","06:30","Wake up + routine","fixed"},
                     {"06:30","08:00","Maths Optional","important"},
                     {"08:00","09:00","Breakfast + commute","fixed"},
@@ -1756,8 +1187,9 @@ public class MainActivity extends Activity {
                     {"22:00","23:00","Interview preparation","important"},
                     {"23:00","23:30","Wind down","flexible"}
             };
-        } else if ("weekend".equals(mode)) {
-            t = new String[][]{
+        }
+        if ("weekend".equals(key)) {
+            return new String[][]{
                     {"06:30","07:00","Morning routine","fixed"},
                     {"07:00","10:00","GS study","important"},
                     {"10:00","11:00","Breakfast + break","flexible"},
@@ -1769,25 +1201,233 @@ public class MainActivity extends Activity {
                     {"20:00","21:00","Dinner","fixed"},
                     {"21:00","22:30","Interview preparation","important"}
             };
-        } else {
-            t = new String[][]{
-                    {"06:00","06:20","Wake up","fixed"},
-                    {"06:20","07:00","Morning routine","flexible"},
-                    {"07:00","09:00","GS study","important"},
-                    {"09:00","09:30","Breakfast","flexible"},
-                    {"09:30","13:00","Work","fixed"},
-                    {"13:00","14:00","Lunch","fixed"},
-                    {"14:00","18:30","Work","fixed"},
-                    {"18:30","19:15","Exercise","important"},
-                    {"19:30","21:30","Maths Optional","important"},
-                    {"21:30","22:15","Dinner","fixed"},
-                    {"22:15","23:00","Interview preparation","important"},
-                    {"23:00","23:30","Wind down","flexible"}
-            };
         }
+        return new String[][]{
+                {"06:00","06:20","Wake up","fixed"},
+                {"06:20","07:00","Morning routine","flexible"},
+                {"07:00","09:00","GS study","important"},
+                {"09:00","09:30","Breakfast","flexible"},
+                {"09:30","13:00","Work","fixed"},
+                {"13:00","14:00","Lunch","fixed"},
+                {"14:00","18:30","Work","fixed"},
+                {"18:30","19:15","Exercise","important"},
+                {"19:30","21:30","Maths Optional","important"},
+                {"21:30","22:15","Dinner","fixed"},
+                {"22:15","23:00","Interview preparation","important"},
+                {"23:00","23:30","Wind down","flexible"}
+        };
+    }
 
-        for (int i = 0; i < t.length; i++) {
-            blocks.add(new Block(System.currentTimeMillis() + i, t[i][0], t[i][1], t[i][2], t[i][3], "pending"));
+    private void loadTemplate(String key) {
+        blocks.clear();
+        for (Block source : getTemplateBlocks(key)) {
+            blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
+                    source.start, source.end, source.title, source.priority, "pending"));
+        }
+        save();
+    }
+
+    private void openTemplateEditor(String key) {
+        ArrayList<Block> template = getTemplateBlocks(key);
+        LinearLayout list = vertical();
+        list.setPadding(dp(16), dp(4), dp(16), 0);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(list, new ScrollView.LayoutParams(-1, -1));
+
+        AlertDialog editor = new AlertDialog.Builder(this)
+                .setTitle("Edit " + templateLabel(key) + " template")
+                .setView(scroll)
+                .setPositiveButton("Save template", null)
+                .setNeutralButton("Save + apply", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+
+        editor.setOnShowListener(dialog -> {
+            AlertDialog d = (AlertDialog) dialog;
+            d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                saveTemplate(key, template);
+                Toast.makeText(this, templateLabel(key) + " template saved.", Toast.LENGTH_SHORT).show();
+                d.dismiss();
+            });
+            d.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                saveTemplate(key, template);
+                mode = key;
+                blocks.clear();
+                for (Block source : template) {
+                    blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
+                            source.start, source.end, source.title, source.priority, "pending"));
+                }
+                save();
+                Toast.makeText(this, templateLabel(key) + " template saved and applied.", Toast.LENGTH_SHORT).show();
+                d.dismiss();
+            });
+            renderTemplateEditorRows(list, template, editor);
+        });
+
+        editor.show();
+    }
+
+    private void renderTemplateEditorRows(LinearLayout list, ArrayList<Block> template, AlertDialog editor) {
+        list.removeAllViews();
+
+        TextView hint = text("Edit, add, or remove blocks. Existing days are unchanged unless you choose Save + apply.",
+                11, color("#7F899D"), false);
+        hint.setPadding(0, 0, 0, dp(10));
+        list.addView(hint);
+
+        Button add = actionButton("＋  Add template block", Color.WHITE, "#8B7CFF");
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(44));
+        addLp.bottomMargin = dp(10);
+        list.addView(add, addLp);
+        add.setOnClickListener(v -> editTemplateBlockDialog(template, -1, () ->
+                renderTemplateEditorRows(list, template, editor)));
+
+        Collections.sort(template, Comparator.comparingInt(b -> mins(b.start)));
+
+        for (int i = 0; i < template.size(); i++) {
+            final int index = i;
+            Block b = template.get(i);
+            LinearLayout row = horizontal();
+            row.setPadding(dp(10), dp(8), dp(6), dp(8));
+            row.setBackground(bg("#151A27", 14));
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.bottomMargin = dp(7);
+            list.addView(row, rowLp);
+
+            LinearLayout details = vertical();
+            details.addView(text(b.title, 14, Color.WHITE, true));
+            details.addView(text(time12(b.start) + " – " + time12(b.end) + "  •  " + priorityLabel(b.priority),
+                    11, color("#8E98AA"), false));
+            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+
+            Button del = actionButton("×", color("#FFB8C1"), "#2A2024");
+            row.addView(del, new LinearLayout.LayoutParams(dp(42), dp(40)));
+            row.setOnClickListener(v -> editTemplateBlockDialog(template, index, () ->
+                    renderTemplateEditorRows(list, template, editor)));
+            del.setOnClickListener(v -> {
+                template.remove(index);
+                renderTemplateEditorRows(list, template, editor);
+            });
         }
     }
-}
+
+    private void editTemplateBlockDialog(ArrayList<Block> template, int index, Runnable onChanged) {
+        boolean adding = index < 0;
+        Block original;
+        if (adding) {
+            int start = template.isEmpty() ? 360 : mins(Collections.max(template, Comparator.comparingInt(b -> mins(b.end))).end);
+            int end = Math.min(1439, start + 30);
+            original = new Block(System.currentTimeMillis(), toTime(start), toTime(end),
+                    "New block", "flexible", "pending");
+        } else {
+            original = template.get(index);
+        }
+
+        LinearLayout form = vertical();
+        form.setPadding(dp(20), 0, dp(20), 0);
+
+        EditText title = new EditText(this);
+        title.setSingleLine(true);
+        title.setHint("Block name");
+        title.setText(original.title);
+        title.setTextColor(Color.WHITE);
+        title.setHintTextColor(color("#697386"));
+        form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        final int[] start = {mins(original.start)};
+        final int[] end = {mins(original.end)};
+        final String[] priority = {original.priority};
+
+        Button startButton = chip("Start • " + time12(original.start));
+        Button endButton = chip("End • " + time12(original.end));
+        LinearLayout.LayoutParams timeLp = new LinearLayout.LayoutParams(-1, dp(40));
+        timeLp.topMargin = dp(8);
+        form.addView(startButton, timeLp);
+        LinearLayout.LayoutParams timeLp2 = new LinearLayout.LayoutParams(-1, dp(40));
+        timeLp2.topMargin = dp(6);
+        form.addView(endButton, timeLp2);
+
+        startButton.setOnClickListener(v -> {
+            TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
+                start[0] = h * 60 + m;
+                startButton.setText("Start • " + time12(toTime(start[0])));
+            }, start[0] / 60, start[0] % 60, true);
+            picker.show();
+        });
+
+        endButton.setOnClickListener(v -> {
+            TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
+                end[0] = h * 60 + m;
+                endButton.setText("End • " + time12(toTime(end[0])));
+            }, end[0] / 60, end[0] % 60, true);
+            picker.show();
+        });
+
+        TextView behaviorLabel = text("BLOCK BEHAVIOR", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams behaviorLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        behaviorLabelLp.topMargin = dp(12);
+        form.addView(behaviorLabel, behaviorLabelLp);
+
+        LinearLayout behaviors = horizontal();
+        form.addView(behaviors, new LinearLayout.LayoutParams(-1, dp(42)));
+        String[] behaviorNames = {"Important", "Fixed", "Flexible", "Optional"};
+        String[] behaviorValues = {"important", "fixed", "flexible", "optional"};
+        int selected = 0;
+        for (int i = 0; i < behaviorValues.length; i++) {
+            if (behaviorValues[i].equals(priority[0])) selected = i;
+        }
+        for (int i = 0; i < behaviorNames.length; i++) {
+            final int idx = i;
+            Button b = chip(behaviorNames[i]);
+            b.setTextColor(i == selected ? Color.WHITE : color("#AEB7C9"));
+            b.setBackground(bg(i == selected ? "#413B73" : "#151A27", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1);
+            if (i > 0) lp.leftMargin = dp(5);
+            behaviors.addView(b, lp);
+            b.setOnClickListener(v -> {
+                priority[0] = behaviorValues[idx];
+                for (int j = 0; j < behaviors.getChildCount(); j++) {
+                    Button child = (Button) behaviors.getChildAt(j);
+                    child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(adding ? "Add template block" : "Edit template block")
+                .setView(form)
+                .setPositiveButton("Save", (d, w) -> {
+                    String name = title.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        Toast.makeText(this, "Give this block a name.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (end[0] <= start[0]) {
+                        Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (adding) {
+                        template.add(new Block(System.currentTimeMillis(), toTime(start[0]), toTime(end[0]),
+                                name, priority[0], "pending"));
+                    } else {
+                        original.title = name;
+                        original.start = toTime(start[0]);
+                        original.end = toTime(end[0]);
+                        original.priority = priority[0];
+                    }
+                    Collections.sort(template, Comparator.comparingInt(b -> mins(b.start)));
+                    onChanged.run();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void loadTemplateSilent() {
+        for (Block source : getTemplateBlocks(mode)) {
+            blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
+                    source.start, source.end, source.title, source.priority, "pending"));
+        }
+    }
+
