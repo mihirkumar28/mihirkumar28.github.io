@@ -40,6 +40,7 @@ public class MainActivity extends Activity {
     private TextView officeStatus, officeTimes, commuteView;
     private Button officeAction, commuteAction;
     private String mode = "wfh";
+    private String selectedDateKey;
 
     private static class Block {
         long id;
@@ -61,6 +62,7 @@ public class MainActivity extends Activity {
         window.setStatusBarColor(color("#0B0D12"));
         window.setNavigationBarColor(color("#0B0D12"));
 
+        selectedDateKey = todayKey();
         load();
         buildUi();
         render();
@@ -233,22 +235,42 @@ public class MainActivity extends Activity {
     }
 
     private void buildHeader() {
-        LinearLayout header = horizontal();
-        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
-        hp.bottomMargin = dp(14);
-        root.addView(header, hp);
+        LinearLayout top = horizontal();
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
+        tp.bottomMargin = dp(8);
+        root.addView(top, tp);
 
-        LinearLayout titleCol = vertical();
         TextView appName = text("DayFlow", 25, Color.WHITE, true);
-        dateView = text("", 13, color("#8E98AA"), false);
-        titleCol.addView(appName);
-        titleCol.addView(dateView);
-        header.addView(titleCol, new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(appName, new LinearLayout.LayoutParams(0, -2, 1));
 
-        Button menu = actionButton("＋", Color.WHITE, "#191E2B");
-        menu.setTextSize(22);
-        menu.setOnClickListener(v -> openAddDialog());
-        header.addView(menu, new LinearLayout.LayoutParams(dp(50), dp(48)));
+        Button add = actionButton("＋", Color.WHITE, "#191E2B");
+        add.setTextSize(22);
+        add.setContentDescription("Add block");
+        add.setOnClickListener(v -> openAddDialog());
+        top.addView(add, new LinearLayout.LayoutParams(dp(50), dp(48)));
+
+        LinearLayout nav = horizontal();
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, dp(42));
+        np.bottomMargin = dp(14);
+        root.addView(nav, np);
+
+        Button prev = actionButton("‹", Color.WHITE, "#151A27");
+        prev.setTextSize(24);
+        prev.setContentDescription("Previous day");
+        prev.setOnClickListener(v -> changeSelectedDate(-1));
+        nav.addView(prev, new LinearLayout.LayoutParams(dp(42), dp(38)));
+
+        dateView = text("", 14, Color.WHITE, true);
+        dateView.setGravity(Gravity.CENTER);
+        dateView.setContentDescription("Selected day. Tap to choose a date.");
+        dateView.setOnClickListener(v -> openDatePicker());
+        nav.addView(dateView, new LinearLayout.LayoutParams(0, -2, 1));
+
+        Button next = actionButton("›", Color.WHITE, "#151A27");
+        next.setTextSize(24);
+        next.setContentDescription("Next day");
+        next.setOnClickListener(v -> changeSelectedDate(1));
+        nav.addView(next, new LinearLayout.LayoutParams(dp(42), dp(38)));
     }
 
     private void buildModeRow() {
@@ -308,6 +330,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(-1, dp(42));
         recLp.topMargin = dp(8);
         card.addView(recover, recLp);
+        recover.setTag("recoveryButton");
         recover.setOnClickListener(v -> recoveryMode());
     }
 
@@ -365,13 +388,19 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(48));
         ap.topMargin = dp(14);
         officeCard.addView(officeAction, ap);
-        officeAction.setOnClickListener(v -> toggleOfficeAttendance());
+        officeAction.setOnClickListener(v -> {
+            if (selectedDateKey.equals(todayKey())) toggleOfficeAttendance();
+            else editAttendanceDay(selectedDateKey);
+        });
 
         commuteAction = actionButton("Start commute", color("#C7D3E6"), "#202936");
         LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, dp(38));
         cmp.topMargin = dp(7);
         officeCard.addView(commuteAction, cmp);
-        commuteAction.setOnClickListener(v -> toggleCommute());
+        commuteAction.setOnClickListener(v -> {
+            if (selectedDateKey.equals(todayKey())) toggleCommute();
+            else showAttendanceDayDetail(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(parseDateKey(selectedDateKey)), selectedDateKey, getOfficeDay(selectedDateKey, false));
+        });
 
         TextView hint = text("Tap CHECK IN when you enter. Tap CHECK OUT when you leave.", 10, color("#627087"), false);
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
@@ -405,7 +434,13 @@ public class MainActivity extends Activity {
 
         Calendar now = Calendar.getInstance();
         int nowMins = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
-        String date = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(now.getTime());
+        Date selectedDate = parseDateKey(selectedDateKey);
+        String date = selectedDate == null
+                ? selectedDateKey
+                : new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(selectedDate);
+        if (selectedDateKey.equals(todayKey())) date += "  •  Today";
+        else if (selectedDateKey.compareTo(todayKey()) < 0) date += "  •  Past";
+        else date += "  •  Planned";
         dateView.setText(date);
 
         String modeLabel = mode.equals("office") ? "Office" : mode.equals("weekend") ? "Weekend" : "WFH";
@@ -414,15 +449,16 @@ public class MainActivity extends Activity {
         if (headerMode instanceof TextView) ((TextView) headerMode).setText(modeLabel.toUpperCase(Locale.US));
 
         Block current = null, next = null;
+        boolean viewingToday = selectedDateKey.equals(todayKey());
         for (Block b : blocks) {
-            if ("pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
+            if (viewingToday && "pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
                 current = b;
                 break;
             }
         }
         if (current == null) {
             for (Block b : blocks) {
-                if ("pending".equals(b.status) && mins(b.start) > nowMins) {
+                if (viewingToday && "pending".equals(b.status) && mins(b.start) > nowMins) {
                     next = b;
                     break;
                 }
@@ -475,6 +511,18 @@ public class MainActivity extends Activity {
 
     private void updateCurrentCard(Block current, Block next, int nowMins) {
         View doneButton = root.findViewWithTag("currentDone");
+        View recoveryButton = root.findViewWithTag("recoveryButton");
+        boolean viewingToday = selectedDateKey.equals(todayKey());
+        if (!viewingToday) {
+            currentTitle.setText(selectedDateKey.compareTo(todayKey()) < 0 ? "Historical day" : "Planned day");
+            Date d = parseDateKey(selectedDateKey);
+            currentTime.setText(d == null ? selectedDateKey : new SimpleDateFormat("EEE, d MMMM", Locale.getDefault()).format(d));
+            currentCountdown.setText("Review timeline");
+            if (doneButton != null) doneButton.setVisibility(View.GONE);
+            if (recoveryButton != null) recoveryButton.setVisibility(View.GONE);
+            return;
+        }
+        if (recoveryButton != null) recoveryButton.setVisibility(View.VISIBLE);
         Block target = current != null ? current : next;
 
         if (target == null) {
@@ -1000,21 +1048,29 @@ public class MainActivity extends Activity {
         if (!"office".equals(mode)) return;
 
         try {
-            JSONObject day = getOfficeDay(todayKey(), false);
+            JSONObject day = getOfficeDay(selectedDateKey, false);
             long now = System.currentTimeMillis();
             long office = officeDuration(day, now);
             long commute = commuteDuration(day, now);
             boolean open = hasOpenOfficeSession(day);
             boolean commuteOpen = hasOpenCommute(day);
 
-            if (open) {
+            boolean viewingToday = selectedDateKey.equals(todayKey());
+            if (viewingToday && open) {
                 officeStatus.setText("IN OFFICE");
                 officeAction.setText("CHECK OUT");
                 officeAction.setBackground(bg("#B84B5C", 12));
-            } else {
+                officeAction.setEnabled(true);
+            } else if (viewingToday) {
                 officeStatus.setText(day == null ? "Ready for office" : "OUT OF OFFICE");
                 officeAction.setText("CHECK IN");
                 officeAction.setBackground(bg("#8B7CFF", 12));
+                officeAction.setEnabled(true);
+            } else {
+                officeStatus.setText(day == null ? "No office record" : "OFFICE RECORD");
+                officeAction.setText("EDIT TIMES");
+                officeAction.setBackground(bg("#334B63", 12));
+                officeAction.setEnabled(true);
             }
 
             StringBuilder times = new StringBuilder();
@@ -1045,6 +1101,12 @@ public class MainActivity extends Activity {
             commuteView.setText("Today • Office " + fmtMillis(office)
                     + "  •  Commute " + fmtMillis(commute));
 
+            if (!selectedDateKey.equals(todayKey())) {
+                commuteAction.setText("View commute details");
+                commuteAction.setEnabled(day != null);
+                commuteAction.setAlpha(day != null ? 1f : 0.5f);
+            }
+
             long ciS = day == null ? 0 : day.optLong("commuteInStart", 0);
             long ciE = day == null ? 0 : day.optLong("commuteInEnd", 0);
             long coS = day == null ? 0 : day.optLong("commuteOutStart", 0);
@@ -1054,8 +1116,10 @@ public class MainActivity extends Activity {
             else if (coS > 0 && coE == 0) commuteAction.setText("Finish home commute");
             else if (coE > 0) commuteAction.setText("Commute complete");
             else commuteAction.setText("Start commute");
-            commuteAction.setEnabled(!(coE > 0));
-            commuteAction.setAlpha(coE > 0 ? 0.55f : 1f);
+            if (selectedDateKey.equals(todayKey())) {
+                commuteAction.setEnabled(!(coE > 0));
+                commuteAction.setAlpha(coE > 0 ? 0.55f : 1f);
+            }
         } catch (Exception ignored) {
             officeStatus.setText("Ready");
             officeAction.setText("CHECK IN");
@@ -1292,7 +1356,7 @@ public class MainActivity extends Activity {
                 if (day != null) {
                     final JSONObject detailDay = day;
                     final String detailDate = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(c.getTime());
-                    row.setOnClickListener(v -> showAttendanceDayDetail(detailDate, detailDay));
+                    row.setOnClickListener(v -> showAttendanceDayDetail(detailDate, k, detailDay));
                 }
                 c.add(Calendar.DAY_OF_YEAR, -1);
             }
@@ -1309,14 +1373,18 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showAttendanceDayDetail(String date, JSONObject day) {
+    private void showAttendanceDayDetail(String date, String dayKey, JSONObject day) {
         try {
             LinearLayout content = vertical();
             content.setPadding(dp(20), dp(2), dp(20), dp(2));
 
+            if (day == null) {
+                Toast.makeText(this, "No attendance record for this day.", Toast.LENGTH_SHORT).show();
+                return;
+            }
             long now = System.currentTimeMillis();
-            long office = officeDuration(day, date.equals(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(new Date())) ? now : 0);
-            long commute = commuteDuration(day, date.equals(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(new Date())) ? now : 0);
+            long office = officeDuration(day, dayKey.equals(todayKey()) ? now : 0);
+            long commute = commuteDuration(day, dayKey.equals(todayKey()) ? now : 0);
 
             TextView summary = text("Office " + fmtMillis(office) + "  •  Commute " + fmtMillis(commute),
                     15, Color.WHITE, true);
@@ -1347,6 +1415,7 @@ public class MainActivity extends Activity {
             new AlertDialog.Builder(this)
                     .setTitle(date)
                     .setView(content)
+                    .setNeutralButton("Edit times", (d, w) -> editAttendanceDay(dayKey))
                     .setPositiveButton("Done", null)
                     .show();
         } catch (Exception ignored) {
@@ -1366,6 +1435,163 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    private Date parseDateKey(String key) {
+        try {
+            return new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(key);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String keyForDate(Date date) {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date);
+    }
+
+    private boolean isBeforeToday(String key) {
+        return key.compareTo(todayKey()) < 0;
+    }
+
+    private void changeSelectedDate(int delta) {
+        save();
+        Calendar c = Calendar.getInstance();
+        Date d = parseDateKey(selectedDateKey);
+        if (d == null) d = new Date();
+        c.setTime(d);
+        c.add(Calendar.DAY_OF_YEAR, delta);
+        selectedDateKey = keyForDate(c.getTime());
+        loadSelectedDate();
+        render();
+    }
+
+    private void openDatePicker() {
+        Date d = parseDateKey(selectedDateKey);
+        Calendar c = Calendar.getInstance();
+        if (d != null) c.setTime(d);
+        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar chosen = Calendar.getInstance();
+            chosen.set(Calendar.YEAR, year);
+            chosen.set(Calendar.MONTH, month);
+            chosen.set(Calendar.DAY_OF_MONTH, day);
+            save();
+            selectedDateKey = keyForDate(chosen.getTime());
+            loadSelectedDate();
+            render();
+        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
+        picker.show();
+    }
+
+    private String blocksKey(String dayKey) {
+        return "blocks_" + dayKey;
+    }
+
+    private String modeKey(String dayKey) {
+        return "mode_" + dayKey;
+    }
+
+    private void loadSelectedDate() {
+        blocks.clear();
+        SharedPreferences p = getPrefs();
+        mode = p.getString(modeKey(selectedDateKey), p.getString(MODE_KEY, "wfh"));
+        String raw = p.getString(blocksKey(selectedDateKey), null);
+
+        try {
+            if (raw == null && selectedDateKey.equals(todayKey())) {
+                raw = p.getString(KEY, null);
+                if (raw != null) {
+                    p.edit().putString(blocksKey(selectedDateKey), raw).putString(modeKey(selectedDateKey), mode).apply();
+                }
+            }
+
+            if (raw != null) {
+                JSONArray arr = new JSONArray(raw);
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject o = arr.getJSONObject(i);
+                    blocks.add(new Block(o.getLong("id"), o.getString("start"), o.getString("end"),
+                            o.getString("title"), o.getString("priority"), o.getString("status")));
+                }
+            } else if (!isBeforeToday(selectedDateKey)) {
+                loadTemplateSilent();
+                save();
+            }
+        } catch (Exception e) {
+            blocks.clear();
+        }
+    }
+
+    private void editAttendanceDay(String dayKey) {
+        try {
+            JSONObject day = getOfficeDay(dayKey, true);
+            JSONArray sessions = day.optJSONArray("sessions");
+            if (sessions == null) {
+                sessions = new JSONArray();
+                day.put("sessions", sessions);
+            }
+            JSONObject session;
+            if (sessions.length() == 0) {
+                session = new JSONObject();
+                session.put("in", 0);
+                session.put("out", 0);
+                sessions.put(session);
+            } else {
+                session = sessions.optJSONObject(0);
+            }
+
+            LinearLayout content = vertical();
+            content.setPadding(dp(18), dp(2), dp(18), dp(2));
+            TextView note = text("Correct the recorded times. DayFlow stores the exact date + time.", 11, color("#7F899D"), false);
+            content.addView(note);
+
+            Button inBtn = actionButton("Office in  •  " + (session.optLong("in", 0) > 0 ? clock(session.optLong("in", 0)) : "Not set"), Color.WHITE, "#202638");
+            Button outBtn = actionButton("Office out  •  " + (session.optLong("out", 0) > 0 ? clock(session.optLong("out", 0)) : "Not set"), Color.WHITE, "#202638");
+            Button ciBtn = actionButton("Commute to office  •  " + timeLabel(day.optLong("commuteInStart", 0)) + " → " + timeLabel(day.optLong("commuteInEnd", 0)), Color.WHITE, "#202638");
+            Button coBtn = actionButton("Commute home  •  " + timeLabel(day.optLong("commuteOutStart", 0)) + " → " + timeLabel(day.optLong("commuteOutEnd", 0)), Color.WHITE, "#202638");
+            content.addView(inBtn, new LinearLayout.LayoutParams(-1, dp(42)));
+            LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(outBtn, ml);
+            ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(ciBtn, ml);
+            ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(coBtn, ml);
+
+            AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Edit attendance")
+                    .setView(content).setPositiveButton("Done", (d, w) -> { saveOfficeDay(day); render(); })
+                    .show();
+
+            inBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "officeIn", session, inBtn));
+            outBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "officeOut", session, outBtn));
+            ciBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteInStart", day, ciBtn));
+            coBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteOutStart", day, coBtn));
+        } catch (Exception ignored) {
+            Toast.makeText(this, "Couldn't edit attendance.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private String timeLabel(long value) {
+        return value > 0 ? clock(value) : "Not set";
+    }
+
+    private void pickAttendanceTime(String dayKey, String field, JSONObject target, Button button) {
+        long existing = target.optLong(field, 0);
+        Calendar c = Calendar.getInstance();
+        Date d = parseDateKey(dayKey);
+        if (d != null) c.setTime(d);
+        if (existing > 0) c.setTimeInMillis(existing);
+        TimePickerDialog picker = new TimePickerDialog(this, (v, h, m) -> {
+            Calendar chosen = Calendar.getInstance();
+            chosen.set(Calendar.YEAR, c.get(Calendar.YEAR));
+            chosen.set(Calendar.MONTH, c.get(Calendar.MONTH));
+            chosen.set(Calendar.DAY_OF_MONTH, c.get(Calendar.DAY_OF_MONTH));
+            chosen.set(Calendar.HOUR_OF_DAY, h);
+            chosen.set(Calendar.MINUTE, m);
+            chosen.set(Calendar.SECOND, 0);
+            chosen.set(Calendar.MILLISECOND, 0);
+            try {
+                target.put(field, chosen.getTimeInMillis());
+                button.setText(button.getText().toString().split("  •  ")[0] + "  •  " + clock(chosen.getTimeInMillis()));
+                saveOfficeDay(getOfficeDay(dayKey, false));
+            } catch (Exception ignored) {
+            }
+        }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true);
+        picker.show();
+    }
+
     private SharedPreferences getPrefs() {
         return getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
@@ -1383,36 +1609,19 @@ public class MainActivity extends Activity {
                 o.put("status", b.status);
                 arr.put(o);
             }
-            getPrefs().edit().putString(KEY, arr.toString()).putString(MODE_KEY, mode).apply();
+            getPrefs().edit()
+                    .putString(blocksKey(selectedDateKey), arr.toString())
+                    .putString(modeKey(selectedDateKey), mode)
+                    .putString(KEY, selectedDateKey.equals(todayKey()) ? arr.toString() : getPrefs().getString(KEY, arr.toString()))
+                    .putString(MODE_KEY, mode)
+                    .apply();
         } catch (Exception ignored) {
         }
         render();
     }
 
     private void load() {
-        mode = getPrefs().getString(MODE_KEY, "wfh");
-        try {
-            String raw = getPrefs().getString(KEY, null);
-            if (raw != null) {
-                JSONArray arr = new JSONArray(raw);
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject o = arr.getJSONObject(i);
-                    blocks.add(new Block(
-                            o.getLong("id"),
-                            o.getString("start"),
-                            o.getString("end"),
-                            o.getString("title"),
-                            o.getString("priority"),
-                            o.getString("status")
-                    ));
-                }
-            } else {
-                loadTemplateSilent();
-            }
-        } catch (Exception e) {
-            blocks.clear();
-            loadTemplateSilent();
-        }
+        loadSelectedDate();
     }
 
     private void loadTemplateSilent() {
