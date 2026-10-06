@@ -17,8 +17,8 @@ import java.util.Locale;
 public class DayFlowWidgetProvider extends AppWidgetProvider {
     private static final String PREFS = "dayflow";
     private static final String OFFICE_LOG_KEY = "officeLog";
+    private static final String BLOCKS_KEY = "blocks";
     private static final String ACTION_TOGGLE = "com.mihirkumar.dayflow.CHECK_IN_OUT";
-    private static final String ACTION_OPEN = "com.mihirkumar.dayflow.OPEN";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
@@ -30,19 +30,66 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         super.onReceive(context, intent);
         if (ACTION_TOGGLE.equals(intent.getAction())) {
             toggleAttendance(context);
-            AppWidgetManager manager = AppWidgetManager.getInstance(context);
-            ComponentName component = new ComponentName(context, DayFlowWidgetProvider.class);
-            for (int id : manager.getAppWidgetIds(component)) update(context, manager, id);
+            updateAll(context);
+        }
+    }
+
+    private static void updateAll(Context context) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        ComponentName component = new ComponentName(context, DayFlowWidgetProvider.class);
+        for (int id : manager.getAppWidgetIds(component)) {
+            update(context, manager, id);
         }
     }
 
     private static void update(Context context, AppWidgetManager manager, int id) {
         RemoteViews views = new RemoteViews(context.getPackageName(), com.mihirkumar.dayflow.R.layout.widget_dayflow);
-        JSONObject day = getTodayDay(context, false);
-        boolean open = hasOpenSession(day);
 
-        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_status, open ? "IN OFFICE" : "OUT OF OFFICE");
-        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, open ? "CHECK OUT" : "CHECK IN");
+        JSONObject day = getTodayDay(context, false);
+        boolean inOffice = hasOpenSession(day);
+        long officeMs = officeDuration(day, System.currentTimeMillis());
+        long commuteMs = commuteDuration(day, System.currentTimeMillis());
+
+        String current = "Nothing active";
+        String timing = "Open DayFlow to plan";
+        try {
+            JSONArray blocks = getTodayBlocks(context);
+            int now = currentMinutes();
+            JSONObject active = null;
+            JSONObject next = null;
+
+            for (int i = 0; i < blocks.length(); i++) {
+                JSONObject b = blocks.optJSONObject(i);
+                if (b == null || !"pending".equals(b.optString("status"))) continue;
+                int start = mins(b.optString("start", "00:00"));
+                int end = mins(b.optString("end", "00:00"));
+                if (start <= now && now < end) {
+                    active = b;
+                    break;
+                }
+                if (start > now && next == null) next = b;
+            }
+
+            JSONObject target = active != null ? active : next;
+            if (target != null) {
+                current = target.optString("title", "Current task");
+                int start = mins(target.optString("start", "00:00"));
+                int end = mins(target.optString("end", "00:00"));
+                if (active != null) {
+                    timing = fmt(end - now) + " left";
+                } else {
+                    timing = "Next • " + time12(target.optString("start", "00:00"));
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_status,
+                inOffice ? "IN OFFICE  •  " + fmtMillis(officeMs) : "OUT  •  OFFICE " + fmtMillis(officeMs));
+        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_task, current);
+        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_timing,
+                timing + "  •  Commute " + fmtMillis(commuteMs));
+        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, inOffice ? "OUT" : "IN");
 
         Intent toggle = new Intent(context, DayFlowWidgetProvider.class).setAction(ACTION_TOGGLE);
         PendingIntent togglePi = PendingIntent.getBroadcast(
@@ -55,6 +102,14 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_container, openPi);
 
         manager.updateAppWidget(id, views);
+    }
+
+    private static JSONArray getTodayBlocks(Context context) {
+        String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String raw = p.getString("blocks_" + key, null);
+        if (raw == null) raw = p.getString(BLOCKS_KEY, "[]");
+        return new JSONArray(raw);
     }
 
     private static void toggleAttendance(Context context) {
@@ -87,6 +142,33 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         if (sessions == null || sessions.length() == 0) return false;
         JSONObject last = sessions.optJSONObject(sessions.length() - 1);
         return last != null && last.optLong("in", 0) > 0 && last.optLong("out", 0) == 0;
+    }
+
+    private static long officeDuration(JSONObject day, long now) {
+        if (day == null) return 0;
+        long total = 0;
+        JSONArray sessions = day.optJSONArray("sessions");
+        if (sessions == null) return 0;
+        for (int i = 0; i < sessions.length(); i++) {
+            JSONObject s = sessions.optJSONObject(i);
+            if (s == null) continue;
+            long in = s.optLong("in", 0);
+            long out = s.optLong("out", 0);
+            if (in > 0) total += (out > in ? out : now) - in;
+        }
+        return Math.max(0, total);
+    }
+
+    private static long commuteDuration(JSONObject day, long now) {
+        if (day == null) return 0;
+        long total = 0;
+        long a = day.optLong("commuteInStart", 0);
+        long b = day.optLong("commuteInEnd", 0);
+        if (a > 0) total += (b > a ? b : now) - a;
+        a = day.optLong("commuteOutStart", 0);
+        b = day.optLong("commuteOutEnd", 0);
+        if (a > 0) total += (b > a ? b : now) - a;
+        return Math.max(0, total);
     }
 
     private static JSONObject getTodayDay(Context context, boolean create) {
@@ -133,5 +215,31 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
             p.edit().putString(OFFICE_LOG_KEY, arr.toString()).apply();
         } catch (Exception ignored) {
         }
+    }
+
+    private static int currentMinutes() {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        return c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE);
+    }
+
+    private static int mins(String value) {
+        String[] p = value.split(":");
+        return Integer.parseInt(p[0]) * 60 + Integer.parseInt(p[1]);
+    }
+
+    private static String time12(String value) {
+        int m = mins(value);
+        int h = (m / 60) % 12;
+        if (h == 0) h = 12;
+        return h + ":" + String.format(Locale.US, "%02d", m % 60) + (m >= 720 ? " PM" : " AM");
+    }
+
+    private static String fmt(int minutes) {
+        if (minutes < 60) return minutes + "m";
+        return (minutes / 60) + "h " + String.format(Locale.US, "%02d", minutes % 60) + "m";
+    }
+
+    private static String fmtMillis(long ms) {
+        return fmt((int) Math.min(Integer.MAX_VALUE, Math.max(0, ms / 60000L)));
     }
 }
