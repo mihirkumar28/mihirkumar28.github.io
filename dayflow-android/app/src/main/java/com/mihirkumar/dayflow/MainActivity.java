@@ -1065,57 +1065,69 @@ public class MainActivity extends Activity {
 
     private void reflowRemainingDay(int activeIndex) {
         int cursor = mins(blocks.get(activeIndex).end);
+        int fixedIndex = activeIndex + 1;
         int moved = 0;
 
-        // Fixed blocks are hard anchors. Every other pending block is movable.
-        // Movable blocks keep their duration and relative order, but can move
-        // earlier or later to use the available gaps around fixed anchors.
+        // Fixed blocks are hard anchors. Everything else that is still pending
+        // is movable and keeps its duration + relative order.
+        while (fixedIndex < blocks.size()) {
+            Block fixed = blocks.get(fixedIndex);
+            if ("pending".equals(fixed.status) && "fixed".equals(fixed.priority)) break;
+            fixedIndex++;
+        }
+
         for (int i = activeIndex + 1; i < blocks.size(); i++) {
             Block block = blocks.get(i);
             if (!"pending".equals(block.status)) continue;
 
+            // If this block itself is fixed, it becomes the next hard anchor.
             if ("fixed".equals(block.priority)) {
                 cursor = Math.max(cursor, mins(block.end));
+                fixedIndex = i + 1;
+                while (fixedIndex < blocks.size()) {
+                    Block next = blocks.get(fixedIndex);
+                    if ("pending".equals(next.status) && "fixed".equals(next.priority)) break;
+                    fixedIndex++;
+                }
                 continue;
             }
 
             int duration = Math.max(1, mins(block.end) - mins(block.start));
-            int originalStart = mins(block.start);
 
-            // Find the next pending fixed block. It is an immovable anchor.
-            int nextFixedStart = 1440;
-            for (int j = i + 1; j < blocks.size(); j++) {
-                Block candidate = blocks.get(j);
-                if ("pending".equals(candidate.status) && "fixed".equals(candidate.priority)) {
-                    nextFixedStart = mins(candidate.start);
-                    break;
-                }
-            }
-
-            int newStart = Math.max(0, cursor);
-
-            // Prefer the available space before the next fixed anchor.
-            // If the block cannot fit, move it to immediately after that anchor.
-            if (newStart + duration > nextFixedStart) {
-                int fixedIndex = i + 1;
+            // Skip anchors that we've already passed.
+            while (fixedIndex < blocks.size() &&
+                    mins(blocks.get(fixedIndex).start) < cursor) {
+                cursor = Math.max(cursor, mins(blocks.get(fixedIndex).end));
+                fixedIndex++;
                 while (fixedIndex < blocks.size()) {
-                    Block candidate = blocks.get(fixedIndex);
-                    if ("pending".equals(candidate.status) && "fixed".equals(candidate.priority)) break;
+                    Block next = blocks.get(fixedIndex);
+                    if ("pending".equals(next.status) && "fixed".equals(next.priority)) break;
                     fixedIndex++;
                 }
+            }
 
-                if (fixedIndex < blocks.size()) {
-                    Block fixed = blocks.get(fixedIndex);
-                    cursor = mins(fixed.end);
-                    newStart = cursor;
+            if (fixedIndex < blocks.size()) {
+                Block nextFixed = blocks.get(fixedIndex);
+                int fixedStart = mins(nextFixed.start);
+
+                // Use the free gap before the anchor where possible.
+                if (cursor + duration > fixedStart) {
+                    cursor = mins(nextFixed.end);
+                    fixedIndex++;
+                    while (fixedIndex < blocks.size()) {
+                        Block next = blocks.get(fixedIndex);
+                        if ("pending".equals(next.status) && "fixed".equals(next.priority)) break;
+                        fixedIndex++;
+                    }
                 }
             }
 
+            int newStart = cursor;
             int newEnd = newStart + duration;
+
             if (newEnd > 1440) {
-                // There is no legal space left today. Leave this and everything
-                // after it unchanged rather than breaking a fixed anchor or
-                // silently truncating work.
+                // Never truncate work or move a fixed anchor. Leave this block
+                // unchanged when the remaining day has no legal space.
                 continue;
             }
 
@@ -1133,7 +1145,10 @@ public class MainActivity extends Activity {
         if (moved == 0) {
             Toast.makeText(this, "Nothing needed reflowing.", Toast.LENGTH_SHORT).show();
         } else {
-            Toast.makeText(this, moved + " movable block" + (moved == 1 ? "" : "s") + " reflowed around fixed blocks.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this,
+                    moved + " movable block" + (moved == 1 ? "" : "s") +
+                            " reflowed around fixed blocks.",
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
