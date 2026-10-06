@@ -1016,21 +1016,26 @@ public class MainActivity extends Activity {
                     ? "No office time logged today"
                     : times.toString());
 
-            officeViewText = null;
             commuteView.setText("Today • Office " + fmtMillis(office)
                     + "  •  Commute " + fmtMillis(commute));
 
-            if (commuteOpen) commuteAction.setText("Finish commute");
-            else if (hasCommuteStart(day)) commuteAction.setText("Start home commute");
+            long ciS = day == null ? 0 : day.optLong("commuteInStart", 0);
+            long ciE = day == null ? 0 : day.optLong("commuteInEnd", 0);
+            long coS = day == null ? 0 : day.optLong("commuteOutStart", 0);
+            long coE = day == null ? 0 : day.optLong("commuteOutEnd", 0);
+            if (ciS > 0 && ciE == 0) commuteAction.setText("Finish commute");
+            else if (ciE > 0 && coS == 0) commuteAction.setText("Start home commute");
+            else if (coS > 0 && coE == 0) commuteAction.setText("Finish home commute");
+            else if (coE > 0) commuteAction.setText("Commute complete");
             else commuteAction.setText("Start commute");
+            commuteAction.setEnabled(!(coE > 0));
+            commuteAction.setAlpha(coE > 0 ? 0.55f : 1f);
         } catch (Exception ignored) {
             officeStatus.setText("Ready");
             officeAction.setText("CHECK IN");
             commuteAction.setText("Start commute");
         }
     }
-
-    private String officeViewText;
 
     private String todayKey() {
         return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
@@ -1209,15 +1214,15 @@ public class MainActivity extends Activity {
             int weekDays = 0;
             Calendar cursor = Calendar.getInstance();
             int dow = cursor.get(Calendar.DAY_OF_WEEK);
-            cursor.add(Calendar.DAY_OF_YEAR, -(dow - Calendar.MONDAY + (dow == Calendar.SUNDAY ? 7 : 0)));
             // Move to Monday of the current week.
-            if (dow == Calendar.SUNDAY) cursor.add(Calendar.DAY_OF_YEAR, -6);
-            else cursor.add(Calendar.DAY_OF_YEAR, -(dow - Calendar.MONDAY));
+            int daysSinceMonday = dow == Calendar.SUNDAY ? 6 : dow - Calendar.MONDAY;
+            cursor.add(Calendar.DAY_OF_YEAR, -daysSinceMonday);
 
             for (int i = 0; i < 7; i++) {
                 String k = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cursor.getTime());
                 JSONObject day = getOfficeDay(k, false);
-                long d = officeDuration(day, i == 6 ? System.currentTimeMillis() : cursor.getTimeInMillis());
+                long ref = k.equals(todayKey()) ? System.currentTimeMillis() : cursor.getTimeInMillis();
+                long d = officeDuration(day, ref);
                 if (d > 0) {
                     totalWeek += d;
                     weekDays++;
@@ -1230,10 +1235,9 @@ public class MainActivity extends Activity {
             for (int i = 0; i < 31; i++) {
                 String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
                 JSONObject day = getOfficeDay(key, false);
-                long office = officeDuration(day, c.getTimeInMillis() > System.currentTimeMillis()
-                        ? c.getTimeInMillis() : System.currentTimeMillis());
-                long commute = commuteDuration(day, c.getTimeInMillis() > System.currentTimeMillis()
-                        ? c.getTimeInMillis() : System.currentTimeMillis());
+                long ref = key.equals(todayKey()) ? System.currentTimeMillis() : c.getTimeInMillis();
+                long office = officeDuration(day, ref);
+                long commute = commuteDuration(day, ref);
 
                 LinearLayout row = horizontal();
                 row.setPadding(dp(10), dp(10), dp(10), dp(10));
