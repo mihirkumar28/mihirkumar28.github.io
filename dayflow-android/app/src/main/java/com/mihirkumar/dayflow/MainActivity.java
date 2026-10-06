@@ -807,7 +807,7 @@ public class MainActivity extends Activity {
                             d.dismiss();
                             int defaultStart = suggestedStart >= 0 ? suggestedStart : currentMinutes();
                             TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
-                                finishAddBlock(name, h * 60 + m, durationChoice[0], selectedBehavior[0]);
+                                finishAddBlockRecurring(name, h * 60 + m, durationChoice[0], selectedBehavior[0], selectedRepeat[0]);
                             }, defaultStart / 60, defaultStart % 60, true);
                             picker.setTitle("Start time");
                             picker.show();
@@ -817,14 +817,14 @@ public class MainActivity extends Activity {
                             d.dismiss();
                             TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
                                 int end = h * 60 + m;
-                                addCustomTimedBlock(name, start, end, selectedBehavior[0]);
+                                addCustomTimedBlockRecurring(name, start, end, selectedBehavior[0], selectedRepeat[0]);
                             }, Math.min(23, start / 60), start % 60, true);
                             picker.setTitle("End time");
                             picker.show();
                             return;
                         }
                         d.dismiss();
-                        finishAddBlock(name, start, durationChoice[0], selectedBehavior[0]);
+                        finishAddBlockRecurring(name, start, durationChoice[0], selectedBehavior[0], selectedRepeat[0]);
                     });
                     title.requestFocus();
                     if (d.getWindow() != null) {
@@ -832,6 +832,93 @@ public class MainActivity extends Activity {
                     }
                 });
         addDialog.show();
+    }
+
+    private void finishAddBlockRecurring(String name, int start, int duration, String behavior, String repeat) {
+        if ("never".equals(repeat)) {
+            finishAddBlock(name, start, duration, behavior);
+            return;
+        }
+        int end = start + duration;
+        if (duration <= 0 || end > 1439) {
+            Toast.makeText(this, "That block would run past midnight.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        addRecurringBlocks(name, start, end, behavior, repeat);
+    }
+
+    private void addCustomTimedBlockRecurring(String name, int start, int end, String behavior, String repeat) {
+        if ("never".equals(repeat)) {
+            addCustomTimedBlock(name, start, end, behavior);
+            return;
+        }
+        if (end <= start) {
+            Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        addRecurringBlocks(name, start, end, behavior, repeat);
+    }
+
+    private void addRecurringBlocks(String name, int start, int end, String behavior, String repeat) {
+        Date base = parseDateKey(selectedDateKey);
+        if (base == null) {
+            finishAddBlock(name, start, end - start, behavior);
+            return;
+        }
+        int count = 0;
+        Calendar cursor = Calendar.getInstance();
+        cursor.setTime(base);
+        for (int i = 0; i < 30; i++) {
+            int dow = cursor.get(Calendar.DAY_OF_WEEK);
+            boolean include = "daily".equals(repeat) || (dow != Calendar.SATURDAY && dow != Calendar.SUNDAY);
+            if (include) {
+                String key = keyForDate(cursor.getTime());
+                ArrayList<Block> dayBlocks = readBlocksForDate(key);
+                dayBlocks.add(new Block(System.currentTimeMillis() + i + count,
+                        toTime(start), toTime(end), name, behavior, "pending"));
+                writeBlocksForDate(key, dayBlocks);
+                count++;
+            }
+            cursor.add(Calendar.DAY_OF_YEAR, 1);
+        }
+        loadSelectedDate();
+        Toast.makeText(this, "Added " + count + " occurrences.", Toast.LENGTH_SHORT).show();
+        render();
+    }
+
+    private ArrayList<Block> readBlocksForDate(String dayKey) {
+        ArrayList<Block> result = new ArrayList<>();
+        String raw = getPrefs().getString(blocksKey(dayKey), null);
+        if (raw == null && dayKey.equals(todayKey())) raw = getPrefs().getString(KEY, null);
+        if (raw == null) return result;
+        try {
+            JSONArray arr = new JSONArray(raw);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                result.add(new Block(o.getLong("id"), o.getString("start"), o.getString("end"),
+                        o.getString("title"), o.getString("priority"), o.getString("status")));
+            }
+        } catch (Exception ignored) {
+        }
+        return result;
+    }
+
+    private void writeBlocksForDate(String dayKey, ArrayList<Block> dayBlocks) {
+        try {
+            JSONArray arr = new JSONArray();
+            for (Block b : dayBlocks) {
+                JSONObject o = new JSONObject();
+                o.put("id", b.id);
+                o.put("start", b.start);
+                o.put("end", b.end);
+                o.put("title", b.title);
+                o.put("priority", b.priority);
+                o.put("status", b.status);
+                arr.put(o);
+            }
+            getPrefs().edit().putString(blocksKey(dayKey), arr.toString()).apply();
+        } catch (Exception ignored) {
+        }
     }
 
     private void finishAddBlock(String name, int start, int duration, String behavior) {
