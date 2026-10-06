@@ -1055,10 +1055,11 @@ public class MainActivity extends Activity {
             return;
         }
 
+        final int selectedActiveIndex = activeIndex;
         new AlertDialog.Builder(this)
                 .setTitle("Catch up?")
                 .setMessage("Fixed blocks stay exactly where they are. Flexible, important, and optional blocks will be reflowed in order around those fixed anchors.")
-                .setPositiveButton("Reflow day", (d, w) -> reflowRemainingDay(activeIndex))
+                .setPositiveButton("Reflow day", (d, w) -> reflowRemainingDay(selectedActiveIndex))
                 .setNegativeButton("Cancel", null)
                 .show();
     }
