@@ -3,6 +3,7 @@ package com.mihirkumar.dayflow;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.TimePickerDialog;
+import android.app.DatePickerDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -1356,7 +1357,8 @@ public class MainActivity extends Activity {
                 if (day != null) {
                     final JSONObject detailDay = day;
                     final String detailDate = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(c.getTime());
-                    row.setOnClickListener(v -> showAttendanceDayDetail(detailDate, k, detailDay));
+                    final String detailKey = key;
+                    row.setOnClickListener(v -> showAttendanceDayDetail(detailDate, detailKey, detailDay));
                 }
                 c.add(Calendar.DAY_OF_YEAR, -1);
             }
