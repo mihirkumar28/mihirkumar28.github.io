@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -32,10 +32,54 @@ jobs:
           gradle-version: "8.13"
           cache-provider: basic
 
+      - name: Prepare persistent signing key
+        id: signing
+        env:
+          DAYFLOW_KEYSTORE_BASE64: ${{ secrets.DAYFLOW_KEYSTORE_BASE64 }}
+          DAYFLOW_STORE_PASSWORD: ${{ secrets.DAYFLOW_STORE_PASSWORD }}
+          DAYFLOW_KEY_PASSWORD: ${{ secrets.DAYFLOW_KEY_PASSWORD }}
+          DAYFLOW_KEY_ALIAS: ${{ secrets.DAYFLOW_KEY_ALIAS }}
+        run: |
+          if [ -n "$DAYFLOW_KEYSTORE_BASE64" ] && [ -n "$DAYFLOW_STORE_PASSWORD" ] && [ -n "$DAYFLOW_KEY_PASSWORD" ]; then
+            echo "$DAYFLOW_KEYSTORE_BASE64" | base64 --decode > dayflow-release.jks
+            echo "DAYFLOW_SIGNED=true" >> "$GITHUB_ENV"
+            echo "Persistent release signing is configured."
+          else
+            echo "DAYFLOW_SIGNED=false" >> "$GITHUB_ENV"
+            echo "Persistent signing secrets are not configured; building a debug APK."
+          fi
+
+      - name: Build release APK
+        if: env.DAYFLOW_SIGNED == 'true'
+        env:
+          DAYFLOW_STORE_PASSWORD: ${{ secrets.DAYFLOW_STORE_PASSWORD }}
+          DAYFLOW_KEY_PASSWORD: ${{ secrets.DAYFLOW_KEY_PASSWORD }}
+          DAYFLOW_KEY_ALIAS: ${{ secrets.DAYFLOW_KEY_ALIAS }}
+        run: gradle :app:assembleRelease
+
       - name: Build debug APK
+        if: env.DAYFLOW_SIGNED != 'true'
         run: gradle :app:assembleDebug
 
+      - name: Upload release APK
+        if: env.DAYFLOW_SIGNED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dayflow-release-apk
+          path: dayflow-android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Publish latest signed APK
+        if: env.DAYFLOW_SIGNED == 'true'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "DayFlow latest" --notes "Latest stable DayFlow APK."
+          gh release upload latest dayflow-android/app/build/outputs/apk/release/app-release.apk --clobber
+
       - name: Upload debug APK
+        if: env.DAYFLOW_SIGNED != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: dayflow-debug-apk
