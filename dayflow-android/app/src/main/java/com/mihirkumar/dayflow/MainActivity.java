@@ -12,9 +12,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Window;
-import android.view.WindowInsets;
 import android.widget.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -24,21 +22,34 @@ import java.util.*;
 public class MainActivity extends Activity {
     private static final String PREFS = "dayflow";
     private static final String KEY = "blocks";
+    private static final String MODE_KEY = "mode";
+    private static final String COMMUTE_IN_START = "commuteInStart";
+    private static final String COMMUTE_IN_END = "commuteInEnd";
+    private static final String OFFICE_IN = "officeIn";
+    private static final String OFFICE_OUT = "officeOut";
+    private static final String COMMUTE_OUT_START = "commuteOutStart";
+    private static final String COMMUTE_OUT_END = "commuteOutEnd";
 
     private final ArrayList<Block> blocks = new ArrayList<>();
     private final Handler handler = new Handler();
 
-    private LinearLayout root;
-    private LinearLayout timeline;
-    private TextView dateView, completionView, progressPercent, currentTitle, currentTime, currentCountdown;
-    private TextView plannedView, doneView;
-    private ProgressBar progressBar;
+    private LinearLayout root, timeline, officeCard;
+    private TextView dateView, modeView, completionView, progressPercent;
+    private TextView currentTitle, currentTime, currentCountdown, plannedView, doneView;
+    private TextView officeStatus, officeTimes, commuteView;
+    private Button officeAction;
+    private String mode = "wfh";
 
     private static class Block {
         long id;
         String start, end, title, priority, status;
         Block(long id, String start, String end, String title, String priority, String status) {
-            this.id=id; this.start=start; this.end=end; this.title=title; this.priority=priority; this.status=status;
+            this.id = id;
+            this.start = start;
+            this.end = end;
+            this.title = title;
+            this.priority = priority;
+            this.status = status;
         }
     }
 
@@ -61,6 +72,12 @@ public class MainActivity extends Activity {
         }, 30000);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
     private int dp(float v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
@@ -79,12 +96,24 @@ public class MainActivity extends Activity {
 
     private String fmt(int n) {
         int h = n / 60, m = n % 60;
-        return h > 0 ? h + "h " + String.format(Locale.US, "%02d", m) + "m" : m + "m";
+        if (h > 0) return h + "h " + String.format(Locale.US, "%02d", m) + "m";
+        return m + "m";
+    }
+
+    private String fmtShort(int minutes) {
+        int h = minutes / 60, m = minutes % 60;
+        if (h == 0) return m + "m";
+        if (m == 0) return h + "h";
+        return h + "h " + m + "m";
     }
 
     private String toTime(int n) {
         n = Math.max(0, Math.min(1439, n));
         return String.format(Locale.US, "%02d:%02d", n / 60, n % 60);
+    }
+
+    private int roundUp5(int m) {
+        return Math.min(1439, ((m + 4) / 5) * 5);
     }
 
     private int color(String hex) {
@@ -121,6 +150,12 @@ public class MainActivity extends Activity {
         return b;
     }
 
+    private Button chip(String label) {
+        Button b = actionButton(label, color("#AEB7C9"), "#151A27");
+        b.setTextSize(11);
+        return b;
+    }
+
     private LinearLayout vertical() {
         LinearLayout l = new LinearLayout(this);
         l.setOrientation(LinearLayout.VERTICAL);
@@ -140,6 +175,12 @@ public class MainActivity extends Activity {
         return s;
     }
 
+    private View spacerHorizontal(int width) {
+        Space s = new Space(this);
+        s.setLayoutParams(new LinearLayout.LayoutParams(dp(width), 1));
+        return s;
+    }
+
     private void buildUi() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -151,7 +192,6 @@ public class MainActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
         setContentView(scroll);
 
-        // Extra inset safety for Android gesture/status bars.
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             int top = Math.max(dp(12), insets.getSystemWindowInsetTop() + dp(6));
             int bottom = Math.max(dp(34), insets.getSystemWindowInsetBottom() + dp(20));
@@ -160,8 +200,18 @@ public class MainActivity extends Activity {
         });
 
         buildHeader();
+        buildModeRow();
         buildCurrentCard();
         buildTodaySummary();
+
+        officeCard = vertical();
+        officeCard.setPadding(dp(16), dp(16), dp(16), dp(16));
+        officeCard.setBackground(bg("#151C23", 18));
+        LinearLayout.LayoutParams ocp = new LinearLayout.LayoutParams(-1, -2);
+        ocp.bottomMargin = dp(16);
+        root.addView(officeCard, ocp);
+        buildOfficeCardContents();
+
         buildScheduleHeader();
         timeline = vertical();
         root.addView(timeline, new LinearLayout.LayoutParams(-1, -2));
@@ -169,19 +219,17 @@ public class MainActivity extends Activity {
 
         TextView footer = text("Saved on this device • safe to close the app", 12, color("#697386"), false);
         footer.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-1, dp(34));
-        fp.topMargin = dp(6);
-        root.addView(footer, fp);
+        root.addView(footer, new LinearLayout.LayoutParams(-1, dp(34)));
     }
 
     private void buildHeader() {
         LinearLayout header = horizontal();
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
-        hp.bottomMargin = dp(20);
+        hp.bottomMargin = dp(14);
         root.addView(header, hp);
 
         LinearLayout titleCol = vertical();
-        TextView appName = text("DayFlow", 24, Color.WHITE, true);
+        TextView appName = text("DayFlow", 25, Color.WHITE, true);
         dateView = text("", 13, color("#8E98AA"), false);
         titleCol.addView(appName);
         titleCol.addView(dateView);
@@ -190,15 +238,33 @@ public class MainActivity extends Activity {
         Button menu = actionButton("＋", Color.WHITE, "#191E2B");
         menu.setTextSize(22);
         menu.setOnClickListener(v -> openAddDialog());
-        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(48), dp(48));
-        header.addView(menu, mp);
+        header.addView(menu, new LinearLayout.LayoutParams(dp(50), dp(48)));
+    }
+
+    private void buildModeRow() {
+        LinearLayout row = horizontal();
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(44));
+        rp.bottomMargin = dp(14);
+        root.addView(row, rp);
+
+        modeView = text("", 12, color("#8E98AA"), false);
+        row.addView(modeView, new LinearLayout.LayoutParams(0, -2, 1));
+
+        String[] modes = {"WFH", "Office", "Weekend"};
+        for (String item : modes) {
+            Button b = chip(item);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(item.equals("Weekend") ? 78 : 68), dp(38));
+            lp.leftMargin = dp(6);
+            row.addView(b, lp);
+            b.setTag(item.toLowerCase(Locale.US));
+            b.setOnClickListener(v -> chooseMode((String) v.getTag()));
+        }
     }
 
     private void buildCurrentCard() {
         LinearLayout card = vertical();
         card.setPadding(dp(18), dp(18), dp(18), dp(18));
         card.setBackground(bg("#171A2A", 20));
-
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.bottomMargin = dp(14);
         root.addView(card, cp);
@@ -219,7 +285,7 @@ public class MainActivity extends Activity {
         currentTime = text("—", 13, color("#A8B0C2"), false);
         currentCountdown = text("—", 13, color("#FFFFFF"), true);
         row.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1));
-        row.addView(currentCountdown, new LinearLayout.LayoutParams(-2, -2));
+        row.addView(currentCountdown);
 
         Button markDone = actionButton("Mark done", Color.WHITE, "#8B7CFF");
         LinearLayout.LayoutParams doneLp = new LinearLayout.LayoutParams(-1, dp(46));
@@ -237,8 +303,8 @@ public class MainActivity extends Activity {
 
     private void buildTodaySummary() {
         LinearLayout summary = horizontal();
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(76));
-        sp.bottomMargin = dp(18);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(72));
+        sp.bottomMargin = dp(14);
         root.addView(summary, sp);
 
         LinearLayout left = vertical();
@@ -246,13 +312,11 @@ public class MainActivity extends Activity {
         progressPercent = text("0% of the plan", 12, color("#7F899D"), false);
         left.addView(completionView);
         left.addView(progressPercent);
-
         summary.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
 
         LinearLayout metricBox = horizontal();
         metricBox.setPadding(dp(12), dp(8), dp(12), dp(8));
         metricBox.setBackground(bg("#131722", 13));
-
         plannedView = text("0h", 15, Color.WHITE, true);
         doneView = text("0h done", 11, color("#8E98AA"), false);
         metricBox.addView(plannedView);
@@ -261,10 +325,40 @@ public class MainActivity extends Activity {
         summary.addView(metricBox, new LinearLayout.LayoutParams(-2, dp(48)));
     }
 
-    private View spacerHorizontal(int width) {
-        Space s = new Space(this);
-        s.setLayoutParams(new LinearLayout.LayoutParams(dp(width), 1));
-        return s;
+    private void buildOfficeCardContents() {
+        LinearLayout titleRow = horizontal();
+        TextView title = text("OFFICE DAY", 12, color("#9FAFC4"), true);
+        titleRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView editHint = text("One tap per step", 10, color("#627087"), false);
+        titleRow.addView(editHint);
+        officeCard.addView(titleRow);
+
+        officeStatus = text("Ready to leave home", 19, Color.WHITE, true);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
+        sp.topMargin = dp(6);
+        officeCard.addView(officeStatus, sp);
+
+        officeTimes = text("No office timestamps yet", 11, color("#8E98AA"), false);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
+        tp.topMargin = dp(5);
+        officeCard.addView(officeTimes, tp);
+
+        commuteView = text("Commute 0m  •  Office 0m", 11, color("#8E98AA"), false);
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
+        cp.topMargin = dp(7);
+        officeCard.addView(commuteView, cp);
+
+        officeAction = actionButton("Start commute", Color.WHITE, "#334B63");
+        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(44));
+        ap.topMargin = dp(14);
+        officeCard.addView(officeAction, ap);
+        officeAction.setOnClickListener(v -> advanceOfficeState());
+
+        Button already = actionButton("I’m already at the office", color("#C7D3E6"), "#202936");
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(38));
+        bp.topMargin = dp(7);
+        officeCard.addView(already, bp);
+        already.setOnClickListener(v -> markAlreadyAtOffice());
     }
 
     private void buildScheduleHeader() {
@@ -276,8 +370,16 @@ public class MainActivity extends Activity {
         TextView label = text("TODAY", 13, color("#8E98AA"), true);
         row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
 
-        TextView hint = text("Tap ✓ when you're done", 11, color("#697386"), false);
-        row.addView(hint);
+        TextView modeLabel = text("", 11, color("#697386"), false);
+        modeLabel.setTag("modeHeader");
+        row.addView(modeLabel);
+
+        Button more = actionButton("•••", color("#A8B0C2"), "#151A27");
+        more.setTextSize(14);
+        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(44), dp(34));
+        mp.leftMargin = dp(7);
+        row.addView(more, mp);
+        more.setOnClickListener(v -> openManageDialog());
     }
 
     private void render() {
@@ -288,9 +390,12 @@ public class MainActivity extends Activity {
         String date = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(now.getTime());
         dateView.setText(date);
 
-        Block current = null;
-        Block next = null;
+        String modeLabel = mode.equals("office") ? "Office" : mode.equals("weekend") ? "Weekend" : "WFH";
+        modeView.setText("TODAY • " + modeLabel);
+        View headerMode = root.findViewWithTag("modeHeader");
+        if (headerMode instanceof TextView) ((TextView) headerMode).setText(modeLabel.toUpperCase(Locale.US));
 
+        Block current = null, next = null;
         for (Block b : blocks) {
             if ("pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
                 current = b;
@@ -306,11 +411,7 @@ public class MainActivity extends Activity {
             }
         }
 
-        int total = blocks.size();
-        int done = 0;
-        int plannedMinutes = 0;
-        int doneMinutes = 0;
-
+        int total = blocks.size(), done = 0, plannedMinutes = 0, doneMinutes = 0;
         for (Block b : blocks) {
             int d = Math.max(0, mins(b.end) - mins(b.start));
             plannedMinutes += d;
@@ -327,32 +428,34 @@ public class MainActivity extends Activity {
         doneView.setText(fmt(doneMinutes) + " done");
 
         updateCurrentCard(current, next, nowMins);
+        renderOfficeCard();
 
         timeline.removeAllViews();
         if (blocks.isEmpty()) {
-            TextView empty = text("Your day is empty. Tap ＋ to add a block.", 15, color("#8E98AA"), false);
+            TextView empty = text("Your day is empty.\nTap ＋ to add your first block.", 15, color("#8E98AA"), false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(0, dp(42), 0, dp(42));
             timeline.addView(empty);
         } else {
+            int lastEnd = -1;
             for (Block b : blocks) {
+                if (lastEnd >= 0 && mins(b.start) - lastEnd >= 10) {
+                    LinearLayout gap = horizontal();
+                    TextView gapText = text("·  " + fmtShort(mins(b.start) - lastEnd) + " free", 10, color("#566176"), false);
+                    gapText.setGravity(Gravity.CENTER);
+                    gap.addView(gapText, new LinearLayout.LayoutParams(-1, dp(24)));
+                    timeline.addView(gap);
+                }
                 addBlockView(b, current != null && current.id == b.id, nowMins);
+                lastEnd = Math.max(lastEnd, mins(b.end));
             }
         }
     }
 
-    private String fmtShort(int minutes) {
-        int h = minutes / 60;
-        int m = minutes % 60;
-        if (h == 0) return m + "m";
-        if (m == 0) return h + "h";
-        return h + "h " + m + "m";
-    }
-
     private void updateCurrentCard(Block current, Block next, int nowMins) {
         View doneButton = root.findViewWithTag("currentDone");
-
         Block target = current != null ? current : next;
+
         if (target == null) {
             currentTitle.setText("Day complete");
             currentTime.setText("Nice work.");
@@ -361,8 +464,7 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (doneButton != null) doneButton.setVisibility(View.VISIBLE);
-
+        if (doneButton != null) doneButton.setVisibility(current != null ? View.VISIBLE : View.GONE);
         if (current != null) {
             currentTitle.setText(current.title);
             currentTime.setText(time12(current.start) + " – " + time12(current.end));
@@ -385,29 +487,22 @@ public class MainActivity extends Activity {
 
         LinearLayout timeCol = vertical();
         timeCol.setGravity(Gravity.RIGHT);
-        TextView start = text(time12(b.start), 12, color("#8E98AA"), true);
-        TextView end = text(time12(b.end), 10, color("#606A7B"), false);
-        timeCol.addView(start);
-        timeCol.addView(end);
+        timeCol.addView(text(time12(b.start), 12, color("#8E98AA"), true));
+        timeCol.addView(text(time12(b.end), 10, color("#606A7B"), false));
         row.addView(timeCol, new LinearLayout.LayoutParams(dp(63), -2));
 
         LinearLayout card = horizontal();
-        card.setPadding(dp(13), dp(12), dp(8), dp(12));
+        card.setPadding(dp(13), dp(11), dp(8), dp(11));
 
-        String surface;
-        String border;
+        String surface, border;
         if ("done".equals(b.status)) {
-            surface = "#111A16";
-            border = "#2F7B58";
+            surface = "#111A16"; border = "#2F7B58";
         } else if ("skipped".equals(b.status)) {
-            surface = "#171214";
-            border = "#5C3038";
+            surface = "#171214"; border = "#5C3038";
         } else if (current) {
-            surface = "#26233E";
-            border = "#8B7CFF";
+            surface = "#26233E"; border = "#8B7CFF";
         } else {
-            surface = "#151A27";
-            border = "#252C3B";
+            surface = "#151A27"; border = "#252C3B";
         }
 
         GradientDrawable cardBg = bg(surface, 16);
@@ -423,11 +518,13 @@ public class MainActivity extends Activity {
         TextView meta = text(priorityLabel(b.priority) + " • " + fmt(mins(b.end) - mins(b.start)), 11, color("#8E98AA"), false);
         details.addView(title);
         details.addView(meta);
+
         if (current) {
             TextView state = text("IN PROGRESS", 10, color("#A59DFF"), true);
             state.setPadding(0, dp(6), 0, 0);
             details.addView(state);
         }
+
         card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
 
         if ("pending".equals(b.status)) {
@@ -441,7 +538,6 @@ public class MainActivity extends Activity {
             });
         } else if ("done".equals(b.status)) {
             TextView check = text("✓", 20, color("#47D18C"), true);
-            check.setTextSize(20);
             check.setGravity(Gravity.CENTER);
             card.addView(check, new LinearLayout.LayoutParams(dp(44), dp(44)));
         } else {
@@ -459,39 +555,48 @@ public class MainActivity extends Activity {
     }
 
     private String priorityLabel(String value) {
-        if (value == null) return "Flexible";
-        if (value.length() == 0) return "Flexible";
-        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
+        if (value == null || value.isEmpty()) return "Flexible";
+        String result = value;
+        return Character.toUpperCase(result.charAt(0)) + result.substring(1);
     }
 
     private void showBlockOptions(Block b) {
-        String[] actions;
-        if ("done".equals(b.status)) {
-            actions = new String[]{"Undo completion"};
-        } else if ("skipped".equals(b.status)) {
-            actions = new String[]{"Restore block"};
-        } else {
-            actions = new String[]{"Mark done", "Skip block"};
+        ArrayList<String> actions = new ArrayList<>();
+        actions.add("Edit block");
+        if ("done".equals(b.status)) actions.add("Undo completion");
+        else if ("skipped".equals(b.status)) actions.add("Restore block");
+        else {
+            actions.add("Mark done");
+            actions.add("Skip block");
         }
+        actions.add("Delete block");
 
         new AlertDialog.Builder(this)
                 .setTitle(b.title)
-                .setItems(actions, (dialog, which) -> {
-                    if ("done".equals(b.status) || "skipped".equals(b.status)) {
+                .setItems(actions.toArray(new String[0]), (dialog, which) -> {
+                    String a = actions.get(which);
+                    if ("Edit block".equals(a)) editBlockDialog(b);
+                    else if ("Delete block".equals(a)) {
+                        blocks.remove(b);
+                        save();
+                    } else if ("Undo completion".equals(a) || "Restore block".equals(a)) {
                         b.status = "pending";
-                    } else if (which == 0) {
+                        save();
+                    } else if ("Mark done".equals(a)) {
                         b.status = "done";
-                    } else {
+                        save();
+                    } else if ("Skip block".equals(a)) {
                         b.status = "skipped";
+                        save();
                     }
-                    save();
                 })
                 .setNegativeButton("Close", null)
                 .show();
     }
 
     private void completeCurrent() {
-        int nowMins = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) * 60 + Calendar.getInstance().get(Calendar.MINUTE);
+        int nowMins = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) * 60
+                + Calendar.getInstance().get(Calendar.MINUTE);
         for (Block b : blocks) {
             if ("pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
                 b.status = "done";
@@ -504,45 +609,223 @@ public class MainActivity extends Activity {
 
     private void openAddDialog() {
         LinearLayout form = vertical();
-        form.setPadding(dp(20), dp(4), dp(20), dp(4));
+        form.setPadding(dp(20), dp(4), dp(20), dp(2));
 
         EditText title = new EditText(this);
         title.setHint("What are you doing?");
         title.setTextColor(Color.WHITE);
         title.setHintTextColor(color("#697386"));
-        form.addView(title, new LinearLayout.LayoutParams(-1, dp(54)));
+        title.setSingleLine(true);
+        form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
 
-        String[] priority = {"Important", "Fixed", "Flexible", "Optional"};
+        TextView startLabel = text("START", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
+        slp.topMargin = dp(10);
+        form.addView(startLabel, slp);
+
+        LinearLayout starts = horizontal();
+        form.addView(starts, new LinearLayout.LayoutParams(-1, dp(42)));
+        String[] startNames = {"Next free", "Now", "Pick time"};
+        int[] startChoice = {0};
+        for (int i = 0; i < startNames.length; i++) {
+            final int idx = i;
+            Button b = chip(startNames[i]);
+            if (i == 0) b.setTextColor(Color.WHITE);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1);
+            if (i > 0) lp.leftMargin = dp(6);
+            starts.addView(b, lp);
+            b.setOnClickListener(v -> {
+                startChoice[0] = idx;
+                for (int j = 0; j < starts.getChildCount(); j++) {
+                    ((Button) starts.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    ((Button) starts.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
+
+        TextView durationLabel = text("DURATION", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-1, -2);
+        dlp.topMargin = dp(12);
+        form.addView(durationLabel, dlp);
+
+        LinearLayout durations = horizontal();
+        form.addView(durations, new LinearLayout.LayoutParams(-1, dp(42)));
+        String[] durationNames = {"30m", "45m", "1h", "2h"};
+        int[] durationChoice = {30};
+        for (int i = 0; i < durationNames.length; i++) {
+            final int value = i == 0 ? 30 : i == 1 ? 45 : i == 2 ? 60 : 120;
+            final int idx = i;
+            Button b = chip(durationNames[i]);
+            if (i == 0) b.setTextColor(Color.WHITE);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1);
+            if (i > 0) lp.leftMargin = dp(6);
+            durations.addView(b, lp);
+            b.setOnClickListener(v -> {
+                durationChoice[0] = value;
+                for (int j = 0; j < durations.getChildCount(); j++) {
+                    ((Button) durations.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    ((Button) durations.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
+
+        Button custom = chip("Custom");
+        LinearLayout.LayoutParams customLp = new LinearLayout.LayoutParams(dp(72), dp(38));
+        customLp.leftMargin = dp(6);
+        durations.addView(custom, customLp);
+        custom.setOnClickListener(v -> durationChoice[0] = -1);
+
+        TextView behaviorLabel = text("BLOCK BEHAVIOR", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
+        blp.topMargin = dp(12);
+        form.addView(behaviorLabel, blp);
+
+        LinearLayout behaviors = horizontal();
+        form.addView(behaviors, new LinearLayout.LayoutParams(-1, dp(42)));
+        String[] behaviorNames = {"Important", "Fixed", "Flexible", "Optional"};
+        String[] behaviorValues = {"important", "fixed", "flexible", "optional"};
+        String[] selectedBehavior = {"flexible"};
+        for (int i = 0; i < behaviorNames.length; i++) {
+            final int idx = i;
+            Button b = chip(behaviorNames[i]);
+            if (i == 2) {
+                b.setTextColor(Color.WHITE);
+                b.setBackground(bg("#413B73", 12));
+            }
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1);
+            if (i > 0) lp.leftMargin = dp(5);
+            behaviors.addView(b, lp);
+            b.setOnClickListener(v -> {
+                selectedBehavior[0] = behaviorValues[idx];
+                for (int j = 0; j < behaviors.getChildCount(); j++) {
+                    ((Button) behaviors.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    ((Button) behaviors.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
 
         new AlertDialog.Builder(this)
-                .setTitle("New time block")
+                .setTitle("Add to your day")
                 .setView(form)
-                .setSingleChoiceItems(priority, 0, null)
-                .setPositiveButton("Choose time", (d, w) -> {
-                    int which = ((AlertDialog) d).getListView().getCheckedItemPosition();
-                    which = which < 0 ? 0 : which;
-                    final int selectedPriority = which;
+                .setPositiveButton("Add block", null)
+                .setNegativeButton("Cancel", null)
+                .create()
+                .setOnShowListener(dialog -> {
+                    AlertDialog d = (AlertDialog) dialog;
+                    d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                        String name = title.getText().toString().trim();
+                        if (name.isEmpty()) {
+                            title.setError("Give this block a name");
+                            title.requestFocus();
+                            return;
+                        }
+                        int start = startChoice[0] == 0 ? nextFreeStart() :
+                                startChoice[0] == 1 ? currentMinutes() : -1;
+                        if (startChoice[0] == 2) {
+                            d.dismiss();
+                            TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
+                                finishAddBlock(name, h * 60 + m, durationChoice[0], selectedBehavior[0]);
+                            }, currentHour(), currentMinute(), true);
+                            picker.setTitle("Start time");
+                            picker.show();
+                            return;
+                        }
+                        if (durationChoice[0] == -1) {
+                            d.dismiss();
+                            TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
+                                int end = h * 60 + m;
+                                addCustomTimedBlock(name, start, end, selectedBehavior[0]);
+                            }, Math.min(23, start / 60), start % 60, true);
+                            picker.setTitle("End time");
+                            picker.show();
+                            return;
+                        }
+                        d.dismiss();
+                        finishAddBlock(name, start, durationChoice[0], selectedBehavior[0]);
+                    });
+                    title.requestFocus();
+                    d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+                });
+    }
+
+    private void finishAddBlock(String name, int start, int duration, String behavior) {
+        if (duration <= 0) {
+            Toast.makeText(this, "Choose a valid duration.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int end = start + duration;
+        if (end > 1439) {
+            Toast.makeText(this, "That block would run past midnight.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        blocks.add(new Block(System.currentTimeMillis(), toTime(start), toTime(end), name, behavior, "pending"));
+        save();
+    }
+
+    private void addCustomTimedBlock(String name, int start, int end, String behavior) {
+        if (end <= start) {
+            Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        blocks.add(new Block(System.currentTimeMillis(), toTime(start), toTime(end), name, behavior, "pending"));
+        save();
+    }
+
+    private int currentMinutes() {
+        Calendar c = Calendar.getInstance();
+        return c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
+    }
+
+    private int currentHour() { return Calendar.getInstance().get(Calendar.HOUR_OF_DAY); }
+    private int currentMinute() { return Calendar.getInstance().get(Calendar.MINUTE); }
+
+    private int nextFreeStart() {
+        int now = roundUp5(currentMinutes());
+        int candidate = now;
+        for (Block b : blocks) {
+            if ("done".equals(b.status) || "skipped".equals(b.status)) continue;
+            if (mins(b.start) <= candidate && candidate < mins(b.end)) candidate = mins(b.end);
+        }
+        return Math.min(1430, candidate);
+    }
+
+    private void editBlockDialog(Block b) {
+        LinearLayout form = vertical();
+        form.setPadding(dp(20), 0, dp(20), 0);
+
+        EditText title = new EditText(this);
+        title.setSingleLine(true);
+        title.setText(b.title);
+        title.setTextColor(Color.WHITE);
+        form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        TextView timing = text("Current: " + time12(b.start) + " – " + time12(b.end), 12, color("#8E98AA"), false);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
+        tp.topMargin = dp(8);
+        form.addView(timing, tp);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Edit block")
+                .setView(form)
+                .setPositiveButton("Change time", (d, w) -> {
                     TimePickerDialog start = new TimePickerDialog(this, (v, h, m) -> {
-                        final String s = String.format(Locale.US, "%02d:%02d", h, m);
+                        int s = h * 60 + m;
                         TimePickerDialog end = new TimePickerDialog(this, (v2, h2, m2) -> {
-                            String e = String.format(Locale.US, "%02d:%02d", h2, m2);
-                            if (mins(e) <= mins(s)) {
+                            int e = h2 * 60 + m2;
+                            if (e <= s) {
                                 Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
                                 return;
                             }
-                            String p = priority[selectedPriority].toLowerCase(Locale.US);
                             String name = title.getText().toString().trim();
-                            if (name.isEmpty()) {
-                                Toast.makeText(this, "Give the block a name.", Toast.LENGTH_SHORT).show();
-                                return;
-                            }
-                            blocks.add(new Block(System.currentTimeMillis(), s, e, name, p, "pending"));
+                            if (!name.isEmpty()) b.title = name;
+                            b.start = toTime(s);
+                            b.end = toTime(e);
                             save();
-                        }, 20, 0, true);
-                        end.setTitle("End time");
+                        }, mins(b.end) / 60, mins(b.end) % 60, true);
+                        end.setTitle("New end time");
                         end.show();
-                    }, 19, 0, true);
-                    start.setTitle("Start time");
+                    }, mins(b.start) / 60, mins(b.start) % 60, true);
+                    start.setTitle("New start time");
                     start.show();
                 })
                 .setNegativeButton("Cancel", null)
@@ -550,11 +833,10 @@ public class MainActivity extends Activity {
     }
 
     private void recoveryMode() {
-        int nowMins = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) * 60 + Calendar.getInstance().get(Calendar.MINUTE);
+        int nowMins = currentMinutes();
         Block active = null;
-
         for (Block b : blocks) {
-            if ("pending".equals(b.status) && mins(b.start) < nowMins && nowMins < mins(b.end)) {
+            if ("pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
                 active = b;
                 break;
             }
@@ -567,11 +849,9 @@ public class MainActivity extends Activity {
 
         int late = nowMins - mins(active.start);
         int index = blocks.indexOf(active);
-
         for (int i = index + 1; i < blocks.size(); i++) {
             Block b = blocks.get(i);
             if (!"pending".equals(b.status) || "fixed".equals(b.priority)) continue;
-
             int start = mins(b.start) + late;
             int end = mins(b.end) + late;
             if (end < 1440) {
@@ -579,9 +859,53 @@ public class MainActivity extends Activity {
                 b.end = toTime(end);
             }
         }
-
         save();
-        Toast.makeText(this, "Adjusted the flexible part of your day by " + late + " minutes.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Flexible blocks moved by " + late + " minutes.", Toast.LENGTH_SHORT).show();
+    }
+
+    private void chooseMode(String key) {
+        if (mode.equals(key)) return;
+        String label = key.equals("office") ? "Office" : key.equals("weekend") ? "Weekend" : "WFH";
+        new AlertDialog.Builder(this)
+                .setTitle("Switch to " + label + "?")
+                .setMessage("This replaces today's current timeline with the " + label + " template.")
+                .setPositiveButton("Switch", (d, w) -> {
+                    mode = key;
+                    getPrefs().edit().putString(MODE_KEY, mode).apply();
+                    loadTemplate(key);
+                    if (!"office".equals(key)) clearOfficeTracking();
+                })
+                .setNegativeButton("Keep today", null)
+                .show();
+    }
+
+    private void openManageDialog() {
+        String[] items = {"Load WFH template", "Load Office template", "Load Weekend template", "Clear today's plan"};
+        new AlertDialog.Builder(this)
+                .setTitle("Manage day")
+                .setItems(items, (d, which) -> {
+                    if (which == 0) chooseTemplateDirect("wfh");
+                    else if (which == 1) chooseTemplateDirect("office");
+                    else if (which == 2) chooseTemplateDirect("weekend");
+                    else clearDay();
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void chooseTemplateDirect(String key) {
+        String label = key.equals("office") ? "Office" : key.equals("weekend") ? "Weekend" : "WFH";
+        new AlertDialog.Builder(this)
+                .setTitle("Load " + label + " template?")
+                .setMessage("Your current timeline will be replaced.")
+                .setPositiveButton("Load", (d, w) -> {
+                    mode = key;
+                    getPrefs().edit().putString(MODE_KEY, mode).apply();
+                    loadTemplate(key);
+                    if (!"office".equals(key)) clearOfficeTracking();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void loadTemplate(String key) {
@@ -591,7 +915,7 @@ public class MainActivity extends Activity {
                     {"06:00","06:30","Wake up + routine","fixed"},
                     {"06:30","08:00","Maths Optional","important"},
                     {"08:00","09:00","Breakfast + commute","fixed"},
-                    {"09:00","18:30","Work + commute","fixed"},
+                    {"09:00","18:30","Work","fixed"},
                     {"18:30","19:15","Reset","flexible"},
                     {"19:15","21:15","GS study","important"},
                     {"21:15","22:00","Dinner","fixed"},
@@ -635,6 +959,119 @@ public class MainActivity extends Activity {
         save();
     }
 
+    private void renderOfficeCard() {
+        if (officeCard == null) return;
+        officeCard.setVisibility("office".equals(mode) ? View.VISIBLE : View.GONE);
+        if (!"office".equals(mode)) return;
+
+        SharedPreferences p = getPrefs();
+        long ciS = p.getLong(COMMUTE_IN_START, 0);
+        long ciE = p.getLong(COMMUTE_IN_END, 0);
+        long in = p.getLong(OFFICE_IN, 0);
+        long out = p.getLong(OFFICE_OUT, 0);
+        long coS = p.getLong(COMMUTE_OUT_START, 0);
+        long coE = p.getLong(COMMUTE_OUT_END, 0);
+
+        String status;
+        String action;
+        if (ciS > 0 && ciE == 0) {
+            status = "On the way to office";
+            action = "Arrived at office";
+        } else if (ciE > 0 && in == 0) {
+            status = "At office";
+            action = "Check in";
+        } else if (in > 0 && out == 0) {
+            status = "Checked in";
+            action = "Check out";
+        } else if (out > 0 && coS == 0) {
+            status = "Workday finished";
+            action = "Start home commute";
+        } else if (coS > 0 && coE == 0) {
+            status = "On the way home";
+            action = "Arrived home";
+        } else if (coE > 0) {
+            status = "Home";
+            action = "Day tracked";
+        } else {
+            status = "Ready to leave home";
+            action = "Start commute";
+        }
+
+        officeStatus.setText(status);
+        officeAction.setText(action);
+        officeAction.setEnabled(!"Day tracked".equals(action));
+        officeAction.setAlpha("Day tracked".equals(action) ? 0.55f : 1f);
+
+        StringBuilder times = new StringBuilder();
+        if (ciS > 0) times.append("Left ").append(clock(ciS));
+        if (ciE > 0) times.append("  •  Office arrival ").append(clock(ciE));
+        if (in > 0) times.append("  •  Check-in ").append(clock(in));
+        if (out > 0) times.append("  •  Check-out ").append(clock(out));
+        if (coE > 0) times.append("  •  Home ").append(clock(coE));
+        officeTimes.setText(times.length() == 0 ? "No office timestamps yet" : times.toString());
+
+        long commute = duration(ciS, ciE) + duration(coS, coE);
+        long office = in > 0 ? (out > 0 ? out - in : System.currentTimeMillis() - in) : 0;
+        commuteView.setText("Commute " + fmtMillis(commute) + "  •  Office " + fmtMillis(office));
+    }
+
+    private void advanceOfficeState() {
+        SharedPreferences p = getPrefs();
+        long now = System.currentTimeMillis();
+        long ciS = p.getLong(COMMUTE_IN_START, 0);
+        long ciE = p.getLong(COMMUTE_IN_END, 0);
+        long in = p.getLong(OFFICE_IN, 0);
+        long out = p.getLong(OFFICE_OUT, 0);
+        long coS = p.getLong(COMMUTE_OUT_START, 0);
+        long coE = p.getLong(COMMUTE_OUT_END, 0);
+
+        SharedPreferences.Editor e = p.edit();
+        if (ciS == 0) e.putLong(COMMUTE_IN_START, now);
+        else if (ciE == 0) e.putLong(COMMUTE_IN_END, now);
+        else if (in == 0) e.putLong(OFFICE_IN, now);
+        else if (out == 0) e.putLong(OFFICE_OUT, now);
+        else if (coS == 0) e.putLong(COMMUTE_OUT_START, now);
+        else if (coE == 0) e.putLong(COMMUTE_OUT_END, now);
+        e.apply();
+        render();
+    }
+
+    private void markAlreadyAtOffice() {
+        SharedPreferences p = getPrefs();
+        long now = System.currentTimeMillis();
+        p.edit()
+                .putLong(COMMUTE_IN_START, 0)
+                .putLong(COMMUTE_IN_END, 0)
+                .putLong(OFFICE_IN, now)
+                .apply();
+        Toast.makeText(this, "Office check-in started.", Toast.LENGTH_SHORT).show();
+        render();
+    }
+
+    private long duration(long start, long end) {
+        return start > 0 && end > start ? end - start : 0;
+    }
+
+    private String fmtMillis(long ms) {
+        long minutes = Math.max(0, ms / 60000L);
+        return fmtShort((int) Math.min(minutes, Integer.MAX_VALUE));
+    }
+
+    private String clock(long timestamp) {
+        return new SimpleDateFormat("h:mm a", Locale.getDefault()).format(new Date(timestamp));
+    }
+
+    private void clearOfficeTracking() {
+        getPrefs().edit()
+                .remove(COMMUTE_IN_START)
+                .remove(COMMUTE_IN_END)
+                .remove(OFFICE_IN)
+                .remove(OFFICE_OUT)
+                .remove(COMMUTE_OUT_START)
+                .remove(COMMUTE_OUT_END)
+                .apply();
+    }
+
     private void clearDay() {
         new AlertDialog.Builder(this)
                 .setTitle("Clear today's plan?")
@@ -645,6 +1082,10 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private SharedPreferences getPrefs() {
+        return getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     private void save() {
@@ -660,18 +1101,16 @@ public class MainActivity extends Activity {
                 o.put("status", b.status);
                 arr.put(o);
             }
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY, arr.toString())
-                    .apply();
+            getPrefs().edit().putString(KEY, arr.toString()).putString(MODE_KEY, mode).apply();
         } catch (Exception ignored) {
         }
         render();
     }
 
     private void load() {
+        mode = getPrefs().getString(MODE_KEY, "wfh");
         try {
-            String raw = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null);
+            String raw = getPrefs().getString(KEY, null);
             if (raw != null) {
                 JSONArray arr = new JSONArray(raw);
                 for (int i = 0; i < arr.length(); i++) {
@@ -695,20 +1134,48 @@ public class MainActivity extends Activity {
     }
 
     private void loadTemplateSilent() {
-        String[][] t = new String[][]{
-                {"06:00","06:20","Wake up","fixed"},
-                {"06:20","07:00","Morning routine","flexible"},
-                {"07:00","09:00","GS study","important"},
-                {"09:00","09:30","Breakfast","flexible"},
-                {"09:30","13:00","Work","fixed"},
-                {"13:00","14:00","Lunch","fixed"},
-                {"14:00","18:30","Work","fixed"},
-                {"18:30","19:15","Exercise","important"},
-                {"19:30","21:30","Maths Optional","important"},
-                {"21:30","22:15","Dinner","fixed"},
-                {"22:15","23:00","Interview preparation","important"},
-                {"23:00","23:30","Wind down","flexible"}
-        };
+        String[][] t;
+        if ("office".equals(mode)) {
+            t = new String[][]{
+                    {"06:00","06:30","Wake up + routine","fixed"},
+                    {"06:30","08:00","Maths Optional","important"},
+                    {"08:00","09:00","Breakfast + commute","fixed"},
+                    {"09:00","18:30","Work","fixed"},
+                    {"18:30","19:15","Reset","flexible"},
+                    {"19:15","21:15","GS study","important"},
+                    {"21:15","22:00","Dinner","fixed"},
+                    {"22:00","23:00","Interview preparation","important"},
+                    {"23:00","23:30","Wind down","flexible"}
+            };
+        } else if ("weekend".equals(mode)) {
+            t = new String[][]{
+                    {"06:30","07:00","Morning routine","fixed"},
+                    {"07:00","10:00","GS study","important"},
+                    {"10:00","11:00","Breakfast + break","flexible"},
+                    {"11:00","14:00","Maths Optional","important"},
+                    {"14:00","15:00","Lunch","fixed"},
+                    {"15:00","17:00","Maths / revision","important"},
+                    {"17:00","18:00","Exercise","important"},
+                    {"18:00","20:00","Personal time","flexible"},
+                    {"20:00","21:00","Dinner","fixed"},
+                    {"21:00","22:30","Interview preparation","important"}
+            };
+        } else {
+            t = new String[][]{
+                    {"06:00","06:20","Wake up","fixed"},
+                    {"06:20","07:00","Morning routine","flexible"},
+                    {"07:00","09:00","GS study","important"},
+                    {"09:00","09:30","Breakfast","flexible"},
+                    {"09:30","13:00","Work","fixed"},
+                    {"13:00","14:00","Lunch","fixed"},
+                    {"14:00","18:30","Work","fixed"},
+                    {"18:30","19:15","Exercise","important"},
+                    {"19:30","21:30","Maths Optional","important"},
+                    {"21:30","22:15","Dinner","fixed"},
+                    {"22:15","23:00","Interview preparation","important"},
+                    {"23:00","23:30","Wind down","flexible"}
+            };
+        }
 
         for (int i = 0; i < t.length; i++) {
             blocks.add(new Block(System.currentTimeMillis() + i, t[i][0], t[i][1], t[i][2], t[i][3], "pending"));
