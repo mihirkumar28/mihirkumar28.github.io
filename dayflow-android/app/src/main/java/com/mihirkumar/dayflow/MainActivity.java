@@ -327,7 +327,7 @@ public class MainActivity extends Activity {
         markDone.setTag("currentDone");
         markDone.setOnClickListener(v -> completeCurrent());
 
-        Button recover = actionButton("Adjust my day", color("#DAD7FF"), "#2C2A4A");
+        Button recover = actionButton("Catch up", color("#DAD7FF"), "#2C2A4A");
         LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(-1, dp(42));
         recLp.topMargin = dp(8);
         card.addView(recover, recLp);
@@ -1035,34 +1035,106 @@ public class MainActivity extends Activity {
     }
 
     private void recoveryMode() {
+        Collections.sort(blocks, Comparator.comparingInt(b -> mins(b.start)));
+
         int nowMins = currentMinutes();
+        int activeIndex = -1;
         Block active = null;
-        for (Block b : blocks) {
+
+        for (int i = 0; i < blocks.size(); i++) {
+            Block b = blocks.get(i);
             if ("pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
                 active = b;
+                activeIndex = i;
                 break;
             }
         }
 
         if (active == null) {
-            Toast.makeText(this, "No active block to adjust.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No active block to catch up from.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        int late = nowMins - mins(active.start);
-        int index = blocks.indexOf(active);
-        for (int i = index + 1; i < blocks.size(); i++) {
-            Block b = blocks.get(i);
-            if (!"pending".equals(b.status) || "fixed".equals(b.priority)) continue;
-            int start = mins(b.start) + late;
-            int end = mins(b.end) + late;
-            if (end < 1440) {
-                b.start = toTime(start);
-                b.end = toTime(end);
+        new AlertDialog.Builder(this)
+                .setTitle("Catch up?")
+                .setMessage("Fixed blocks stay exactly where they are. Flexible, important, and optional blocks will be reflowed in order around those fixed anchors.")
+                .setPositiveButton("Reflow day", (d, w) -> reflowRemainingDay(activeIndex))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void reflowRemainingDay(int activeIndex) {
+        int cursor = mins(blocks.get(activeIndex).end);
+        int moved = 0;
+
+        // Fixed blocks are hard anchors. Every other pending block is movable.
+        // Movable blocks keep their duration and relative order, but can move
+        // earlier or later to use the available gaps around fixed anchors.
+        for (int i = activeIndex + 1; i < blocks.size(); i++) {
+            Block block = blocks.get(i);
+            if (!"pending".equals(block.status)) continue;
+
+            if ("fixed".equals(block.priority)) {
+                cursor = Math.max(cursor, mins(block.end));
+                continue;
             }
+
+            int duration = Math.max(1, mins(block.end) - mins(block.start));
+            int originalStart = mins(block.start);
+
+            // Find the next pending fixed block. It is an immovable anchor.
+            int nextFixedStart = 1440;
+            for (int j = i + 1; j < blocks.size(); j++) {
+                Block candidate = blocks.get(j);
+                if ("pending".equals(candidate.status) && "fixed".equals(candidate.priority)) {
+                    nextFixedStart = mins(candidate.start);
+                    break;
+                }
+            }
+
+            int newStart = Math.max(0, cursor);
+
+            // Prefer the available space before the next fixed anchor.
+            // If the block cannot fit, move it to immediately after that anchor.
+            if (newStart + duration > nextFixedStart) {
+                int fixedIndex = i + 1;
+                while (fixedIndex < blocks.size()) {
+                    Block candidate = blocks.get(fixedIndex);
+                    if ("pending".equals(candidate.status) && "fixed".equals(candidate.priority)) break;
+                    fixedIndex++;
+                }
+
+                if (fixedIndex < blocks.size()) {
+                    Block fixed = blocks.get(fixedIndex);
+                    cursor = mins(fixed.end);
+                    newStart = cursor;
+                }
+            }
+
+            int newEnd = newStart + duration;
+            if (newEnd > 1440) {
+                // There is no legal space left today. Leave this and everything
+                // after it unchanged rather than breaking a fixed anchor or
+                // silently truncating work.
+                continue;
+            }
+
+            String oldStart = block.start;
+            String oldEnd = block.end;
+            block.start = toTime(newStart);
+            block.end = toTime(newEnd);
+            cursor = newEnd;
+
+            if (!oldStart.equals(block.start) || !oldEnd.equals(block.end)) moved++;
         }
+
         save();
-        Toast.makeText(this, "Flexible blocks moved by " + late + " minutes.", Toast.LENGTH_SHORT).show();
+
+        if (moved == 0) {
+            Toast.makeText(this, "Nothing needed reflowing.", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, moved + " movable block" + (moved == 1 ? "" : "s") + " reflowed around fixed blocks.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void chooseMode(String key) {
