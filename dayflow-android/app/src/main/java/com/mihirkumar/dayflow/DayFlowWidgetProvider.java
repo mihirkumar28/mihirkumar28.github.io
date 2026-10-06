@@ -105,11 +105,15 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
     }
 
     private static JSONArray getTodayBlocks(Context context) {
-        String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String raw = p.getString("blocks_" + key, null);
-        if (raw == null) raw = p.getString(BLOCKS_KEY, "[]");
-        return new JSONArray(raw);
+        try {
+            String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            String raw = p.getString("blocks_" + key, null);
+            if (raw == null) raw = p.getString(BLOCKS_KEY, "[]");
+            return new JSONArray(raw);
+        } catch (Exception e) {
+            return new JSONArray();
+        }
     }
 
     private static void toggleAttendance(Context context) {
