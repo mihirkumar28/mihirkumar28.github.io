@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.util.Log;
 import android.widget.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,6 +32,8 @@ public class MainActivity extends Activity {
     private static final String COMMUTE_OUT_START = "commuteOutStart";
     private static final String COMMUTE_OUT_END = "commuteOutEnd";
     private static final String OFFICE_LOG_KEY = "officeLog";
+    private static final String DEBUG_LOG_KEY = "debugLog";
+    private static final String DEBUG_TAG = "DayFlow";
 
     private final ArrayList<Block> blocks = new ArrayList<>();
     private final Handler handler = new Handler();
@@ -1257,6 +1260,8 @@ public class MainActivity extends Activity {
                 arr.put(o);
             }
             getPrefs().edit().putString(templateKey(key), arr.toString()).apply();
+            debugLog("Template saved: " + key + " blocks=" + template.size());
+            DayFlowWidgetProvider.refreshAll(this);
         } catch (Exception ignored) {
         }
     }
@@ -2056,6 +2061,20 @@ public class MainActivity extends Activity {
         picker.show();
     }
 
+    private void debugLog(String message) {
+        String line = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())
+                + " | APP | " + message;
+        Log.d(DEBUG_TAG, message);
+        try {
+            SharedPreferences p = getPrefs();
+            String old = p.getString(DEBUG_LOG_KEY, "");
+            String combined = old + line + "\n";
+            if (combined.length() > 20000) combined = combined.substring(combined.length() - 20000);
+            p.edit().putString(DEBUG_LOG_KEY, combined).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
     private SharedPreferences getPrefs() {
         return getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
@@ -2079,6 +2098,7 @@ public class MainActivity extends Activity {
                     .putString(KEY, selectedDateKey.equals(todayKey()) ? arr.toString() : getPrefs().getString(KEY, arr.toString()))
                     .putString(MODE_KEY, mode)
                     .apply();
+            debugLog("Day saved: date=" + selectedDateKey + " mode=" + mode + " blocks=" + blocks.size());
             DayFlowWidgetProvider.refreshAll(this);
         } catch (Exception ignored) {
         }
@@ -2087,6 +2107,7 @@ public class MainActivity extends Activity {
 
     private void load() {
         loadSelectedDate();
+        debugLog("App load: date=" + selectedDateKey + " mode=" + mode + " blocks=" + blocks.size());
     }
 
     private void loadTemplateSilent() {
