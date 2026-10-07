@@ -1179,6 +1179,7 @@ public class MainActivity extends Activity {
                 "Edit WFH template",
                 "Edit Office template",
                 "Edit Weekend template",
+                "View diagnostics",
                 "Clear selected day's plan"
         };
         new AlertDialog.Builder(this)
@@ -1190,6 +1191,7 @@ public class MainActivity extends Activity {
                     else if (which == 3) openTemplateEditor("wfh");
                     else if (which == 4) openTemplateEditor("office");
                     else if (which == 5) openTemplateEditor("weekend");
+                    else if (which == 6) showDiagnostics();
                     else clearDay();
                 })
                 .setNegativeButton("Close", null)
@@ -1890,6 +1892,24 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {
             Toast.makeText(this, "Couldn't load that day.", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void showDiagnostics() {
+        String log = getPrefs().getString(DEBUG_LOG_KEY, "No diagnostics recorded yet.");
+        if (log.length() > 12000) log = log.substring(log.length() - 12000);
+        TextView view = text(log, 11, color("#C7D0DF"), false);
+        view.setTextIsSelectable(true);
+        view.setPadding(dp(16), dp(12), dp(16), dp(12));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(color("#0F131C"));
+        scroll.addView(view, new ScrollView.LayoutParams(-1, -1));
+
+        new AlertDialog.Builder(this)
+                .setTitle("DayFlow diagnostics")
+                .setView(scroll)
+                .setPositiveButton("Close", null)
+                .show();
     }
 
     private void clearDay() {
