@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.RemoteViews;
+import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.text.SimpleDateFormat;
@@ -20,6 +21,8 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
     private static final String BLOCKS_KEY = "blocks";
     private static final String MODE_KEY = "mode";
     private static final String ACTION_TOGGLE = "com.mihirkumar.dayflow.CHECK_IN_OUT";
+    private static final String DEBUG_LOG_KEY = "debugLog";
+    private static final String DEBUG_TAG = "DayFlow";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
@@ -46,11 +49,27 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    private static void debugLog(Context context, String message) {
+        String line = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())
+                + " | WIDGET | " + message;
+        Log.d(DEBUG_TAG, message);
+        try {
+            SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            String old = p.getString(DEBUG_LOG_KEY, "");
+            String combined = old + line + "\n";
+            if (combined.length() > 20000) combined = combined.substring(combined.length() - 20000);
+            p.edit().putString(DEBUG_LOG_KEY, combined).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
     private static void update(Context context, AppWidgetManager manager, int id) {
         RemoteViews views = new RemoteViews(context.getPackageName(), com.mihirkumar.dayflow.R.layout.widget_dayflow);
 
         JSONObject day = getTodayDay(context, false);
         String mode = getTodayMode(context);
+        debugLog(context, "Refresh widget id=" + id + " mode=" + mode
+                + " dayExists=" + (day != null));
         boolean officeMode = "office".equals(mode);
         boolean inOffice = hasOpenSession(day);
         long officeMs = officeDuration(day, System.currentTimeMillis());
@@ -61,6 +80,8 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         try {
             JSONArray blocks = getTodayBlocks(context);
             int now = currentMinutes();
+            debugLog(context, "Widget read blocks=" + blocks.length()
+                    + " now=" + now + " mode=" + mode);
             JSONObject active = null;
             JSONObject next = null;
 
@@ -79,6 +100,9 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
             JSONObject target = active != null ? active : next;
             if (target != null) {
                 current = target.optString("title", "Current task");
+                debugLog(context, "Widget selected task='" + current + "'"
+                        + " start=" + target.optString("start", "")
+                        + " end=" + target.optString("end", ""));
                 int start = mins(target.optString("start", "00:00"));
                 int end = mins(target.optString("end", "00:00"));
                 if (active != null) {
@@ -126,6 +150,8 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_container, openPi);
 
         manager.updateAppWidget(id, views);
+        debugLog(context, "Widget rendered id=" + id + " status='" + statusText
+                + "' task='" + current + "' timing='" + timing + "'");
     }
 
     private static PendingIntent commutePendingIntent(Context context) {
@@ -176,7 +202,10 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
             SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             String raw = p.getString("blocks_" + key, null);
             if (raw == null) raw = p.getString(BLOCKS_KEY, "[]");
-            return new JSONArray(raw);
+            JSONArray result = new JSONArray(raw);
+            debugLog(context, "Read blocks key=blocks_" + key + " rawFound=" + (p.getString("blocks_" + key, null) != null)
+                    + " count=" + result.length());
+            return result;
         } catch (Exception e) {
             return new JSONArray();
         }
