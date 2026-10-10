@@ -16,6 +16,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Calendar;
 import java.util.Locale;
 
 public class DayFlowWidgetProvider extends AppWidgetProvider {
@@ -277,7 +278,8 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
 
         manager.updateAppWidget(id, views);
         debugLog(context, "Widget rendered id=" + id + " status='" + statusText
-                + "' task='" + current + "' timing='" + timing + "'");
+                + "' task='" + current + "' timerState='"
+                + (target == null ? "done" : active != null ? "active" : "next") + "'");
     }
 
     private static PendingIntent commutePendingIntent(Context context) {
