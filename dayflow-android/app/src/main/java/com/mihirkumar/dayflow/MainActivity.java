@@ -580,7 +580,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void updateCurrentCard(Block current, Block next, int nowMins) {
     private void updateLiveBits() {
         if (!selectedDateKey.equals(todayKey())) return;
         int nowMins = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) * 60
@@ -601,10 +600,26 @@ public class MainActivity extends Activity {
             }
         }
         updateCurrentCard(current, next, nowMins);
-        renderOfficeCard();
+        updateLiveOfficeMetrics();
     }
 
+    private void updateLiveOfficeMetrics() {
+        if (officeCard == null || !"office".equals(mode) || !selectedDateKey.equals(todayKey())) return;
+        try {
+            JSONObject day = getOfficeDay(selectedDateKey, false);
+            long now = System.currentTimeMillis();
+            boolean open = hasOpenOfficeSession(day);
+            boolean commuteOpen = hasOpenCommute(day);
+            long office = officeDuration(day, now);
+            long commute = commuteDuration(day, now);
+            commuteView.setText("Today • Office " + (open ? fmtPreciseMillis(office) : fmtMillis(office))
+                    + "  •  Commute " + (commuteOpen ? fmtPreciseMillis(commute) : fmtMillis(commute)));
+        } catch (Exception e) {
+            debugLog("Live office metric update failed: " + e.getMessage());
+        }
+    }
 
+    private void updateCurrentCard(Block current, Block next, int nowMins) {
         View doneButton = root.findViewWithTag("currentDone");
         View recoveryButton = root.findViewWithTag("recoveryButton");
         boolean viewingToday = selectedDateKey.equals(todayKey());

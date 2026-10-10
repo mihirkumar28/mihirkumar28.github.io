@@ -442,7 +442,6 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    private static int currentMinutes() {
     private static boolean hasOpenCommute(JSONObject day) {
         if (day == null) return false;
         long a = day.optLong("commuteInStart", 0);
@@ -468,7 +467,7 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         }
     }
 
-
+    private static int currentMinutes() {
         java.util.Calendar c = java.util.Calendar.getInstance();
         return c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE);
     }
