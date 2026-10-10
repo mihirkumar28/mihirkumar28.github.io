@@ -1,6 +1,7 @@
 package com.mihirkumar.dayflow;
 
 import android.app.PendingIntent;
+import android.app.AlarmManager;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
@@ -9,6 +10,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.RemoteViews;
 import android.util.Log;
+import android.os.Build;
+import android.os.SystemClock;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.text.SimpleDateFormat;
@@ -23,29 +26,115 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
     private static final String ACTION_TOGGLE = "com.mihirkumar.dayflow.CHECK_IN_OUT";
     private static final String DEBUG_LOG_KEY = "debugLog";
     private static final String DEBUG_TAG = "DayFlow";
+    private static final String SYLLABUS_KEY = "syllabusTopics";
+    private static final String ACTION_TICK = "com.mihirkumar.dayflow.WIDGET_TICK";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         for (int id : ids) update(context, manager, id);
+        scheduleNextBoundary(context);
     }
 
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
-        if (ACTION_TOGGLE.equals(intent.getAction())) {
+        String action = intent == null ? null : intent.getAction();
+        if (ACTION_TOGGLE.equals(action)) {
             toggleAttendance(context);
             refreshAll(context);
-        } else if ("com.mihirkumar.dayflow.COMMUTE".equals(intent.getAction())) {
+        } else if ("com.mihirkumar.dayflow.COMMUTE".equals(action)) {
             toggleCommute(context);
             refreshAll(context);
+        } else if (ACTION_TICK.equals(action)
+                || Intent.ACTION_BOOT_COMPLETED.equals(action)
+                || Intent.ACTION_TIME_CHANGED.equals(action)
+                || Intent.ACTION_TIMEZONE_CHANGED.equals(action)
+                || "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED".equals(action)) {
+            refreshAll(context);
         }
+    }
+
+    @Override
+    public void onDisabled(Context context) {
+        cancelBoundaryAlarm(context);
+        super.onDisabled(context);
     }
 
     public static void refreshAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         ComponentName component = new ComponentName(context, DayFlowWidgetProvider.class);
-        for (int id : manager.getAppWidgetIds(component)) {
-            update(context, manager, id);
+        int[] ids = manager.getAppWidgetIds(component);
+        for (int id : ids) update(context, manager, id);
+        scheduleNextBoundary(context);
+    }
+
+    private static PendingIntent boundaryPendingIntent(Context context) {
+        Intent intent = new Intent(context, DayFlowWidgetProvider.class).setAction(ACTION_TICK);
+        return PendingIntent.getBroadcast(context, 1004, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private static void cancelBoundaryAlarm(Context context) {
+        try {
+            AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (alarms != null) alarms.cancel(boundaryPendingIntent(context));
+        } catch (Exception e) {
+            debugLog(context, "Boundary alarm cancel failed: " + e.getMessage());
+        }
+    }
+
+    private static void scheduleNextBoundary(Context context) {
+        try {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            ComponentName component = new ComponentName(context, DayFlowWidgetProvider.class);
+            if (manager.getAppWidgetIds(component).length == 0) {
+                cancelBoundaryAlarm(context);
+                return;
+            }
+            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            JSONArray blocks = new JSONArray(prefs.getString("blocks_" + today,
+                    prefs.getString(BLOCKS_KEY, "[]")));
+            long now = System.currentTimeMillis();
+            long next;
+            Calendar todayCalendar = Calendar.getInstance();
+            Calendar midnight = (Calendar) todayCalendar.clone();
+            midnight.add(Calendar.DAY_OF_YEAR, 1);
+            midnight.set(Calendar.HOUR_OF_DAY, 0);
+            midnight.set(Calendar.MINUTE, 0);
+            midnight.set(Calendar.SECOND, 0);
+            midnight.set(Calendar.MILLISECOND, 0);
+            next = midnight.getTimeInMillis();
+
+            for (int i = 0; i < blocks.length(); i++) {
+                JSONObject block = blocks.optJSONObject(i);
+                if (block == null || !"pending".equals(block.optString("status"))) continue;
+                String[] times = {block.optString("start", ""), block.optString("end", "")};
+                for (String value : times) {
+                    if (value.isEmpty()) continue;
+                    int minute = mins(value);
+                    Calendar boundary = (Calendar) todayCalendar.clone();
+                    boundary.set(Calendar.HOUR_OF_DAY, minute / 60);
+                    boundary.set(Calendar.MINUTE, minute % 60);
+                    boundary.set(Calendar.SECOND, 0);
+                    boundary.set(Calendar.MILLISECOND, 0);
+                    long when = boundary.getTimeInMillis();
+                    if (when > now + 250L && when < next) next = when;
+                }
+            }
+
+            AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (alarms == null) return;
+            PendingIntent pending = boundaryPendingIntent(context);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && alarms.canScheduleExactAlarms()) {
+                alarms.setExact(AlarmManager.RTC, next, pending);
+                debugLog(context, "Scheduled precise task boundary at=" + new Date(next));
+            } else {
+                alarms.set(AlarmManager.RTC, next, pending);
+                debugLog(context, "Scheduled battery-friendly inexact boundary at=" + new Date(next));
+            }
+        } catch (Exception e) {
+            debugLog(context, "Boundary schedule failed: " + e.getMessage());
         }
     }
 
@@ -76,15 +165,13 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         long commuteMs = commuteDuration(day, System.currentTimeMillis());
 
         String current = "Nothing active";
-        String timing = "Open DayFlow to plan";
+        JSONArray blocks = getTodayBlocks(context);
+        JSONObject active = null;
+        JSONObject next = null;
+        int now = currentMinutes();
         try {
-            JSONArray blocks = getTodayBlocks(context);
-            int now = currentMinutes();
             debugLog(context, "Widget read blocks=" + blocks.length()
                     + " now=" + now + " mode=" + mode);
-            JSONObject active = null;
-            JSONObject next = null;
-
             for (int i = 0; i < blocks.length(); i++) {
                 JSONObject b = blocks.optJSONObject(i);
                 if (b == null || !"pending".equals(b.optString("status"))) continue;
@@ -96,35 +183,74 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
                 }
                 if (start > now && next == null) next = b;
             }
+        } catch (Exception e) {
+            debugLog(context, "Widget task selection failed: " + e.getMessage());
+        }
 
-            JSONObject target = active != null ? active : next;
-            if (target != null) {
-                current = target.optString("title", "Current task");
-                debugLog(context, "Widget selected task='" + current + "'"
-                        + " start=" + target.optString("start", "")
-                        + " end=" + target.optString("end", ""));
-                int start = mins(target.optString("start", "00:00"));
-                int end = mins(target.optString("end", "00:00"));
-                if (active != null) {
-                    timing = fmt(end - now) + " left";
-                } else {
-                    timing = "Next • " + time12(target.optString("start", "00:00"));
-                }
-            }
-        } catch (Exception ignored) {
+        JSONObject target = active != null ? active : next;
+        long nowWall = System.currentTimeMillis();
+        if (target != null) {
+            current = target.optString("title", "Current task");
+            int targetMinute = mins(target.optString(active != null ? "end" : "start", "00:00"));
+            Calendar boundary = Calendar.getInstance();
+            boundary.set(Calendar.HOUR_OF_DAY, targetMinute / 60);
+            boundary.set(Calendar.MINUTE, targetMinute % 60);
+            boundary.set(Calendar.SECOND, 0);
+            boundary.set(Calendar.MILLISECOND, 0);
+            long remainingMs = Math.max(0L, boundary.getTimeInMillis() - nowWall);
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_timing, active != null ? "ENDS IN" : "NEXT IN");
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_countdown,
+                    SystemClock.elapsedRealtime() + remainingMs, "%s", true);
+            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_countdown, true);
+            views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_countdown, android.view.View.VISIBLE);
+            debugLog(context, "Widget selected task='" + current + "' remainingMs=" + remainingMs);
+        } else {
+            current = "Day complete";
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_timing, "SCHEDULE");
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_countdown,
+                    SystemClock.elapsedRealtime(), "%s", false);
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_countdown, "Done");
+            views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_countdown, android.view.View.VISIBLE);
         }
 
         String statusText;
         if (!officeMode) {
             statusText = mode.equals("weekend") ? "WEEKEND" : "WFH";
         } else {
-            statusText = inOffice ? "IN OFFICE • " + fmtMillis(officeMs)
-                                  : "OUT • OFFICE " + fmtMillis(officeMs);
+            statusText = inOffice ? "IN OFFICE" : "OUT OF OFFICE";
         }
         views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_status, statusText);
         views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_task, current);
-        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_timing,
-                timing + " • Commute " + fmtMillis(commuteMs));
+
+        int doneBlocks = 0;
+        for (int i = 0; i < blocks.length(); i++) {
+            JSONObject block = blocks.optJSONObject(i);
+            if (block != null && "done".equals(block.optString("status"))) doneBlocks++;
+        }
+        if (officeMode && hasOpenCommute(day)) {
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics_label, "COMMUTE");
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metrics,
+                    SystemClock.elapsedRealtime() - commuteMs, "%s", true);
+            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metrics, false);
+        } else if (officeMode && inOffice) {
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics_label, "OFFICE");
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metrics,
+                    SystemClock.elapsedRealtime() - officeMs, "%s", true);
+            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metrics, false);
+        } else if (officeMode) {
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics_label, "TOTAL");
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metrics,
+                    SystemClock.elapsedRealtime(), "%s", false);
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics,
+                    "O " + fmtMillis(officeMs) + " • C " + fmtMillis(commuteMs));
+        } else {
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics_label, "PLAN");
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metrics,
+                    SystemClock.elapsedRealtime(), "%s", false);
+            String syllabus = syllabusProgressPercent(context);
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics,
+                    doneBlocks + "/" + blocks.length() + " • S " + syllabus + "%");
+        }
 
         views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_action,
                 officeMode ? android.view.View.VISIBLE : android.view.View.GONE);
@@ -317,6 +443,32 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
     }
 
     private static int currentMinutes() {
+    private static boolean hasOpenCommute(JSONObject day) {
+        if (day == null) return false;
+        long a = day.optLong("commuteInStart", 0);
+        long b = day.optLong("commuteInEnd", 0);
+        long c = day.optLong("commuteOutStart", 0);
+        long d = day.optLong("commuteOutEnd", 0);
+        return (a > 0 && b == 0) || (c > 0 && d == 0);
+    }
+
+    private static String syllabusProgressPercent(Context context) {
+        try {
+            JSONArray topics = new JSONArray(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString(SYLLABUS_KEY, "[]"));
+            if (topics.length() == 0) return "—";
+            int done = 0;
+            for (int i = 0; i < topics.length(); i++) {
+                JSONObject topic = topics.optJSONObject(i);
+                if (topic != null && topic.optBoolean("done", false)) done++;
+            }
+            return String.valueOf(Math.round(done * 100f / topics.length()));
+        } catch (Exception e) {
+            return "—";
+        }
+    }
+
+
         java.util.Calendar c = java.util.Calendar.getInstance();
         return c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE);
     }

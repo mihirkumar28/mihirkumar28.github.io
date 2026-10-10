@@ -1,19 +1,23 @@
 package com.mihirkumar.dayflow;
 
 import android.app.Activity;
+import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.app.DatePickerDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.provider.Settings;
 import android.util.Log;
 import android.widget.*;
 import org.json.JSONArray;
@@ -34,6 +38,10 @@ public class MainActivity extends Activity {
     private static final String OFFICE_LOG_KEY = "officeLog";
     private static final String DEBUG_LOG_KEY = "debugLog";
     private static final String DEBUG_TAG = "DayFlow";
+    private static final String SYLLABUS_KEY = "syllabusTopics";
+    private static final String[] SYLLABUS_SUBJECTS = {
+            "General Studies", "Maths Optional", "CSAT", "Essay", "Interview"
+    };
 
     private final ArrayList<Block> blocks = new ArrayList<>();
     private final Handler handler = new Handler();
@@ -59,6 +67,33 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static class SyllabusTopic {
+        long id;
+        String subject, title;
+        boolean done;
+        SyllabusTopic(long id, String subject, String title, boolean done) {
+            this.id = id;
+            this.subject = subject;
+            this.title = title;
+            this.done = done;
+        }
+    }
+
+    private long lastRenderedMinute = -1;
+    private final Runnable liveRefresh = new Runnable() {
+        @Override public void run() {
+            long minute = System.currentTimeMillis() / 60000L;
+            if (selectedDateKey != null && selectedDateKey.equals(todayKey())) {
+                if (minute != lastRenderedMinute) render();
+                else updateLiveBits();
+            } else {
+                lastRenderedMinute = minute;
+            }
+            long remainder = System.currentTimeMillis() % 1000L;
+            handler.postDelayed(this, Math.max(50L, 1000L - remainder));
+        }
+    };
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -71,18 +106,20 @@ public class MainActivity extends Activity {
         buildUi();
         render();
 
-        handler.postDelayed(new Runnable() {
-            @Override public void run() {
-                render();
-                handler.postDelayed(this, 30000);
-            }
-        }, 30000);
+        handler.postDelayed(liveRefresh, Math.max(50L, 1000L - (System.currentTimeMillis() % 1000L)));
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         render();
+        DayFlowWidgetProvider.refreshAll(this);
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacks(liveRefresh);
+        super.onDestroy();
     }
 
     private int dp(float v) {
@@ -118,6 +155,35 @@ public class MainActivity extends Activity {
         long minutes = Math.max(0, ms / 60000L);
         return fmtShort((int) Math.min(minutes, Integer.MAX_VALUE));
     }
+    private String fmtPreciseMillis(long ms) {
+        long seconds = Math.max(0L, ms / 1000L);
+        long hours = seconds / 3600L;
+        long minutes = (seconds % 3600L) / 60L;
+        long remainder = seconds % 60L;
+        if (hours > 0) return hours + "h " + String.format(Locale.US, "%02dm %02ds", minutes, remainder);
+        if (minutes > 0) return minutes + "m " + String.format(Locale.US, "%02ds", remainder);
+        return seconds + "s";
+    }
+
+    private long millisAtMinute(int minuteOfDay) {
+        Calendar c = Calendar.getInstance();
+        c.set(Calendar.HOUR_OF_DAY, Math.max(0, Math.min(23, minuteOfDay / 60)));
+        c.set(Calendar.MINUTE, Math.max(0, Math.min(59, minuteOfDay % 60)));
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
+    }
+
+    private String formatCountdown(long millis) {
+        long seconds = Math.max(0L, (millis + 999L) / 1000L);
+        long hours = seconds / 3600L;
+        long minutes = (seconds % 3600L) / 60L;
+        long remainder = seconds % 60L;
+        if (hours > 0) return hours + "h " + String.format(Locale.US, "%02dm %02ds", minutes, remainder);
+        if (minutes > 0) return minutes + "m " + String.format(Locale.US, "%02ds", remainder);
+        return remainder + "s";
+    }
+
 
     private String clock(long timestamp) {
         return new SimpleDateFormat("h:mm a", Locale.getDefault()).format(new Date(timestamp));
@@ -434,6 +500,7 @@ public class MainActivity extends Activity {
     }
 
     private void render() {
+        lastRenderedMinute = System.currentTimeMillis() / 60000L;
         Collections.sort(blocks, Comparator.comparingInt(b -> mins(b.start)));
 
         Calendar now = Calendar.getInstance();
@@ -481,7 +548,7 @@ public class MainActivity extends Activity {
 
         completionView.setText(done + " / " + total + " complete");
         int percent = total == 0 ? 0 : Math.round(done * 100f / total);
-        progressPercent.setText(percent + "% of the plan");
+        progressPercent.setText(percent + "% of plan • " + syllabusProgressLabel());
         plannedView.setText(fmtShort(plannedMinutes));
         doneView.setText(fmt(doneMinutes) + " done");
 
@@ -514,6 +581,30 @@ public class MainActivity extends Activity {
     }
 
     private void updateCurrentCard(Block current, Block next, int nowMins) {
+    private void updateLiveBits() {
+        if (!selectedDateKey.equals(todayKey())) return;
+        int nowMins = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) * 60
+                + Calendar.getInstance().get(Calendar.MINUTE);
+        Block current = null, next = null;
+        for (Block b : blocks) {
+            if ("pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
+                current = b;
+                break;
+            }
+        }
+        if (current == null) {
+            for (Block b : blocks) {
+                if ("pending".equals(b.status) && mins(b.start) > nowMins) {
+                    next = b;
+                    break;
+                }
+            }
+        }
+        updateCurrentCard(current, next, nowMins);
+        renderOfficeCard();
+    }
+
+
         View doneButton = root.findViewWithTag("currentDone");
         View recoveryButton = root.findViewWithTag("recoveryButton");
         boolean viewingToday = selectedDateKey.equals(todayKey());
@@ -541,13 +632,13 @@ public class MainActivity extends Activity {
         if (current != null) {
             currentTitle.setText(current.title);
             currentTime.setText(time12(current.start) + " – " + time12(current.end));
-            int remaining = Math.max(0, mins(current.end) - nowMins);
-            currentCountdown.setText(fmt(remaining) + " left");
+            long remainingMs = millisAtMinute(mins(current.end)) - System.currentTimeMillis();
+            currentCountdown.setText(formatCountdown(remainingMs) + " left");
         } else {
             currentTitle.setText(next.title);
             currentTime.setText("Next • " + time12(next.start) + " – " + time12(next.end));
-            int until = Math.max(0, mins(next.start) - nowMins);
-            currentCountdown.setText("in " + fmt(until));
+            long untilMs = millisAtMinute(mins(next.start)) - System.currentTimeMillis();
+            currentCountdown.setText("in " + formatCountdown(untilMs));
         }
     }
 
@@ -1179,6 +1270,8 @@ public class MainActivity extends Activity {
                 "Edit WFH template",
                 "Edit Office template",
                 "Edit Weekend template",
+                "Syllabus tracker",
+                "Enable precise live widget updates",
                 "View diagnostics",
                 "Clear selected day's plan"
         };
@@ -1191,10 +1284,212 @@ public class MainActivity extends Activity {
                     else if (which == 3) openTemplateEditor("wfh");
                     else if (which == 4) openTemplateEditor("office");
                     else if (which == 5) openTemplateEditor("weekend");
-                    else if (which == 6) showDiagnostics();
+                    else if (which == 6) showSyllabusTracker();
+                    else if (which == 7) enablePreciseLiveWidgetUpdates();
+                    else if (which == 8) showDiagnostics();
                     else clearDay();
                 })
                 .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private ArrayList<SyllabusTopic> readSyllabusTopics() {
+        ArrayList<SyllabusTopic> topics = new ArrayList<>();
+        try {
+            JSONArray data = new JSONArray(getPrefs().getString(SYLLABUS_KEY, "[]"));
+            for (int i = 0; i < data.length(); i++) {
+                JSONObject item = data.optJSONObject(i);
+                if (item == null) continue;
+                topics.add(new SyllabusTopic(
+                        item.optLong("id", i + 1L),
+                        item.optString("subject", "General Studies"),
+                        item.optString("title", ""),
+                        item.optBoolean("done", false)));
+            }
+        } catch (Exception e) {
+            debugLog("Syllabus read failed: " + e.getMessage());
+        }
+        return topics;
+    }
+
+    private String syllabusProgressLabel() {
+        ArrayList<SyllabusTopic> topics = readSyllabusTopics();
+        if (topics.isEmpty()) return "Syllabus not set";
+        int done = 0;
+        for (SyllabusTopic topic : topics) if (topic.done) done++;
+        return "Syllabus " + Math.round(done * 100f / topics.size()) + "%";
+    }
+
+    private String syllabusSummary(ArrayList<SyllabusTopic> topics) {
+        if (topics.isEmpty()) return "Add your own GS, Maths Optional, CSAT, Essay or Interview topics. Progress is calculated from topics you mark complete.";
+        LinkedHashMap<String, int[]> counts = new LinkedHashMap<>();
+        int done = 0;
+        for (SyllabusTopic topic : topics) {
+            int[] values = counts.get(topic.subject);
+            if (values == null) {
+                values = new int[2];
+                counts.put(topic.subject, values);
+            }
+            values[1]++;
+            if (topic.done) { values[0]++; done++; }
+        }
+        StringBuilder summary = new StringBuilder();
+        summary.append("Overall: ").append(done).append("/").append(topics.size())
+                .append(" complete (").append(Math.round(done * 100f / topics.size())).append("%)");
+        for (Map.Entry<String, int[]> entry : counts.entrySet()) {
+            int[] values = entry.getValue();
+            summary.append("\n").append(entry.getKey()).append(": ").append(values[0]).append("/")
+                    .append(values[1]).append(" (").append(Math.round(values[0] * 100f / values[1])).append("%)");
+        }
+        return summary.toString();
+    }
+
+    private void showSyllabusTracker() {
+        ArrayList<SyllabusTopic> topics = readSyllabusTopics();
+        String[] rows = new String[topics.size() + 1];
+        rows[0] = "＋ Add syllabus topic";
+        for (int i = 0; i < topics.size(); i++) {
+            SyllabusTopic topic = topics.get(i);
+            rows[i + 1] = (topic.done ? "✓ " : "○ ") + topic.subject + " • " + topic.title;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Syllabus tracker")
+                .setMessage(syllabusSummary(topics))
+                .setItems(rows, (dialog, which) -> {
+                    if (which == 0) editSyllabusTopic(null);
+                    else showSyllabusTopicActions(topics.get(which - 1));
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void showSyllabusTopicActions(SyllabusTopic topic) {
+        String toggle = topic.done ? "Mark pending" : "Mark complete";
+        String[] actions = {toggle, "Edit topic", "Delete topic"};
+        new AlertDialog.Builder(this).setTitle(topic.title).setItems(actions, (dialog, which) -> {
+            if (which == 0) {
+                topic.done = !topic.done;
+                saveSyllabusTopics();
+            } else if (which == 1) {
+                editSyllabusTopic(topic);
+            } else {
+                new AlertDialog.Builder(this)
+                        .setTitle("Delete topic?")
+                        .setMessage(topic.title + " will be removed from your syllabus tracker.")
+                        .setPositiveButton("Delete", (d, w) -> {
+                            ArrayList<SyllabusTopic> all = readSyllabusTopics();
+                            for (int i = all.size() - 1; i >= 0; i--) {
+                                if (all.get(i).id == topic.id) all.remove(i);
+                            }
+                            persistSyllabusTopics(all);
+                        })
+                        .setNegativeButton("Keep", null)
+                        .show();
+            }
+        }).setNegativeButton("Cancel", null).show();
+    }
+
+    private void editSyllabusTopic(SyllabusTopic existing) {
+        LinearLayout form = vertical();
+        form.setPadding(dp(20), dp(4), dp(20), dp(4));
+        EditText title = new EditText(this);
+        title.setSingleLine(true);
+        title.setHint("Exact topic / syllabus item");
+        title.setTextColor(Color.WHITE);
+        title.setHintTextColor(color("#697386"));
+        if (existing != null) title.setText(existing.title);
+        form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
+
+        TextView label = text("SUBJECT", 10, color("#8E98AA"), true);
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, -2);
+        labelLp.topMargin = dp(10);
+        form.addView(label, labelLp);
+        Spinner subject = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, SYLLABUS_SUBJECTS);
+        subject.setAdapter(adapter);
+        if (existing != null) {
+            for (int i = 0; i < SYLLABUS_SUBJECTS.length; i++) {
+                if (SYLLABUS_SUBJECTS[i].equals(existing.subject)) subject.setSelection(i);
+            }
+        }
+        form.addView(subject, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        new AlertDialog.Builder(this)
+                .setTitle(existing == null ? "Add syllabus topic" : "Edit syllabus topic")
+                .setView(form)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String name = title.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        Toast.makeText(this, "Enter a topic name.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    ArrayList<SyllabusTopic> all = readSyllabusTopics();
+                    if (existing == null) {
+                        all.add(new SyllabusTopic(System.currentTimeMillis(), subject.getSelectedItem().toString(), name, false));
+                    } else {
+                        for (SyllabusTopic item : all) {
+                            if (item.id == existing.id) {
+                                item.subject = subject.getSelectedItem().toString();
+                                item.title = name;
+                            }
+                        }
+                    }
+                    persistSyllabusTopics(all);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void saveSyllabusTopics() {
+        persistSyllabusTopics(readSyllabusTopics());
+    }
+
+    private void persistSyllabusTopics(ArrayList<SyllabusTopic> topics) {
+        JSONArray data = new JSONArray();
+        try {
+            for (SyllabusTopic topic : topics) {
+                JSONObject item = new JSONObject();
+                item.put("id", topic.id);
+                item.put("subject", topic.subject);
+                item.put("title", topic.title);
+                item.put("done", topic.done);
+                data.put(item);
+            }
+            getPrefs().edit().putString(SYLLABUS_KEY, data.toString()).apply();
+            debugLog("Syllabus saved: topics=" + topics.size());
+            DayFlowWidgetProvider.refreshAll(this);
+        } catch (Exception e) {
+            debugLog("Syllabus save failed: " + e.getMessage());
+            Toast.makeText(this, "Could not save syllabus changes.", Toast.LENGTH_SHORT).show();
+        }
+        render();
+    }
+
+    private void enablePreciseLiveWidgetUpdates() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            DayFlowWidgetProvider.refreshAll(this);
+            Toast.makeText(this, "Live timers use the device clock; widget task names refresh at schedule boundaries.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        AlarmManager alarms = (AlarmManager) getSystemService(ALARM_SERVICE);
+        if (alarms != null && alarms.canScheduleExactAlarms()) {
+            DayFlowWidgetProvider.refreshAll(this);
+            Toast.makeText(this, "Precise widget boundary updates are enabled.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Enable precise live updates")
+                .setMessage("DayFlow's timers tick locally to the second. Allow Alarms & reminders so the widget can switch task names at scheduled boundaries. This uses one non-waking alarm for the next schedule change, not a background loop.")
+                .setPositiveButton("Open settings", (dialog, which) -> {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                Uri.parse("package:" + getPackageName())));
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Open Android Settings → Apps → DayFlow → Alarms & reminders.", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton("Not now", null)
                 .show();
     }
 
@@ -1567,8 +1862,8 @@ public class MainActivity extends Activity {
                     ? "No office time logged today"
                     : times.toString());
 
-            commuteView.setText("Today • Office " + fmtMillis(office)
-                    + "  •  Commute " + fmtMillis(commute));
+            commuteView.setText("Today • Office " + (viewingToday && open ? fmtPreciseMillis(office) : fmtMillis(office))
+                    + "  •  Commute " + (viewingToday && commuteOpen ? fmtPreciseMillis(commute) : fmtMillis(commute)));
 
             if (!selectedDateKey.equals(todayKey())) {
                 commuteAction.setText("View commute details");
