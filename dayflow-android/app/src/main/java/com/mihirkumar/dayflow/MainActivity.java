@@ -9,6 +9,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -40,6 +43,8 @@ public class MainActivity extends Activity {
     private static final String DEBUG_LOG_KEY = "debugLog";
     private static final String DEBUG_TAG = "DayFlow";
     private static final String SYLLABUS_KEY = "syllabusTopics";
+    private static final int REQUEST_EXPORT_BACKUP = 4201;
+    private static final int REQUEST_IMPORT_BACKUP = 4202;
     private static final String[] SYLLABUS_SUBJECTS = {
             "General Studies", "Maths Optional", "CSAT", "Essay", "Interview"
     };
@@ -106,6 +111,8 @@ public class MainActivity extends Activity {
         load();
         buildUi();
         render();
+        ensureScreenTimeWorker();
+        if (ScreenTimeTracker.hasUsageAccess(this)) ScreenTimeTracker.refreshRecentDays(this, 7);
 
         handler.postDelayed(liveRefresh, Math.max(50L, 1000L - (System.currentTimeMillis() % 1000L)));
     }
@@ -113,6 +120,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        ensureScreenTimeWorker();
+        if (ScreenTimeTracker.refreshRecentDays(this, 7)) DayFlowWidgetProvider.refreshAll(this);
         render();
         DayFlowWidgetProvider.refreshAll(this);
     }
@@ -1286,8 +1295,11 @@ public class MainActivity extends Activity {
                 "Edit WFH template",
                 "Edit Office template",
                 "Edit Weekend template",
+                "Screen time & history",
                 "Syllabus tracker",
                 "Enable precise live widget updates",
+                "Export DayFlow backup",
+                "Import DayFlow backup",
                 "View diagnostics",
                 "Clear selected day's plan"
         };
@@ -1300,9 +1312,12 @@ public class MainActivity extends Activity {
                     else if (which == 3) openTemplateEditor("wfh");
                     else if (which == 4) openTemplateEditor("office");
                     else if (which == 5) openTemplateEditor("weekend");
-                    else if (which == 6) showSyllabusTracker();
-                    else if (which == 7) enablePreciseLiveWidgetUpdates();
-                    else if (which == 8) showDiagnostics();
+                    else if (which == 6) showScreenTimeTracker();
+                    else if (which == 7) showSyllabusTracker();
+                    else if (which == 8) enablePreciseLiveWidgetUpdates();
+                    else if (which == 9) requestExportBackup();
+                    else if (which == 10) requestImportBackup();
+                    else if (which == 11) showDiagnostics();
                     else clearDay();
                 })
                 .setNegativeButton("Close", null)
@@ -2202,6 +2217,192 @@ public class MainActivity extends Activity {
                     .show();
         } catch (Exception ignored) {
             Toast.makeText(this, "Couldn't load that day.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
+    private void ensureScreenTimeWorker() {
+        try {
+            PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
+                    ScreenTimeWorker.class, 15, java.util.concurrent.TimeUnit.MINUTES).build();
+            WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork(
+                    "dayflow-screen-time-history", ExistingPeriodicWorkPolicy.KEEP, request);
+        } catch (Exception e) {
+            debugLog("Screen-time work scheduling failed: " + e.getMessage());
+        }
+    }
+
+    private void showScreenTimeTracker() {
+        if (!ScreenTimeTracker.hasUsageAccess(this)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Enable screen-time history")
+                    .setMessage("DayFlow needs Android Usage access to read screen-interactive history. It stores daily totals locally on this device; it does not upload an app-by-app list. After access is granted, DayFlow snapshots recent days and keeps a durable local history.")
+                    .setPositiveButton("Open Usage access", (d, w) -> {
+                        try { startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)); }
+                        catch (Exception e) {
+                            Toast.makeText(this, "Settings → Apps → Special app access → Usage access → DayFlow.", Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return;
+        }
+        ScreenTimeTracker.refreshRecentDays(this, 14);
+        StringBuilder report = new StringBuilder("Phone screen-interactive time • saved locally\n\n");
+        for (int i = 0; i < 14; i++) {
+            Calendar day = Calendar.getInstance();
+            day.add(Calendar.DAY_OF_YEAR, -i);
+            String key = keyForDate(day.getTime());
+            String label = new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(day.getTime());
+            long value = ScreenTimeTracker.getStoredMillis(this, key);
+            report.append(label).append("  —  ");
+            if (value < 0) report.append("No DayFlow snapshot");
+            else {
+                report.append(ScreenTimeTracker.formatDuration(value));
+                if (ScreenTimeTracker.isEstimated(this, key)) report.append(" (foreground-use estimate)");
+                long captured = ScreenTimeTracker.getCapturedAt(this, key);
+                if (captured > 0) report.append("\n    Updated ").append(clock(captured));
+            }
+            report.append("\n");
+        }
+        report.append("\nAndroid keeps detailed screen events only for a limited recent period. Once DayFlow saves a daily total, it remains in local history.");
+        TextView view = text(report.toString(), 13, color("#D7DFED"), false);
+        view.setPadding(dp(16), dp(12), dp(16), dp(12));
+        view.setTextIsSelectable(true);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(color("#0F131C"));
+        scroll.addView(view, new ScrollView.LayoutParams(-1, -2));
+        new AlertDialog.Builder(this).setTitle("Screen time history")
+                .setView(scroll)
+                .setNeutralButton("Refresh", (d, w) -> showScreenTimeTracker())
+                .setPositiveButton("Close", null)
+                .show();
+    }
+
+    private void requestExportBackup() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        intent.putExtra(Intent.EXTRA_TITLE, "dayflow-backup-" + todayKey() + ".json");
+        try { startActivityForResult(intent, REQUEST_EXPORT_BACKUP); }
+        catch (Exception e) { Toast.makeText(this, "No file picker is available.", Toast.LENGTH_LONG).show(); }
+    }
+
+    private void requestImportBackup() {
+        new AlertDialog.Builder(this).setTitle("Import DayFlow backup?")
+                .setMessage("Restoring a backup replaces all current local DayFlow data. Export the current data first if it needs to be kept.")
+                .setPositiveButton("Choose file", (d, w) -> {
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("application/json");
+                    try { startActivityForResult(intent, REQUEST_IMPORT_BACKUP); }
+                    catch (Exception e) { Toast.makeText(this, "No file picker is available.", Toast.LENGTH_LONG).show(); }
+                }).setNegativeButton("Cancel", null).show();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (requestCode == REQUEST_EXPORT_BACKUP) writeBackup(data.getData());
+        else if (requestCode == REQUEST_IMPORT_BACKUP) readBackupForRestore(data.getData());
+    }
+
+    private JSONObject buildBackupDocument() throws Exception {
+        JSONObject root = new JSONObject();
+        root.put("app", "DayFlow");
+        root.put("formatVersion", 1);
+        root.put("exportedAt", System.currentTimeMillis());
+        JSONObject values = new JSONObject();
+        for (Map.Entry<String, ?> entry : getPrefs().getAll().entrySet()) {
+            Object value = entry.getValue();
+            JSONObject typed = new JSONObject();
+            if (value instanceof String) { typed.put("type", "string"); typed.put("value", value); }
+            else if (value instanceof Boolean) { typed.put("type", "boolean"); typed.put("value", value); }
+            else if (value instanceof Integer) { typed.put("type", "int"); typed.put("value", value); }
+            else if (value instanceof Long) { typed.put("type", "long"); typed.put("value", value); }
+            else if (value instanceof Float) { typed.put("type", "float"); typed.put("value", value); }
+            else if (value instanceof Set) {
+                JSONArray set = new JSONArray();
+                for (Object item : (Set<?>) value) set.put(String.valueOf(item));
+                typed.put("type", "stringSet");
+                typed.put("value", set);
+            } else continue;
+            values.put(entry.getKey(), typed);
+        }
+        root.put("preferences", values);
+        return root;
+    }
+
+    private void writeBackup(Uri uri) {
+        try (java.io.OutputStream output = getContentResolver().openOutputStream(uri)) {
+            if (output == null) throw new java.io.IOException("Could not open backup destination");
+            output.write(buildBackupDocument().toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            output.flush();
+            debugLog("Backup exported");
+            Toast.makeText(this, "DayFlow backup exported.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            debugLog("Backup export failed: " + e.getMessage());
+            Toast.makeText(this, "Backup export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void readBackupForRestore(Uri uri) {
+        try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+            if (input == null) throw new java.io.IOException("Could not open backup file");
+            java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+            byte[] bytes = new byte[4096];
+            int count;
+            while ((count = input.read(bytes)) != -1) buffer.write(bytes, 0, count);
+            JSONObject root = new JSONObject(buffer.toString(java.nio.charset.StandardCharsets.UTF_8.name()));
+            if (!"DayFlow".equals(root.optString("app")) || root.optInt("formatVersion", 0) != 1
+                    || !(root.opt("preferences") instanceof JSONObject)) {
+                throw new IllegalArgumentException("This is not a supported DayFlow backup.");
+            }
+            JSONObject values = root.getJSONObject("preferences");
+            new AlertDialog.Builder(this).setTitle("Restore backup?")
+                    .setMessage("The backup contains " + values.length() + " values. It replaces current plans, attendance, syllabus and screen-time history.")
+                    .setPositiveButton("Restore", (d, w) -> restoreBackupValues(values))
+                    .setNegativeButton("Cancel", null).show();
+        } catch (Exception e) {
+            debugLog("Backup import failed: " + e.getMessage());
+            Toast.makeText(this, "Couldn't read backup: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void restoreBackupValues(JSONObject values) {
+        try {
+            SharedPreferences.Editor editor = getPrefs().edit().clear();
+            java.util.Iterator<String> keys = values.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                JSONObject typed = values.optJSONObject(key);
+                if (typed == null) continue;
+                String type = typed.optString("type");
+                Object value = typed.opt("value");
+                if ("string".equals(type)) editor.putString(key, value == null ? "" : String.valueOf(value));
+                else if ("boolean".equals(type)) editor.putBoolean(key, typed.optBoolean("value", false));
+                else if ("int".equals(type)) editor.putInt(key, typed.optInt("value", 0));
+                else if ("long".equals(type)) editor.putLong(key, typed.optLong("value", 0L));
+                else if ("float".equals(type)) editor.putFloat(key, (float) typed.optDouble("value", 0.0));
+                else if ("stringSet".equals(type) && value instanceof JSONArray) {
+                    HashSet<String> set = new HashSet<>();
+                    JSONArray list = (JSONArray) value;
+                    for (int i = 0; i < list.length(); i++) set.add(list.optString(i));
+                    editor.putStringSet(key, set);
+                }
+            }
+            editor.apply();
+            selectedDateKey = todayKey();
+            load();
+            render();
+            ensureScreenTimeWorker();
+            DayFlowWidgetProvider.refreshAll(this);
+            Toast.makeText(this, "DayFlow backup restored.", Toast.LENGTH_LONG).show();
+            debugLog("Backup restored");
+        } catch (Exception e) {
+            debugLog("Backup restore failed: " + e.getMessage());
+            Toast.makeText(this, "Backup restore failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
