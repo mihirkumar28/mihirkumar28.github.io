@@ -298,7 +298,7 @@ public class MainActivity extends Activity {
             case "#D5B56E": return Color.parseColor("#A76821");
             case "#F2F7F3": case "#F1F6F2": case "#F5FBF7": case "#F5F6F1":
                 return Color.parseColor("#18372E");
-            case "#D6E4DA": case "#D6E1D8": case "#DCE2EE": case "#B7C7BC":
+            case "#D6E4DA": case "#D6E1D8": case "#DCE2EE":
                 return Color.parseColor("#496257");
             case "#9AABA0": case "#91A197": case "#82948A": case "#A5B5AA":
             case "#A8B0C2": case "#8A9A90": case "#8E98AA": case "#AEB7C9":
@@ -1762,7 +1762,7 @@ public class MainActivity extends Activity {
         title.setSingleLine(true);
         title.setText(b.title);
         title.setHint("Block name");
-        title.setTextColor(Color.WHITE);
+        title.setTextColor(color("#18372E"));
         title.setHintTextColor(color("#82948A"));
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
         final int[] start = {mins(b.start)};
@@ -1845,16 +1845,17 @@ public class MainActivity extends Activity {
                 }
             });
         }
-        new AlertDialog.Builder(this).setTitle("Edit block").setView(form)
-                .setPositiveButton("Save", (dialog, which) -> {
+        showFullScreenEditor("EDIT TASK", "Edit block",
+                "Adjust timing, fixed/flexible behaviour and priority.", form, () -> {
                     String name = title.getText().toString().trim();
                     if (name.isEmpty()) {
-                        Toast.makeText(this, "Give this block a name.", Toast.LENGTH_SHORT).show();
-                        return;
+                        title.setError("Give this block a name");
+                        title.requestFocus();
+                        return false;
                     }
                     if (end[0] <= start[0]) {
                         Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
-                        return;
+                        return false;
                     }
                     stopFocusForBlock(b, System.currentTimeMillis());
                     b.title = name;
@@ -1863,10 +1864,11 @@ public class MainActivity extends Activity {
                     b.rigidity = selectedRigidity[0];
                     b.priority = selectedPriority[0];
                     save();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+                    return true;
+                });
     }
+
+
 
     private void recoveryMode() {
         if (!selectedDateKey.equals(todayKey())) {
@@ -2009,6 +2011,69 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    private void showFullScreenEditor(String eyebrow, String title, String subtitle,
+                                      View form, java.util.function.BooleanSupplier saveAction) {
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout editor = vertical();
+        editor.setBackgroundColor(color("#F4F6F1"));
+
+        LinearLayout header = horizontal();
+        header.setPadding(dp(18), dp(12), dp(18), dp(12));
+        Button back = secondaryButton("‹", dialog::dismiss);
+        LinearLayout.LayoutParams backLp = new LinearLayout.LayoutParams(dp(44), dp(42));
+        backLp.rightMargin = dp(12);
+        header.addView(back, backLp);
+        LinearLayout headings = vertical();
+        headings.addView(text(eyebrow.toUpperCase(Locale.US), 10, color("#2E8060"), true));
+        TextView titleView = text(title, 22, color("#18372E"), true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.topMargin = dp(2);
+        headings.addView(titleView, titleLp);
+        TextView subtitleView = text(subtitle, 11, color("#687A70"), false);
+        subtitleView.setLineSpacing(dp(2), 1f);
+        headings.addView(subtitleView);
+        header.addView(headings, new LinearLayout.LayoutParams(0, -2, 1));
+        editor.addView(header, new LinearLayout.LayoutParams(-1, -2));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.setClipToPadding(false);
+        if (form.getParent() instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) form.getParent()).removeView(form);
+        }
+        scroll.addView(form, new ScrollView.LayoutParams(-1, -2));
+        editor.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        LinearLayout footer = horizontal();
+        footer.setPadding(dp(16), dp(10), dp(16), dp(12));
+        footer.setBackgroundColor(Color.WHITE);
+        footer.addView(secondaryButton("Cancel", dialog::dismiss),
+                new LinearLayout.LayoutParams(0, dp(46), 1));
+        Button save = primaryButton("Save changes", () -> {
+            try {
+                if (saveAction.getAsBoolean()) dialog.dismiss();
+            } catch (Exception e) {
+                debugLog("Full-screen editor save failed: " + e.getMessage());
+                Toast.makeText(this, "Couldn't save. Your existing data is unchanged.", Toast.LENGTH_LONG).show();
+            }
+        });
+        LinearLayout.LayoutParams saveLp = new LinearLayout.LayoutParams(0, dp(46), 1);
+        saveLp.leftMargin = dp(8);
+        footer.addView(save, saveLp);
+        editor.addView(footer, new LinearLayout.LayoutParams(-1, -2));
+
+        dialog.setContentView(editor);
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color("#F4F6F1")));
+            window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        dialog.show();
+        if (window != null) window.setLayout(android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT);
+    }
+
     private void openManageDialog() { switchPage("more"); }
 
     private ArrayList<SyllabusTopic> readSyllabusTopics() {
@@ -2149,7 +2214,7 @@ public class MainActivity extends Activity {
         lines.setGravity(Gravity.TOP);
         lines.setMinLines(6);
         lines.setHint("Paste topics, one per line");
-        lines.setTextColor(Color.WHITE);
+        lines.setTextColor(color("#18372E"));
         lines.setHintTextColor(color("#82948A"));
         form.addView(lines, new LinearLayout.LayoutParams(-1, dp(160)));
         new AlertDialog.Builder(this).setTitle("Import topic list")
@@ -2447,7 +2512,7 @@ public class MainActivity extends Activity {
         EditText title = new EditText(this);
         title.setSingleLine(true);
         title.setHint("Exact topic / syllabus item");
-        title.setTextColor(Color.WHITE);
+        title.setTextColor(color("#18372E"));
         title.setHintTextColor(color("#82948A"));
         if (existing != null) title.setText(existing.title);
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
@@ -2467,18 +2532,19 @@ public class MainActivity extends Activity {
         }
         form.addView(subject, new LinearLayout.LayoutParams(-1, dp(48)));
 
-        new AlertDialog.Builder(this)
-                .setTitle(existing == null ? "Add syllabus topic" : "Edit syllabus topic")
-                .setView(form)
-                .setPositiveButton("Save", (dialog, which) -> {
+        showFullScreenEditor("LEARNING LEDGER", existing == null ? "Add syllabus topic" : "Edit syllabus topic",
+                "Use a specific syllabus item or competency so progress stays meaningful.", form, () -> {
                     String name = title.getText().toString().trim();
                     if (name.isEmpty()) {
-                        Toast.makeText(this, "Enter a topic name.", Toast.LENGTH_SHORT).show();
-                        return;
+                        title.setError("Enter a topic name");
+                        title.requestFocus();
+                        return false;
                     }
                     ArrayList<SyllabusTopic> all = readSyllabusTopics();
                     if (existing == null) {
-                        if (!getPrefs().contains(SYLLABUS_START_KEY)) getPrefs().edit().putString(SYLLABUS_START_KEY, todayKey()).apply();
+                        if (!getPrefs().contains(SYLLABUS_START_KEY)) {
+                            getPrefs().edit().putString(SYLLABUS_START_KEY, todayKey()).apply();
+                        }
                         all.add(new SyllabusTopic(System.currentTimeMillis(), subject.getSelectedItem().toString(), name, false, 0L));
                     } else {
                         for (SyllabusTopic item : all) {
@@ -2489,10 +2555,11 @@ public class MainActivity extends Activity {
                         }
                     }
                     persistSyllabusTopics(all);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+                    return true;
+                });
     }
+
+
 
     private void saveSyllabusTopics() {
         persistSyllabusTopics(readSyllabusTopics());
@@ -2757,7 +2824,7 @@ public class MainActivity extends Activity {
         title.setSingleLine(true);
         title.setHint("Block name");
         title.setText(original.title);
-        title.setTextColor(Color.WHITE);
+        title.setTextColor(color("#18372E"));
         title.setHintTextColor(color("#82948A"));
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
 
@@ -2844,18 +2911,16 @@ public class MainActivity extends Activity {
             });
         }
 
-        new AlertDialog.Builder(this)
-                .setTitle(adding ? "Add template block" : "Edit template block")
-                .setView(form)
-                .setPositiveButton("Save", (d, w) -> {
+        showFullScreenEditor("ROUTINE TEMPLATE", adding ? "Add template block" : "Edit template block",
+                "This changes the reusable routine. Existing days change only when you apply it.", form, () -> {
                     String name = title.getText().toString().trim();
                     if (name.isEmpty()) {
-                        Toast.makeText(this, "Give this block a name.", Toast.LENGTH_SHORT).show();
-                        return;
+                        title.setError("Give this block a name");
+                        return false;
                     }
                     if (end[0] <= start[0]) {
                         Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
-                        return;
+                        return false;
                     }
                     if (adding) {
                         template.add(new Block(System.currentTimeMillis(), toTime(start[0]), toTime(end[0]),
@@ -2867,12 +2932,13 @@ public class MainActivity extends Activity {
                         original.priority = selectedPriority[0];
                         original.rigidity = selectedRigidity[0];
                     }
-                    Collections.sort(template, Comparator.comparingInt(b -> mins(b.start)));
+                    Collections.sort(template, Comparator.comparingInt(block -> mins(block.start)));
                     onChanged.run();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+                    return true;
+                });
     }
+
+
 
     private void loadTemplate(String key) {
         blocks.clear();
