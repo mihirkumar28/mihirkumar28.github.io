@@ -58,13 +58,14 @@ public class MainActivity extends Activity {
     private TextView dateView, modeView, completionView, progressPercent;
     private TextView currentTitle, currentTime, currentCountdown, plannedView, doneView;
     private TextView officeStatus, officeTimes, commuteView;
-    private Button officeAction, commuteAction;
+    private Button officeAction, commuteAction, focusAction;
     private String mode = "wfh";
     private String selectedDateKey;
 
     private static class Block {
         long id;
         String start, end, title, priority, status;
+        long actualMs, actualStartedAt;
         Block(long id, String start, String end, String title, String priority, String status) {
             this.id = id;
             this.start = start;
@@ -72,6 +73,8 @@ public class MainActivity extends Activity {
             this.title = title;
             this.priority = priority;
             this.status = status;
+            this.actualMs = 0L;
+            this.actualStartedAt = 0L;
         }
     }
 
@@ -410,6 +413,13 @@ public class MainActivity extends Activity {
         markDone.setTag("currentDone");
         markDone.setOnClickListener(v -> completeCurrent());
 
+        focusAction = actionButton("Start focus", color("#D9E2F3"), "#263243");
+        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(40));
+        focusLp.topMargin = dp(8);
+        card.addView(focusAction, focusLp);
+        focusAction.setTag("focusAction");
+        focusAction.setOnClickListener(v -> toggleFocusCurrent());
+
         Button recover = actionButton("Catch up", color("#DAD7FF"), "#2C2A4A");
         LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(-1, dp(42));
         recLp.topMargin = dp(8);
@@ -550,21 +560,21 @@ public class MainActivity extends Activity {
             }
         }
 
-        int total = blocks.size(), done = 0, plannedMinutes = 0, doneMinutes = 0;
+        int total = blocks.size(), done = 0, plannedMinutes = 0;
+        long actualFocusMs = 0L;
+        long metricsNow = System.currentTimeMillis();
         for (Block b : blocks) {
             int d = Math.max(0, mins(b.end) - mins(b.start));
             plannedMinutes += d;
-            if ("done".equals(b.status)) {
-                done++;
-                doneMinutes += d;
-            }
+            if ("done".equals(b.status)) done++;
+            actualFocusMs += getActualDuration(b, metricsNow);
         }
 
         completionView.setText(done + " / " + total + " complete");
         int percent = total == 0 ? 0 : Math.round(done * 100f / total);
         progressPercent.setText(percent + "% of plan • " + syllabusProgressLabel());
         plannedView.setText(fmtShort(plannedMinutes));
-        doneView.setText(fmt(doneMinutes) + " done");
+        doneView.setText(fmtMillis(actualFocusMs) + " actual");
 
         updateCurrentCard(current, next, nowMins);
         renderOfficeCard();
@@ -596,6 +606,10 @@ public class MainActivity extends Activity {
 
     private void updateLiveBits() {
         if (!selectedDateKey.equals(todayKey())) return;
+        if (closeExpiredFocusSessions()) {
+            save();
+            return;
+        }
         int nowMins = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) * 60
                 + Calendar.getInstance().get(Calendar.MINUTE);
         Block current = null, next = null;
@@ -615,6 +629,12 @@ public class MainActivity extends Activity {
         }
         updateCurrentCard(current, next, nowMins);
         updateLiveOfficeMetrics();
+        if (doneView != null) {
+            long actualMs = 0L;
+            long now = System.currentTimeMillis();
+            for (Block block : blocks) actualMs += getActualDuration(block, now);
+            doneView.setText(fmtMillis(actualMs) + " actual");
+        }
     }
 
     private void updateLiveOfficeMetrics() {
@@ -636,6 +656,7 @@ public class MainActivity extends Activity {
     private void updateCurrentCard(Block current, Block next, int nowMins) {
         View doneButton = root.findViewWithTag("currentDone");
         View recoveryButton = root.findViewWithTag("recoveryButton");
+        View focusButton = root.findViewWithTag("focusAction");
         boolean viewingToday = selectedDateKey.equals(todayKey());
         if (!viewingToday) {
             currentTitle.setText(selectedDateKey.compareTo(todayKey()) < 0 ? "Historical day" : "Planned day");
@@ -644,6 +665,7 @@ public class MainActivity extends Activity {
             currentCountdown.setText("Review timeline");
             if (doneButton != null) doneButton.setVisibility(View.GONE);
             if (recoveryButton != null) recoveryButton.setVisibility(View.GONE);
+            if (focusButton != null) focusButton.setVisibility(View.GONE);
             return;
         }
         if (recoveryButton != null) recoveryButton.setVisibility(View.VISIBLE);
@@ -654,10 +676,19 @@ public class MainActivity extends Activity {
             currentTime.setText("Nice work.");
             currentCountdown.setText("✓");
             if (doneButton != null) doneButton.setVisibility(View.GONE);
+            if (focusButton != null) focusButton.setVisibility(View.GONE);
             return;
         }
 
         if (doneButton != null) doneButton.setVisibility(current != null ? View.VISIBLE : View.GONE);
+        if (focusButton != null) {
+            focusButton.setVisibility(current != null ? View.VISIBLE : View.GONE);
+            if (current != null) {
+                focusButton.setText(current.actualStartedAt > 0
+                        ? "Stop focus • " + fmtMillis(getActualDuration(current, System.currentTimeMillis()))
+                        : "Start focus • " + fmtShort(Math.max(0, mins(current.end) - mins(current.start))));
+            }
+        }
         if (current != null) {
             currentTitle.setText(current.title);
             currentTime.setText(time12(current.start) + " – " + time12(current.end));
@@ -785,6 +816,67 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("Close", null)
                 .show();
+    }
+
+    private long getActualDuration(Block b, long now) {
+        long total = Math.max(0L, b.actualMs);
+        if (b.actualStartedAt > 0) {
+            long end = millisAtMinute(mins(b.end));
+            long effectiveEnd = Math.min(now, end);
+            if (effectiveEnd > b.actualStartedAt) total += effectiveEnd - b.actualStartedAt;
+        }
+        return total;
+    }
+
+    private boolean closeExpiredFocusSessions() {
+        long now = System.currentTimeMillis();
+        boolean changed = false;
+        for (Block block : blocks) {
+            if (block.actualStartedAt <= 0) continue;
+            long end = millisAtMinute(mins(block.end));
+            if (now >= end) {
+                block.actualMs += Math.max(0L, end - block.actualStartedAt);
+                block.actualStartedAt = 0L;
+                debugLog("Focus auto-stopped at block boundary: " + block.title
+                        + " actualMs=" + block.actualMs);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private void toggleFocusCurrent() {
+        if (!selectedDateKey.equals(todayKey())) return;
+        int nowMins = currentMinutes();
+        Block current = null;
+        for (Block b : blocks) {
+            if ("pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
+                current = b;
+                break;
+            }
+        }
+        if (current == null) {
+            Toast.makeText(this, "Focus timer works on the active task.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (current.actualStartedAt > 0) {
+            current.actualMs += Math.max(0L, now - current.actualStartedAt);
+            current.actualStartedAt = 0L;
+            debugLog("Focus stopped: " + current.title + " actualMs=" + current.actualMs);
+        } else {
+            for (Block other : blocks) {
+                if (other != current && other.actualStartedAt > 0) {
+                    long otherEnd = millisAtMinute(mins(other.end));
+                    other.actualMs += Math.max(0L, Math.min(now, otherEnd) - other.actualStartedAt);
+                    other.actualStartedAt = 0L;
+                    debugLog("Focus auto-stopped when switching tasks: " + other.title);
+                }
+            }
+            current.actualStartedAt = now;
+            debugLog("Focus started: " + current.title);
+        }
+        save();
     }
 
     private void completeCurrent() {
@@ -2616,8 +2708,11 @@ public class MainActivity extends Activity {
                 JSONArray arr = new JSONArray(raw);
                 for (int i = 0; i < arr.length(); i++) {
                     JSONObject o = arr.getJSONObject(i);
-                    blocks.add(new Block(o.getLong("id"), o.getString("start"), o.getString("end"),
-                            o.getString("title"), o.getString("priority"), o.getString("status")));
+                    Block loaded = new Block(o.getLong("id"), o.getString("start"), o.getString("end"),
+                            o.getString("title"), o.getString("priority"), o.getString("status"));
+                    loaded.actualMs = o.optLong("actualMs", 0L);
+                    loaded.actualStartedAt = o.optLong("actualStartedAt", 0L);
+                    blocks.add(loaded);
                 }
             } else if (!isBeforeToday(selectedDateKey)) {
                 loadTemplateSilent();
@@ -2731,6 +2826,8 @@ public class MainActivity extends Activity {
                 o.put("title", b.title);
                 o.put("priority", b.priority);
                 o.put("status", b.status);
+                o.put("actualMs", b.actualMs);
+                o.put("actualStartedAt", b.actualStartedAt);
                 arr.put(o);
             }
             getPrefs().edit()
