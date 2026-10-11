@@ -1564,43 +1564,77 @@ public class MainActivity extends Activity {
     }
 
     private void showBlockOptions(Block b) {
-        ArrayList<String> actions = new ArrayList<>();
-        actions.add("Edit block");
-        if ("done".equals(b.status)) actions.add("Undo completion");
-        else if ("skipped".equals(b.status)) actions.add("Restore block");
-        else {
-            actions.add("Mark done");
-            actions.add("Skip block");
-        }
-        actions.add("Delete block");
+        LinearLayout content = vertical();
+        content.setPadding(dp(16), dp(8), dp(16), dp(18));
 
-        new AlertDialog.Builder(this)
-                .setTitle(b.title)
-                .setItems(actions.toArray(new String[0]), (dialog, which) -> {
-                    String a = actions.get(which);
-                    if ("Edit block".equals(a)) editBlockDialog(b);
-                    else if ("Delete block".equals(a)) {
+        LinearLayout summary = surfaceCard();
+        summary.addView(text("SCHEDULE", 10, color("#2E8060"), true));
+        summary.addView(text(time12(b.start) + "  →  " + time12(b.end), 24, color("#18372E"), true));
+        summary.addView(text(fmt(mins(b.end) - mins(b.start)) + " planned  •  " + blockBehaviorLabel(b),
+                12, color("#687A70"), false));
+        String statusLabel = "done".equals(b.status) ? "Completed"
+                : "skipped".equals(b.status) ? "Skipped" : "Pending";
+        summary.addView(text("Status  •  " + statusLabel, 12, color("#687A70"), true));
+        long actual = getActualDuration(b, System.currentTimeMillis());
+        if (actual > 0) {
+            summary.addView(text("Focus logged  •  " + fmtPreciseMillis(actual), 12, color("#286B55"), true));
+        }
+        content.addView(summary);
+
+        LinearLayout actions = surfaceCard();
+        sectionLabel(actions, "TASK ACTIONS");
+        final android.app.Dialog[] detailDialog = new android.app.Dialog[1];
+        String statusAction = "done".equals(b.status) ? "Reopen task"
+                : "skipped".equals(b.status) ? "Restore task" : "Mark complete";
+        actions.addView(primaryButton(statusAction, () -> {
+            if (detailDialog[0] != null) detailDialog[0].dismiss();
+            if ("done".equals(b.status) || "skipped".equals(b.status)) {
+                b.status = "pending";
+            } else {
+                stopFocusForBlock(b, System.currentTimeMillis());
+                b.status = "done";
+            }
+            save();
+        }), new LinearLayout.LayoutParams(-1, dp(44)));
+
+        if ("pending".equals(b.status)) {
+            Button skip = secondaryButton("Skip this task", () -> {
+                if (detailDialog[0] != null) detailDialog[0].dismiss();
+                stopFocusForBlock(b, System.currentTimeMillis());
+                b.status = "skipped";
+                save();
+            });
+            LinearLayout.LayoutParams skipLp = new LinearLayout.LayoutParams(-1, dp(42));
+            skipLp.topMargin = dp(8);
+            actions.addView(skip, skipLp);
+        }
+
+        Button delete = actionButton("Delete task", color("#B44248"), "#F8E8E6");
+        delete.setTextSize(12);
+        LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(-1, dp(42));
+        deleteLp.topMargin = dp(8);
+        actions.addView(delete, deleteLp);
+        delete.setOnClickListener(v -> {
+            if (detailDialog[0] != null) detailDialog[0].dismiss();
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete this task?")
+                    .setMessage("\"" + b.title + "\" will be removed from this day's plan. Its recorded focus time will no longer be attached to a task.")
+                    .setPositiveButton("Delete", (d, w) -> {
                         stopFocusForBlock(b, System.currentTimeMillis());
                         blocks.remove(b);
                         save();
-                    } else if ("Undo completion".equals(a) || "Restore block".equals(a)) {
-                        b.status = "pending";
-                        save();
-                    } else if ("Mark done".equals(a)) {
-                        stopFocusForBlock(b, System.currentTimeMillis());
-                        b.status = "done";
-                        save();
-                    } else if ("Skip block".equals(a)) {
-                        stopFocusForBlock(b, System.currentTimeMillis());
-                        b.status = "skipped";
-                        save();
-                    }
-                })
-                .setNegativeButton("Close", null)
-                .show();
+                    })
+                    .setNegativeButton("Keep task", null)
+                    .show();
+        });
+        content.addView(actions);
+
+        detailDialog[0] = showFullScreenViewer("TASK DETAILS", b.title,
+                "Edit the plan, record completion, or skip it. Timing and focus history are shown separately.",
+                content, "Edit task", () -> editBlockDialog(b));
     }
 
-    private long getActualDuration(Block b, long now) {
+        private long getActualDuration(Block b, long now) {
         long total = Math.max(0L, b.actualMs);
         if (b.actualStartedAt > 0) {
             long end = millisAtDateMinute(selectedDateKey, mins(b.end));
@@ -2178,7 +2212,8 @@ public class MainActivity extends Activity {
         int activeIndex = -1;
         int overdueMovable = 0;
         int overdueFixed = 0;
-        int remainingMovable = 0;
+        int fixedAnchors = 0;
+        int movablePending = 0;
         Block active = null;
 
         for (int i = 0; i < blocks.size(); i++) {
@@ -2193,26 +2228,74 @@ public class MainActivity extends Activity {
             if (!"pending".equals(b.status) || b == active) continue;
             if ("fixed".equals(b.rigidity)) {
                 if (mins(b.end) <= nowMins) overdueFixed++;
-                else remainingMovable++; // fixed future commitments are anchors, not moved work
+                else fixedAnchors++;
             } else {
-                remainingMovable++;
+                movablePending++;
                 if (mins(b.end) <= nowMins) overdueMovable++;
             }
         }
 
-        String message = "Overdue movable blocks: " + overdueMovable
-                + "\nFixed commitments missed/past: " + overdueFixed
-                + "\n\nRecovery rules: keep the active block and Fixed anchors unchanged; reschedule overdue work; Critical first, Important next, Normal next, Optional last. Rigidity is separate from priority. Preserve durations; never overlap fixed anchors; report work that will not fit.";
+        LinearLayout content = vertical();
+        content.setPadding(dp(16), dp(8), dp(16), dp(18));
+
+        LinearLayout snapshot = surfaceCard();
+        snapshot.addView(text("TODAY AT A GLANCE", 10, color("#2E8060"), true));
+        snapshot.addView(text(overdueMovable + " overdue flexible task(s)", 20, color("#18372E"), true));
+        snapshot.addView(text(fixedAnchors + " future fixed commitment(s) will stay at their scheduled times.",
+                12, color("#687A70"), false));
+        snapshot.addView(text(overdueFixed + " fixed commitment(s) are already in the past and will not be moved.",
+                12, color("#687A70"), false));
+        content.addView(snapshot);
+
+        LinearLayout rules = surfaceCard();
+        sectionLabel(rules, "HOW CATCH UP WORKS");
+        String[][] ruleRows = {
+                {"1", "Keep the active task", active == null ? "No task is active now." : active.title + " stays where it is."},
+                {"2", "Protect fixed times", "Future Fixed blocks are hard anchors. DayFlow will not move them."},
+                {"3", "Prioritise the rest", "Critical → Important → Normal → Optional. Flexible tasks can move."},
+                {"4", "Respect real durations", "Tasks keep their scheduled duration. Work that does not fit remains unchanged and is reported."}
+        };
+        for (String[] rule : ruleRows) {
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.TOP);
+            TextView number = text(rule[0], 13, color("#286B55"), true);
+            number.setGravity(Gravity.CENTER);
+            number.setBackground(bg("#DCEBE2", 18));
+            LinearLayout.LayoutParams numberLp = new LinearLayout.LayoutParams(dp(28), dp(28));
+            numberLp.rightMargin = dp(10);
+            row.addView(number, numberLp);
+            LinearLayout detail = vertical();
+            detail.addView(text(rule[1], 13, color("#18372E"), true));
+            TextView desc = text(rule[2], 11, color("#687A70"), false);
+            desc.setLineSpacing(dp(1), 1f);
+            detail.addView(desc);
+            row.addView(detail, new LinearLayout.LayoutParams(0, -2, 1));
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.bottomMargin = dp(12);
+            rules.addView(row, rowLp);
+        }
+        content.addView(rules);
+
+        if (movablePending == 0) {
+            LinearLayout none = surfaceCard();
+            none.addView(text("Nothing to reflow", 14, color("#18372E"), true));
+            none.addView(text("There are no pending flexible tasks left in today's plan.", 12, color("#687A70"), false));
+            content.addView(none);
+        }
+
         final int selectedActiveIndex = activeIndex;
-        new AlertDialog.Builder(this)
-                .setTitle("Build a recovery plan?")
-                .setMessage(message)
-                .setPositiveButton("Rebuild remaining day", (d, w) -> reflowRemainingDay(selectedActiveIndex))
-                .setNegativeButton("Cancel", null)
-                .show();
+        showFullScreenViewer("RECOVERY PLANNER", "Catch up",
+                "Review the rules before DayFlow rearranges today's remaining work.", content,
+                "Rebuild remaining day", () -> {
+                    if (movablePending == 0) {
+                        Toast.makeText(this, "No flexible tasks need reflowing.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    reflowRemainingDay(selectedActiveIndex);
+                });
     }
 
-    private int recoveryRank(Block block) {
+        private int recoveryRank(Block block) {
         if ("critical".equals(block.priority)) return 0;
         if ("important".equals(block.priority)) return 1;
         if ("normal".equals(block.priority)) return 2;
@@ -2307,7 +2390,7 @@ public class MainActivity extends Activity {
         Toast.makeText(this, templateLabel(mode) + " day type selected. Use Apply saved routine if you want to replace the timeline.", Toast.LENGTH_LONG).show();
     }
 
-    private void showFullScreenViewer(String eyebrow, String title, String subtitle,
+    private android.app.Dialog showFullScreenViewer(String eyebrow, String title, String subtitle,
                                        View content, String primaryLabel, Runnable primaryAction) {
         final android.app.Dialog dialog = new android.app.Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -2367,6 +2450,7 @@ public class MainActivity extends Activity {
         dialog.show();
         if (window != null) window.setLayout(android.view.WindowManager.LayoutParams.MATCH_PARENT,
                 android.view.WindowManager.LayoutParams.MATCH_PARENT);
+        return dialog;
     }
 
     private void showFullScreenEditor(String eyebrow, String title, String subtitle,
@@ -2850,33 +2934,60 @@ public class MainActivity extends Activity {
     private void showSyllabusTracker() { switchPage("syllabus"); }
 
     private void showSyllabusTopicActions(SyllabusTopic topic) {
-        String toggle = topic.done ? "Mark pending" : "Mark complete";
-        String[] actions = {toggle, "Edit topic", "Delete topic"};
-        new AlertDialog.Builder(this).setTitle(topic.title).setItems(actions, (dialog, which) -> {
-            if (which == 0) {
-                topic.done = !topic.done;
-                topic.completedAt = topic.done ? System.currentTimeMillis() : 0L;
-                saveSyllabusTopics();
-            } else if (which == 1) {
-                editSyllabusTopic(topic);
-            } else {
-                new AlertDialog.Builder(this)
-                        .setTitle("Delete topic?")
-                        .setMessage(topic.title + " will be removed from your syllabus tracker.")
-                        .setPositiveButton("Delete", (d, w) -> {
-                            ArrayList<SyllabusTopic> all = readSyllabusTopics();
-                            for (int i = all.size() - 1; i >= 0; i--) {
-                                if (all.get(i).id == topic.id) all.remove(i);
-                            }
-                            persistSyllabusTopics(all);
-                        })
-                        .setNegativeButton("Keep", null)
-                        .show();
-            }
-        }).setNegativeButton("Cancel", null).show();
+        LinearLayout content = vertical();
+        content.setPadding(dp(16), dp(8), dp(16), dp(18));
+
+        LinearLayout summary = surfaceCard();
+        summary.addView(text("SUBJECT", 10, color("#2E8060"), true));
+        summary.addView(text(topic.subject, 16, color("#18372E"), true));
+        summary.addView(text(topic.done ? "Completed" : "Not completed yet", 13,
+                topic.done ? color("#286B55") : color("#687A70"), true));
+        if (topic.done && topic.completedAt > 0) {
+            summary.addView(text("Marked complete  •  "
+                    + new SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault())
+                    .format(new Date(topic.completedAt)), 11, color("#687A70"), false));
+        }
+        content.addView(summary);
+
+        LinearLayout actions = surfaceCard();
+        sectionLabel(actions, "TOPIC ACTIONS");
+        final android.app.Dialog[] detailDialog = new android.app.Dialog[1];
+        Button toggle = primaryButton(topic.done ? "Mark as pending" : "Mark complete", () -> {
+            if (detailDialog[0] != null) detailDialog[0].dismiss();
+            topic.done = !topic.done;
+            topic.completedAt = topic.done ? System.currentTimeMillis() : 0L;
+            saveSyllabusTopics();
+            switchPage("syllabus");
+        });
+        actions.addView(toggle, new LinearLayout.LayoutParams(-1, dp(44)));
+
+        Button delete = actionButton("Delete topic", color("#B44248"), "#F8E8E6");
+        delete.setTextSize(12);
+        LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(-1, dp(42));
+        deleteLp.topMargin = dp(8);
+        actions.addView(delete, deleteLp);
+        delete.setOnClickListener(v -> {
+            if (detailDialog[0] != null) detailDialog[0].dismiss();
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete this topic?")
+                    .setMessage("\"" + topic.title + "\" will be removed from the syllabus tracker. This does not change other topics.")
+                    .setPositiveButton("Delete", (d, w) -> {
+                        ArrayList<SyllabusTopic> all = readSyllabusTopics();
+                        all.removeIf(item -> item.id == topic.id);
+                        persistSyllabusTopics(all);
+                        switchPage("syllabus");
+                    })
+                    .setNegativeButton("Keep topic", null)
+                    .show();
+        });
+        content.addView(actions);
+
+        detailDialog[0] = showFullScreenViewer("LEARNING LEDGER", topic.title,
+                "Topic-level progress is tracked independently from scheduled study time.",
+                content, "Edit topic", () -> editSyllabusTopic(topic));
     }
 
-    private void editSyllabusTopic(SyllabusTopic existing) {
+        private void editSyllabusTopic(SyllabusTopic existing) {
         LinearLayout form = vertical();
         form.setPadding(dp(20), dp(4), dp(20), dp(4));
         EditText title = new EditText(this);
