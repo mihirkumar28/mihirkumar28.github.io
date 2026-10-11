@@ -2052,17 +2052,15 @@ public class MainActivity extends Activity {
 
         private void chooseMode(String key) {
         if (mode.equals(key)) return;
-        String label = key.equals("office") ? "Office" : key.equals("weekend") ? "Weekend" : "WFH";
-        new AlertDialog.Builder(this)
-                .setTitle("Switch to " + label + "?")
-                .setMessage("This replaces today's current timeline with the " + label + " template.")
-                .setPositiveButton("Switch", (d, w) -> {
-                    mode = key;
-                    getPrefs().edit().putString(MODE_KEY, mode).apply();
-                    loadTemplate(key);
-                })
-                .setNegativeButton("Keep today", null)
-                .show();
+        mode = key;
+        SharedPreferences.Editor editor = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
+        if (selectedDateKey.equals(todayKey())) editor.putString(MODE_KEY, mode);
+        editor.apply();
+        debugLog("Day type changed without replacing blocks: date=" + selectedDateKey + " mode=" + mode);
+        render();
+        renderPlanPage();
+        renderOfficePage();
+        Toast.makeText(this, templateLabel(mode) + " day type selected. Use Apply saved routine if you want to replace the timeline.", Toast.LENGTH_LONG).show();
     }
 
     private void showFullScreenEditor(String eyebrow, String title, String subtitle,
