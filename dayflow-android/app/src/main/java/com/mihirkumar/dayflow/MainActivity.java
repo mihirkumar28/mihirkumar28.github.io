@@ -45,11 +45,14 @@ public class MainActivity extends Activity {
     private static final String SYLLABUS_KEY = "syllabusTopics";
     private static final String SYLLABUS_TARGET_KEY = "syllabusTargetDate";
     private static final String SYLLABUS_START_KEY = "syllabusStartDate";
+    private static final String STARTER_SEEDED_KEY = "starterSyllabusSeeded_v2";
+    private static final String INTERVIEW_PLAN_START_KEY = "softwareInterviewPlanStart";
+    private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
     private static final int REQUEST_EXPORT_BACKUP = 4201;
     private static final int REQUEST_IMPORT_BACKUP = 4202;
     private static final String[] SYLLABUS_SUBJECTS = {
             "General Studies", "Maths Optional", "CSAT", "Qualifying English",
-            "Indian Language", "Essay", "Interview"
+            "Indian Language", "Essay", "Interview", "Software Interview Prep"
     };
 
     private final ArrayList<Block> blocks = new ArrayList<>();
@@ -142,6 +145,7 @@ public class MainActivity extends Activity {
         selectedDateKey = todayKey();
         load();
         buildUi();
+        ensureStarterPlans();
         render();
         ensureScreenTimeWorker();
         if (ScreenTimeTracker.hasUsageAccess(this)) ScreenTimeTracker.refreshRecentDays(this, 7);
@@ -370,11 +374,27 @@ public class MainActivity extends Activity {
         TextView appName = text("DayFlow", 25, Color.WHITE, true);
         top.addView(appName, new LinearLayout.LayoutParams(0, -2, 1));
 
+        Button manage = actionButton("Manage", color("#D5DDF0"), "#191E2B");
+        manage.setTextSize(11);
+        manage.setContentDescription("Manage day, screen time, syllabus and backups");
+        manage.setOnClickListener(v -> openManageDialog());
+        LinearLayout.LayoutParams manageLp = new LinearLayout.LayoutParams(dp(70), dp(42));
+        manageLp.rightMargin = dp(5);
+        top.addView(manage, manageLp);
+
+        Button syllabus = actionButton("Study", color("#D5DDF0"), "#191E2B");
+        syllabus.setTextSize(11);
+        syllabus.setContentDescription("Open CSE and software interview progress");
+        syllabus.setOnClickListener(v -> showSyllabusTracker());
+        LinearLayout.LayoutParams syllabusLp = new LinearLayout.LayoutParams(dp(58), dp(42));
+        syllabusLp.rightMargin = dp(5);
+        top.addView(syllabus, syllabusLp);
+
         Button add = actionButton("＋", Color.WHITE, "#191E2B");
         add.setTextSize(22);
         add.setContentDescription("Add block");
         add.setOnClickListener(v -> openAddDialog());
-        top.addView(add, new LinearLayout.LayoutParams(dp(50), dp(48)));
+        top.addView(add, new LinearLayout.LayoutParams(dp(44), dp(42)));
 
         LinearLayout nav = horizontal();
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, dp(42));
@@ -1661,6 +1681,13 @@ public class MainActivity extends Activity {
 
     private String syllabusSummary(ArrayList<SyllabusTopic> topics) {
         String target = getPrefs().getString(SYLLABUS_TARGET_KEY, "2028-01-01");
+        String interviewStart = getPrefs().getString(INTERVIEW_PLAN_START_KEY, todayKey());
+        String interviewTarget = getPrefs().getString(INTERVIEW_TARGET_KEY, "2027-07-11");
+        Calendar interviewSixMonth = Calendar.getInstance();
+        Date interviewStartDate = parseDateKey(interviewStart);
+        if (interviewStartDate != null) interviewSixMonth.setTime(interviewStartDate);
+        interviewSixMonth.add(Calendar.MONTH, 6);
+        String sixMonthDate = keyForDate(interviewSixMonth.getTime());
         Date targetDate = parseDateKey(target);
         Calendar targetCalendar = Calendar.getInstance();
         if (targetDate != null) targetCalendar.setTime(targetDate);
@@ -1674,7 +1701,7 @@ public class MainActivity extends Activity {
         today.set(Calendar.SECOND, 0);
         today.set(Calendar.MILLISECOND, 0);
         long daysLeft = Math.max(0L, (targetCalendar.getTimeInMillis() - today.getTimeInMillis()) / 86400000L);
-        int done = 0, recentlyDone = 0;
+        int done = 0, recentlyDone = 0, cseDone = 0, cseTotal = 0, interviewDone = 0, interviewTotal = 0;
         long weekAgo = System.currentTimeMillis() - 7L * 86400000L;
         LinkedHashMap<String, int[]> counts = new LinkedHashMap<>();
         for (SyllabusTopic topic : topics) {
@@ -1684,33 +1711,47 @@ public class MainActivity extends Activity {
                 counts.put(topic.subject, values);
             }
             values[1]++;
+            boolean softwareInterview = "Software Interview Prep".equals(topic.subject);
+            if (softwareInterview) interviewTotal++; else cseTotal++;
             if (topic.done) {
                 values[0]++;
                 done++;
-                if (topic.completedAt >= weekAgo) recentlyDone++;
+                if (softwareInterview) interviewDone++; else cseDone++;
+                if (topic.completedAt >= weekAgo && !softwareInterview) recentlyDone++;
             }
         }
-        int remaining = Math.max(0, topics.size() - done);
+        int cseRemaining = Math.max(0, cseTotal - cseDone);
+        int interviewRemaining = Math.max(0, interviewTotal - interviewDone);
         StringBuilder summary = new StringBuilder();
         summary.append("Overall: ").append(done).append("/").append(topics.size())
                 .append(" complete (").append(topics.isEmpty() ? 0 : Math.round(done * 100f / topics.size())).append("%)")
-                .append("\nTarget: ").append(target).append(" • ").append(daysLeft).append(" days left");
-        if (remaining == 0 && !topics.isEmpty()) {
-            summary.append("\nAll topics in your current list are complete.");
-        } else if (!topics.isEmpty() && daysLeft > 0) {
-            summary.append("\nRequired pace: ").append(String.format(Locale.US, "%.2f", remaining / (double) daysLeft))
-                    .append(" topics/day");
+                .append("\n\nCSE syllabus target: ").append(target).append(" • ").append(daysLeft).append(" days left");
+        if (cseTotal > 0 && daysLeft > 0) {
+            summary.append("\nCSE pace needed: ").append(String.format(Locale.US, "%.2f", cseRemaining / (double) daysLeft))
+                    .append(" topics/day (software interview topics excluded)");
             if (recentlyDone > 0) {
                 double perDay = recentlyDone / 7.0;
-                long projectedDays = (long) Math.ceil(remaining / perDay);
+                long projectedDays = (long) Math.ceil(cseRemaining / perDay);
                 Calendar forecast = Calendar.getInstance();
                 forecast.add(Calendar.DAY_OF_YEAR, (int) Math.min(Integer.MAX_VALUE, projectedDays));
-                summary.append("\n7-day pace: ").append(recentlyDone).append(" topics/week")
+                summary.append("\nRecent CSE pace: ").append(recentlyDone).append(" topics/week")
                         .append(" • projected finish ").append(new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(forecast.getTime()));
             } else {
-                summary.append("\nFinish forecast: not enough recent completion history yet.");
+                summary.append("\nCSE finish forecast: not enough completion history yet.");
             }
         }
+        summary.append("\n\nSoftware interview prep: ").append(interviewDone).append("/").append(interviewTotal)
+                .append(" complete")
+                .append("\n6-month Tier 3/4 readiness checkpoint: ").append(sixMonthDate)
+                .append("\n9-month Tier 1/2 strong-hire target: ").append(interviewTarget);
+        if (interviewTotal > 0) {
+            summary.append("\nInterview topics remaining: ").append(interviewRemaining);
+        }
+        summary.append("\n\nRoutine anchors from your saved plan:")
+                .append("\n• WFH: protect GS, Maths Optional and the 08:00–09:30 interview-prep slot.")
+                .append("\n• Office: Maths Optional is after work, not in the morning.")
+                .append("\n• Weekends: 6 hours CSE — 3 hours GS + 3 hours Maths Optional.")
+                .append("\n• Interview target: Tier 3/4 readiness around month 6; Tier 1/2 strong-hire target around month 9.");
         for (Map.Entry<String, int[]> entry : counts.entrySet()) {
             int[] values = entry.getValue();
             summary.append("\n").append(entry.getKey()).append(": ").append(values[0]).append("/")
@@ -1776,6 +1817,35 @@ public class MainActivity extends Activity {
 
 
     private void loadStarterSyllabus() {
+        loadStarterSyllabus(true);
+    }
+
+    private void ensureStarterPlans() {
+        SharedPreferences prefs = getPrefs();
+        if (!prefs.contains(INTERVIEW_PLAN_START_KEY)) {
+            String start = todayKey();
+            Calendar sixMonths = Calendar.getInstance();
+            sixMonths.setTime(parseDateKey(start));
+            sixMonths.add(Calendar.MONTH, 6);
+            Calendar nineMonths = Calendar.getInstance();
+            nineMonths.setTime(parseDateKey(start));
+            nineMonths.add(Calendar.MONTH, 9);
+            prefs.edit()
+                    .putString(INTERVIEW_PLAN_START_KEY, start)
+                    .putString(INTERVIEW_TARGET_KEY, keyForDate(nineMonths.getTime()))
+                    .apply();
+            debugLog("Software interview roadmap dates initialised: start=" + start
+                    + " sixMonth=" + keyForDate(sixMonths.getTime())
+                    + " nineMonth=" + keyForDate(nineMonths.getTime()));
+        }
+        if (!prefs.getBoolean(STARTER_SEEDED_KEY, false)) {
+            loadStarterSyllabus(false);
+            prefs.edit().putBoolean(STARTER_SEEDED_KEY, true).apply();
+            debugLog("Saved CSE and software interview starter plan on first run.");
+        }
+    }
+
+    private void loadStarterSyllabus(boolean showTracker) {
         String[][] seed = {
             {"General Studies", "Prelims: Current events of national and international importance"},
             {"General Studies", "Prelims: History of India and Indian National Movement"},
@@ -1928,7 +1998,35 @@ public class MainActivity extends Activity {
             {"Interview", "Interview: State and district issues"},
             {"Interview", "Interview: Current affairs and balanced judgement"},
             {"Interview", "Interview: Public-service motivation and ethical dilemmas"},
-            {"Interview", "Interview: Mock interview and feedback review"}
+            {"Interview", "Interview: Mock interview and feedback review"},
+            {"Software Interview Prep", "Roadmap milestone: after 6 months, target Tier 3/4 interview readiness"},
+            {"Software Interview Prep", "Interview-prep time commitment: use the 12–13 hours in the saved prep plan; log actual sessions with Focus"},
+            {"Software Interview Prep", "Roadmap milestone: after 9 months, target strong-hire readiness for Tier 1/2"},
+            {"Software Interview Prep", "Java: OOP, inheritance, composition, polymorphism and SOLID"},
+            {"Software Interview Prep", "Java: collections, generics, equals/hashCode and immutability"},
+            {"Software Interview Prep", "Java: JVM memory, garbage collection, class loading and performance"},
+            {"Software Interview Prep", "Java: concurrency, synchronisation, executors, futures and thread safety"},
+            {"Software Interview Prep", "Java: exceptions, streams, lambdas and practical API design"},
+            {"Software Interview Prep", "DSA: arrays, strings, hashing, two pointers and sliding windows"},
+            {"Software Interview Prep", "DSA: linked lists, stacks, queues, trees, tries and heaps"},
+            {"Software Interview Prep", "DSA: graphs, traversal, shortest paths and union-find"},
+            {"Software Interview Prep", "Algorithms: sorting, searching, binary search, greedy and backtracking"},
+            {"Software Interview Prep", "Algorithms: recursion, dynamic programming and complexity analysis"},
+            {"Software Interview Prep", "Coding practice: solve timed problems in Java and explain trade-offs"},
+            {"Software Interview Prep", "Databases: SQL, indexes, transactions, isolation and query plans"},
+            {"Software Interview Prep", "Backend: HTTP, REST APIs, authentication, pagination and idempotency"},
+            {"Software Interview Prep", "System design: requirements, capacity estimates and constraints"},
+            {"Software Interview Prep", "System design: data modelling, caching, queues and asynchronous workflows"},
+            {"Software Interview Prep", "Distributed systems: consistency, replication, partitioning and sharding"},
+            {"Software Interview Prep", "Reliability: timeouts, retries, circuit breakers, rate limits and backpressure"},
+            {"Software Interview Prep", "Operations: observability, SLOs, incident response and postmortems"},
+            {"Software Interview Prep", "Architecture: document trade-offs, alternatives, failure modes and cost"},
+            {"Software Interview Prep", "Leadership: project ownership, delivery, prioritisation and stakeholder alignment"},
+            {"Software Interview Prep", "Leadership: mentoring, feedback, conflict resolution and team growth"},
+            {"Software Interview Prep", "Career narrative: explain PM/EM/IC experience and target role coherently"},
+            {"Software Interview Prep", "Behavioural: STAR stories for failure, conflict, ambiguity and impact"},
+            {"Software Interview Prep", "Resume and project deep dives: quantify impact and defend key decisions"},
+            {"Software Interview Prep", "Practice: mock coding, system design and leadership interviews; review gaps"}
         };
         ArrayList<SyllabusTopic> all = readSyllabusTopics();
         HashSet<String> known = new HashSet<>();
@@ -1947,9 +2045,11 @@ public class MainActivity extends Activity {
             getPrefs().edit().putString(SYLLABUS_START_KEY, todayKey()).apply();
         }
         persistSyllabusTopics(all);
-        Toast.makeText(this, added + " syllabus items added.", Toast.LENGTH_LONG).show();
-        debugLog("UPSC syllabus starter loaded: newItems=" + added + " source=UPSC CSE 2026 notice");
-        showSyllabusTracker();
+        debugLog("CSE/software interview starter loaded: newItems=" + added);
+        if (showTracker) {
+            Toast.makeText(this, added + " syllabus and interview-prep items added.", Toast.LENGTH_LONG).show();
+            showSyllabusTracker();
+        }
     }
 
     private void showSyllabusTracker() {
