@@ -41,13 +41,30 @@ jobs:
           DAYFLOW_KEY_ALIAS: ${{ secrets.DAYFLOW_KEY_ALIAS }}
         run: |
           if [ -n "$DAYFLOW_KEYSTORE_BASE64" ] && [ -n "$DAYFLOW_STORE_PASSWORD" ] && [ -n "$DAYFLOW_KEY_PASSWORD" ]; then
-            echo "$DAYFLOW_KEYSTORE_BASE64" | base64 --decode > dayflow-release.jks
+            mkdir -p app
+            echo "$DAYFLOW_KEYSTORE_BASE64" | base64 --decode > app/dayflow-release.jks
+            if [ ! -s app/dayflow-release.jks ]; then
+              echo "::error::The release keystore secret decoded to an empty file."
+              exit 1
+            fi
             echo "DAYFLOW_SIGNED=true" >> "$GITHUB_ENV"
             echo "Persistent release signing is configured."
-          else
+          elif [ -z "$DAYFLOW_KEYSTORE_BASE64" ] && [ -z "$DAYFLOW_STORE_PASSWORD" ] && [ -z "$DAYFLOW_KEY_PASSWORD" ]; then
             echo "DAYFLOW_SIGNED=false" >> "$GITHUB_ENV"
             echo "Persistent signing secrets are not configured; building a debug APK."
+          else
+            echo "::error::Signing secrets are partially configured. Add DAYFLOW_KEYSTORE_BASE64, DAYFLOW_STORE_PASSWORD, and DAYFLOW_KEY_PASSWORD together."
+            exit 1
           fi
+
+      - name: Verify persistent release key
+        if: env.DAYFLOW_SIGNED == 'true'
+        env:
+          DAYFLOW_STORE_PASSWORD: ${{ secrets.DAYFLOW_STORE_PASSWORD }}
+          DAYFLOW_KEY_ALIAS: ${{ secrets.DAYFLOW_KEY_ALIAS }}
+        run: |
+          keytool -list -keystore app/dayflow-release.jks -storepass "$DAYFLOW_STORE_PASSWORD" -alias "${DAYFLOW_KEY_ALIAS:-dayflow}" >/dev/null
+          echo "Persistent release key is readable."
 
       - name: Build release APK
         if: env.DAYFLOW_SIGNED == 'true'
