@@ -23,6 +23,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.*;
@@ -545,8 +546,21 @@ public class MainActivity extends Activity {
     private void buildBottomNavigation(LinearLayout shell) {
         bottomNavigation=horizontal();
         bottomNavigation.setGravity(Gravity.CENTER);
-        bottomNavigation.setPadding(dp(8),dp(7),dp(8),dp(8));
+        // Keep the 64dp tab row above Android's navigation controls. On Android 15+
+        // edge-to-edge is enforced for this target SDK, so the nav-bar area must be
+        // added to this view's bottom padding rather than covered by the tab row.
+        bottomNavigation.setPadding(dp(8),dp(4),dp(8),dp(6));
         bottomNavigation.setBackgroundColor(Color.WHITE);
+        bottomNavigation.setOnApplyWindowInsetsListener((v, insets) -> {
+            int bottomInset;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                bottomInset = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+            } else {
+                bottomInset = insets.getSystemWindowInsetBottom();
+            }
+            v.setPadding(dp(8),dp(4),dp(8),dp(6) + bottomInset);
+            return insets;
+        });
         String[][] items={{"⌂","Today","home"},{"▤","Plan","plan"},{"◔","Study","progress"},{"◷","Office","office"},{"•••","More","more"}};
         for(String[] item:items){
             LinearLayout tab=vertical();tab.setGravity(Gravity.CENTER);tab.setPadding(dp(3),dp(5),dp(3),dp(4));
@@ -555,7 +569,10 @@ public class MainActivity extends Activity {
             tab.addView(icon);tab.addView(label);tab.setContentDescription(item[1]);tab.setOnClickListener(v->switchPage(item[2]));
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.leftMargin=dp(2);lp.rightMargin=dp(2);bottomNavigation.addView(tab,lp);navItems.put(item[2],label);
         }
-        shell.addView(bottomNavigation,new LinearLayout.LayoutParams(-1,dp(64)));
+        // WRAP_CONTENT lets the view grow by the system-bar inset while preserving
+        // a 64dp row for the five tabs, with a white background behind the system bar.
+        shell.addView(bottomNavigation,new LinearLayout.LayoutParams(-1,-2));
+        bottomNavigation.requestApplyInsets();
     }
 
     private void refreshCurrentWorkspace() {
