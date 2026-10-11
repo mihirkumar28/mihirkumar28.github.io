@@ -1871,7 +1871,7 @@ public class MainActivity extends Activity {
             {"Interview", "Interview: Current affairs and balanced judgement"},
             {"Interview", "Interview: Public-service motivation and ethical dilemmas"},
             {"Interview", "Interview: Mock interview and feedback review"}
-        }
+        };
         ArrayList<SyllabusTopic> all = readSyllabusTopics();
         HashSet<String> known = new HashSet<>();
         for (SyllabusTopic topic : all) {
