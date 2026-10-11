@@ -1042,31 +1042,57 @@ public class MainActivity extends Activity {
         durations.addView(custom, customLp);
         custom.setOnClickListener(v -> durationChoice[0] = -1);
 
-        TextView behaviorLabel = text("BLOCK BEHAVIOR", 10, color("#6F7C91"), true);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
-        blp.topMargin = dp(12);
-        form.addView(behaviorLabel, blp);
-
-        LinearLayout behaviors = horizontal();
-        form.addView(behaviors, new LinearLayout.LayoutParams(-1, dp(42)));
-        String[] behaviorNames = {"Important", "Fixed", "Flexible", "Optional"};
-        String[] behaviorValues = {"important", "fixed", "flexible", "optional"};
-        String[] selectedBehavior = {"flexible"};
-        for (int i = 0; i < behaviorNames.length; i++) {
+        TextView rigidityLabel = text("RIGIDITY", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams rigidityLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        rigidityLabelLp.topMargin = dp(12);
+        form.addView(rigidityLabel, rigidityLabelLp);
+        LinearLayout rigidities = horizontal();
+        form.addView(rigidities, new LinearLayout.LayoutParams(-1, dp(40)));
+        String[] rigidityNames = {"Fixed time", "Flexible time"};
+        String[] rigidityValues = {"fixed", "flexible"};
+        String[] selectedRigidity = {"flexible"};
+        String[] selectedPriority = {"normal"};
+        String[] selectedBehavior = {"flexible:normal"};
+        for (int i = 0; i < rigidityNames.length; i++) {
             final int idx = i;
-            Button b = chip(behaviorNames[i]);
-            if (i == 2) {
-                b.setTextColor(Color.WHITE);
-                b.setBackground(bg("#413B73", 12));
-            }
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1);
-            if (i > 0) lp.leftMargin = dp(5);
-            behaviors.addView(b, lp);
+            Button b = chip(rigidityNames[i]);
+            b.setTextColor(i == 1 ? Color.WHITE : color("#AEB7C9"));
+            b.setBackground(bg(i == 1 ? "#413B73" : "#151A27", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+            if (i > 0) lp.leftMargin = dp(6);
+            rigidities.addView(b, lp);
             b.setOnClickListener(v -> {
-                selectedBehavior[0] = behaviorValues[idx];
-                for (int j = 0; j < behaviors.getChildCount(); j++) {
-                    ((Button) behaviors.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    ((Button) behaviors.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                selectedRigidity[0] = rigidityValues[idx];
+                selectedBehavior[0] = selectedRigidity[0] + ":" + selectedPriority[0];
+                for (int j = 0; j < rigidities.getChildCount(); j++) {
+                    ((Button) rigidities.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    ((Button) rigidities.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
+
+        TextView priorityTitle = text("PRIORITY", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams priorityTitleLp = new LinearLayout.LayoutParams(-1, -2);
+        priorityTitleLp.topMargin = dp(10);
+        form.addView(priorityTitle, priorityTitleLp);
+        LinearLayout priorities = horizontal();
+        form.addView(priorities, new LinearLayout.LayoutParams(-1, dp(40)));
+        String[] priorityNames = {"Critical", "Important", "Normal", "Optional"};
+        String[] priorityValues = {"critical", "important", "normal", "optional"};
+        for (int i = 0; i < priorityNames.length; i++) {
+            final int idx = i;
+            Button b = chip(priorityNames[i]);
+            b.setTextColor(i == 2 ? Color.WHITE : color("#AEB7C9"));
+            b.setBackground(bg(i == 2 ? "#413B73" : "#151A27", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+            if (i > 0) lp.leftMargin = dp(4);
+            priorities.addView(b, lp);
+            b.setOnClickListener(v -> {
+                selectedPriority[0] = priorityValues[idx];
+                selectedBehavior[0] = selectedRigidity[0] + ":" + selectedPriority[0];
+                for (int j = 0; j < priorities.getChildCount(); j++) {
+                    ((Button) priorities.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    ((Button) priorities.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
                 }
             });
         }
@@ -1227,6 +1253,7 @@ public class MainActivity extends Activity {
                 o.put("end", b.end);
                 o.put("title", b.title);
                 o.put("priority", b.priority);
+                o.put("rigidity", b.rigidity);
                 o.put("status", b.status);
                 arr.put(o);
             }
@@ -1353,7 +1380,7 @@ public class MainActivity extends Activity {
 
         String message = "Overdue movable blocks: " + overdueMovable
                 + "\nFixed commitments missed/past: " + overdueFixed
-                + "\n\nRecovery rules: keep the active block and Fixed anchors unchanged; reschedule overdue work; Important first, Flexible next, Optional last; preserve each duration; never overlap fixed anchors. Work that cannot fit remains unchanged and is reported.";
+                + "\n\nRecovery rules: keep the active block and Fixed anchors unchanged; reschedule overdue work; Critical first, Important next, Normal next, Optional last. Rigidity is separate from priority. Preserve durations; never overlap fixed anchors; report work that will not fit.";
         final int selectedActiveIndex = activeIndex;
         new AlertDialog.Builder(this)
                 .setTitle("Build a recovery plan?")
@@ -1852,6 +1879,7 @@ public class MainActivity extends Activity {
                 o.put("end", b.end);
                 o.put("title", b.title);
                 o.put("priority", b.priority);
+                o.put("rigidity", b.rigidity);
                 arr.put(o);
             }
             getPrefs().edit().putString(templateKey(key), arr.toString()).apply();
@@ -2011,7 +2039,8 @@ public class MainActivity extends Activity {
 
         final int[] start = {mins(original.start)};
         final int[] end = {mins(original.end)};
-        final String[] priority = {original.priority};
+        final String[] selectedPriority = {original.priority};
+        final String[] selectedRigidity = {original.rigidity};
 
         Button startButton = chip("Start • " + time12(original.start));
         Button endButton = chip("End • " + time12(original.end));
@@ -2037,29 +2066,54 @@ public class MainActivity extends Activity {
             picker.show();
         });
 
-        TextView behaviorLabel = text("BLOCK BEHAVIOR", 10, color("#6F7C91"), true);
-        LinearLayout.LayoutParams behaviorLabelLp = new LinearLayout.LayoutParams(-1, -2);
-        behaviorLabelLp.topMargin = dp(12);
-        form.addView(behaviorLabel, behaviorLabelLp);
-
-        LinearLayout behaviors = horizontal();
-        form.addView(behaviors, new LinearLayout.LayoutParams(-1, dp(42)));
-        String[] behaviorNames = {"Important", "Fixed", "Flexible", "Optional"};
-        String[] behaviorValues = {"important", "fixed", "flexible", "optional"};
-        int selected = 0;
-        for (int i = 0; i < behaviorValues.length; i++) if (behaviorValues[i].equals(priority[0])) selected = i;
-        for (int i = 0; i < behaviorNames.length; i++) {
+        TextView rigidityLabel = text("RIGIDITY", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams rigidityLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        rigidityLabelLp.topMargin = dp(12);
+        form.addView(rigidityLabel, rigidityLabelLp);
+        LinearLayout rigidities = horizontal();
+        form.addView(rigidities, new LinearLayout.LayoutParams(-1, dp(40)));
+        String[] rigidityNames = {"Fixed time", "Flexible time"};
+        String[] rigidityValues = {"fixed", "flexible"};
+        for (int i = 0; i < rigidityNames.length; i++) {
             final int idx = i;
-            Button b = chip(behaviorNames[i]);
-            b.setTextColor(i == selected ? Color.WHITE : color("#AEB7C9"));
-            b.setBackground(bg(i == selected ? "#413B73" : "#151A27", 12));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1);
-            if (i > 0) lp.leftMargin = dp(5);
-            behaviors.addView(b, lp);
+            Button b = chip(rigidityNames[i]);
+            boolean selected = rigidityValues[i].equals(selectedRigidity[0]);
+            b.setTextColor(selected ? Color.WHITE : color("#AEB7C9"));
+            b.setBackground(bg(selected ? "#413B73" : "#151A27", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+            if (i > 0) lp.leftMargin = dp(6);
+            rigidities.addView(b, lp);
             b.setOnClickListener(v -> {
-                priority[0] = behaviorValues[idx];
-                for (int j = 0; j < behaviors.getChildCount(); j++) {
-                    Button child = (Button) behaviors.getChildAt(j);
+                selectedRigidity[0] = rigidityValues[idx];
+                for (int j = 0; j < rigidities.getChildCount(); j++) {
+                    Button child = (Button) rigidities.getChildAt(j);
+                    child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
+
+        TextView priorityTitle = text("PRIORITY", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams priorityTitleLp = new LinearLayout.LayoutParams(-1, -2);
+        priorityTitleLp.topMargin = dp(10);
+        form.addView(priorityTitle, priorityTitleLp);
+        LinearLayout priorities = horizontal();
+        form.addView(priorities, new LinearLayout.LayoutParams(-1, dp(40)));
+        String[] priorityNames = {"Critical", "Important", "Normal", "Optional"};
+        String[] priorityValues = {"critical", "important", "normal", "optional"};
+        for (int i = 0; i < priorityNames.length; i++) {
+            final int idx = i;
+            Button b = chip(priorityNames[i]);
+            boolean selected = priorityValues[i].equals(selectedPriority[0]);
+            b.setTextColor(selected ? Color.WHITE : color("#AEB7C9"));
+            b.setBackground(bg(selected ? "#413B73" : "#151A27", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+            if (i > 0) lp.leftMargin = dp(4);
+            priorities.addView(b, lp);
+            b.setOnClickListener(v -> {
+                selectedPriority[0] = priorityValues[idx];
+                for (int j = 0; j < priorities.getChildCount(); j++) {
+                    Button child = (Button) priorities.getChildAt(j);
                     child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
                     child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
                 }
@@ -2081,12 +2135,13 @@ public class MainActivity extends Activity {
                     }
                     if (adding) {
                         template.add(new Block(System.currentTimeMillis(), toTime(start[0]), toTime(end[0]),
-                                name, priority[0], "pending"));
+                                name, selectedPriority[0], selectedRigidity[0], "pending"));
                     } else {
                         original.title = name;
                         original.start = toTime(start[0]);
                         original.end = toTime(end[0]);
-                        original.priority = priority[0];
+                        original.priority = selectedPriority[0];
+                        original.rigidity = selectedRigidity[0];
                     }
                     Collections.sort(template, Comparator.comparingInt(b -> mins(b.start)));
                     onChanged.run();
@@ -2900,6 +2955,7 @@ public class MainActivity extends Activity {
                 o.put("end", b.end);
                 o.put("title", b.title);
                 o.put("priority", b.priority);
+                o.put("rigidity", b.rigidity);
                 o.put("status", b.status);
                 o.put("actualMs", b.actualMs);
                 o.put("actualStartedAt", b.actualStartedAt);
