@@ -153,7 +153,9 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         Window window = getWindow();
         window.setStatusBarColor(color("#0D1512"));
-        window.setNavigationBarColor(color("#0D1512"));
+        window.setNavigationBarColor(Color.WHITE);
+        window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
 
         selectedDateKey = todayKey();
         load();
@@ -287,7 +289,7 @@ public class MainActivity extends Activity {
             case "#243F34": case "#2C8061": case "#3F8E69":
                 return Color.parseColor("#286B55");
             case "#70D6A5": case "#6BD0A6": case "#7DD6B2": case "#6FD6A3":
-            case "#65C5A0": case "#40B58A":
+            case "#65C5A0":
                 return Color.parseColor("#2E8060");
             case "#203E30": case "#172B22": case "#DCEBE3":
                 return Color.parseColor("#DCEBE2");
@@ -335,7 +337,12 @@ public class MainActivity extends Activity {
         b.setText(value);
         b.setTextSize(12);
         b.setAllCaps(false);
-        b.setTextColor(textColor);
+        boolean solidBackground = "#23845F".equalsIgnoreCase(background)
+                || "#40B58A".equalsIgnoreCase(background) || "#27513E".equalsIgnoreCase(background)
+                || "#245B45".equalsIgnoreCase(background) || "#70D6A5".equalsIgnoreCase(background)
+                || "#6BD0A6".equalsIgnoreCase(background) || "#7DD6B2".equalsIgnoreCase(background)
+                || "#65C5A0".equalsIgnoreCase(background) || "#B84B5C".equalsIgnoreCase(background);
+        b.setTextColor(textColor == Color.WHITE && !solidBackground ? color("#18372E") : textColor);
         b.setGravity(Gravity.CENTER);
         b.setPadding(0, 0, 0, 0);
         b.setMinHeight(0);
