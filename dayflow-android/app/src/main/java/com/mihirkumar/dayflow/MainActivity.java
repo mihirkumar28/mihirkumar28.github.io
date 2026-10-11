@@ -585,7 +585,7 @@ public class MainActivity extends Activity {
         int percent = total == 0 ? 0 : Math.round(done * 100f / total);
         progressPercent.setText(percent + "% of plan • " + syllabusProgressLabel());
         plannedView.setText(fmtShort(plannedMinutes));
-        doneView.setText(fmtMillis(actualFocusMs) + " actual");
+        doneView.setText(fmtPreciseMillis(actualFocusMs) + " actual");
 
         updateCurrentCard(current, next, nowMins);
         renderOfficeCard();
@@ -644,7 +644,7 @@ public class MainActivity extends Activity {
             long actualMs = 0L;
             long now = System.currentTimeMillis();
             for (Block block : blocks) actualMs += getActualDuration(block, now);
-            doneView.setText(fmtMillis(actualMs) + " actual");
+            doneView.setText(fmtPreciseMillis(actualMs) + " actual");
         }
     }
 
@@ -696,7 +696,7 @@ public class MainActivity extends Activity {
             focusButton.setVisibility(current != null ? View.VISIBLE : View.GONE);
             if (current != null) {
                 focusButton.setText(current.actualStartedAt > 0
-                        ? "Stop focus • " + fmtMillis(getActualDuration(current, System.currentTimeMillis()))
+                        ? "Stop focus • " + fmtPreciseMillis(getActualDuration(current, System.currentTimeMillis()))
                         : "Start focus • " + fmtShort(Math.max(0, mins(current.end) - mins(current.start))));
             }
         }
