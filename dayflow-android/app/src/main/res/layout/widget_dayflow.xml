@@ -6,7 +6,7 @@
     android:orientation="horizontal"
     android:gravity="top"
     android:padding="8dp"
-    android:background="#151A27">
+    android:background="#1B2621">
 
     <LinearLayout
         android:layout_width="0dp"
@@ -48,7 +48,7 @@
                 android:layout_width="44dp"
                 android:layout_height="wrap_content"
                 android:text="ENDS IN"
-                android:textColor="#7F899D"
+                android:textColor="#91A197"
                 android:textSize="8sp"
                 android:textStyle="bold" />
             <Chronometer
@@ -74,7 +74,7 @@
                 android:layout_width="44dp"
                 android:layout_height="wrap_content"
                 android:text="PLAN"
-                android:textColor="#7F899D"
+                android:textColor="#91A197"
                 android:textSize="8sp"
                 android:textStyle="bold" />
             <Chronometer
@@ -98,7 +98,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:text="SCREEN TIME • Collecting history"
-            android:textColor="#7F899D"
+            android:textColor="#91A197"
             android:textSize="9sp" />
     </LinearLayout>
 
@@ -118,7 +118,7 @@
             android:textColor="#FFFFFF"
             android:textSize="10sp"
             android:textStyle="bold"
-            android:background="#8B7CFF" />
+            android:background="#40B58A" />
 
         <TextView
             android:id="@+id/widget_commute"
@@ -127,7 +127,7 @@
             android:layout_marginTop="4dp"
             android:gravity="center"
             android:text="START"
-            android:textColor="#C7D3E6"
+            android:textColor="#DCE7DF"
             android:textSize="9sp"
             android:textStyle="bold"
             android:background="#263243" />
