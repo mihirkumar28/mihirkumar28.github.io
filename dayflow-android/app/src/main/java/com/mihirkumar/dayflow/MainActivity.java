@@ -2313,13 +2313,11 @@ public class MainActivity extends Activity {
         int cursor = active == null ? roundUp5(nowMins) : Math.max(nowMins, mins(active.end));
         ArrayList<Block> anchors = new ArrayList<>();
         ArrayList<Block> movable = new ArrayList<>();
-
         for (Block block : blocks) {
             if (!"pending".equals(block.status) || block == active) continue;
             if ("fixed".equals(block.rigidity)) {
                 if (mins(block.end) > nowMins) anchors.add(block);
             } else {
-                // Include both future work and overdue work that was left pending.
                 movable.add(block);
             }
         }
@@ -2333,7 +2331,8 @@ public class MainActivity extends Activity {
         int anchorIndex = 0;
         int moved = 0;
         int overdueRecovered = 0;
-        int couldNotFit = 0;
+        ArrayList<String> movedDetails = new ArrayList<>();
+        ArrayList<String> unplacedDetails = new ArrayList<>();
 
         for (Block block : movable) {
             int duration = Math.max(1, mins(block.end) - mins(block.start));
@@ -2343,7 +2342,6 @@ public class MainActivity extends Activity {
             }
 
             if (anchorIndex < anchors.size() && cursor + duration > mins(anchors.get(anchorIndex).start)) {
-                // The task cannot fit before this fixed anchor. Try after that commitment.
                 cursor = Math.max(cursor, mins(anchors.get(anchorIndex).end));
                 anchorIndex++;
                 while (anchorIndex < anchors.size() && mins(anchors.get(anchorIndex).start) < cursor) {
@@ -2353,7 +2351,7 @@ public class MainActivity extends Activity {
             }
 
             if (cursor + duration > 1440) {
-                couldNotFit++;
+                unplacedDetails.add(block.title + " • " + fmt(duration) + " • no remaining space");
                 continue;
             }
 
@@ -2367,18 +2365,60 @@ public class MainActivity extends Activity {
             if (!oldStart.equals(block.start) || !oldEnd.equals(block.end)) {
                 moved++;
                 if (wasOverdue) overdueRecovered++;
+                movedDetails.add(block.title + "  •  " + time12(oldStart) + " → " + time12(block.start)
+                        + "  •  " + fmt(duration));
             }
         }
 
         save();
-        String result = moved + " blocks reflowed; " + overdueRecovered + " overdue blocks recovered.";
-        if (couldNotFit > 0) result += " " + couldNotFit + " block(s) did not fit and were left unchanged.";
-        Toast.makeText(this, result, Toast.LENGTH_LONG).show();
         debugLog("Catch up result: moved=" + moved + " recoveredOverdue=" + overdueRecovered
-                + " unplaced=" + couldNotFit + " active=" + (active == null ? "none" : active.title));
+                + " unplaced=" + unplacedDetails.size() + " active=" + (active == null ? "none" : active.title));
+
+        LinearLayout content = vertical();
+        content.setPadding(dp(16), dp(8), dp(16), dp(18));
+
+        LinearLayout summary = surfaceCard();
+        summary.addView(text(moved == 0 ? "Plan left unchanged" : moved + " task(s) rescheduled",
+                21, color("#18372E"), true));
+        summary.addView(text(overdueRecovered + " overdue task(s) recovered • "
+                        + anchors.size() + " future Fixed commitment(s) protected",
+                12, color("#687A70"), false));
+        content.addView(summary);
+
+        if (!movedDetails.isEmpty()) {
+            LinearLayout changed = surfaceCard();
+            sectionLabel(changed, "RESCHEDULED");
+            for (String detail : movedDetails) {
+                addManageRow(changed, detail.substring(0, detail.indexOf("  •  ")),
+                        detail.substring(detail.indexOf("  •  ") + 5), () -> {});
+            }
+            content.addView(changed);
+        }
+
+        if (!unplacedDetails.isEmpty()) {
+            LinearLayout unplaced = surfaceCard();
+            unplaced.addView(text("Could not fit", 15, color("#B44248"), true));
+            unplaced.addView(text("These tasks were left at their original times rather than shortened or silently deleted.",
+                    12, color("#687A70"), false));
+            for (String detail : unplacedDetails) {
+                addManageRow(unplaced, detail.substring(0, detail.indexOf(" • ")),
+                        detail.substring(detail.indexOf(" • ") + 3), () -> {});
+            }
+            content.addView(unplaced);
+        } else if (moved == 0) {
+            LinearLayout unchanged = surfaceCard();
+            unchanged.addView(text("No timing changes were needed.", 14, color("#18372E"), true));
+            unchanged.addView(text("The remaining flexible tasks already fit around the protected commitments.",
+                    12, color("#687A70"), false));
+            content.addView(unchanged);
+        }
+
+        showFullScreenViewer("RECOVERY RESULT", "Catch up complete",
+                "Here is what changed. Fixed commitments were not moved; tasks that did not fit remain unchanged.",
+                content, "Return to today", () -> switchPage("home"));
     }
 
-        private void chooseMode(String key) {
+    private void chooseMode(String key) {
         if (mode.equals(key)) return;
         mode = key;
         SharedPreferences.Editor editor = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
