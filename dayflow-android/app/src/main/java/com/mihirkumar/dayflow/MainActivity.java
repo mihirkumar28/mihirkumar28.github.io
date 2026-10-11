@@ -712,17 +712,111 @@ public class MainActivity extends Activity {
         officePageContent=vertical();pageOffice.addView(officePageContent);renderOfficePage();
     }
     private void renderOfficePage() {
-        if(officePageContent==null)return;officePageContent.removeAllViews();JSONObject day=getOfficeDay(todayKey(),false);long now=System.currentTimeMillis();
-        long officeMs=officeDuration(day,now),commuteMs=commuteDuration(day,now);boolean inside=hasOpenOfficeSession(day),travelling=hasOpenCommute(day);
-        LinearLayout status=surfaceCard();status.addView(text(inside?"CURRENTLY AT THE OFFICE":travelling?"COMMUTE IN PROGRESS":"OFFICE STATUS",11,color("#6BD0A6"),true));
-        status.addView(text(inside?"Clocked in":travelling?"Commute running":"Not clocked in",24,color("#F2F7F3"),true));
-        status.addView(text("Office total  "+fmtMillis(officeMs)+"\nCommute total  "+fmtMillis(commuteMs),13,color("#9AABA0"),false));
-        Button check=primaryButton(inside?"Check out":"Check in",()->{toggleOfficeAttendance();renderOfficePage();});LinearLayout.LayoutParams checkLp=new LinearLayout.LayoutParams(-1,dp(48));checkLp.topMargin=dp(12);status.addView(check,checkLp);
-        Button travel=secondaryButton(travelling?"Finish commute":"Start commute",()->{toggleCommute();renderOfficePage();});LinearLayout.LayoutParams travelLp=new LinearLayout.LayoutParams(-1,dp(42));travelLp.topMargin=dp(8);status.addView(travel,travelLp);pageOffice.addView(status);
-        LinearLayout week=surfaceCard();week.addView(text("THIS WEEK",11,color("#D5B56E"),true));long total=0;int count=0;Calendar cursor=Calendar.getInstance();int dow=cursor.get(Calendar.DAY_OF_WEEK);cursor.add(Calendar.DAY_OF_YEAR,-(dow==Calendar.SUNDAY?6:dow-Calendar.MONDAY));
-        for(int i=0;i<7;i++){String key=keyForDate(cursor.getTime());JSONObject log=getOfficeDay(key,false);long value=officeDuration(log,key.equals(todayKey())?now:cursor.getTimeInMillis());if(value>0){total+=value;count++;}cursor.add(Calendar.DAY_OF_YEAR,1);}
-        week.addView(text(fmtMillis(total)+" logged across "+count+" office days",18,color("#F2F7F3"),true));week.addView(secondaryButton("Attendance history & corrections",()->showAttendanceHistory()));pageOffice.addView(week);
-        LinearLayout note=surfaceCard();note.addView(text("No inferred attendance",14,color("#F2F7F3"),true));note.addView(text("Use Check in/out for presence and Start/finish commute for travel. Editing a timetable never fabricates office hours.",12,color("#9AABA0"),false));pageOffice.addView(note);
+        if (officePageContent == null) return;
+        officePageContent.removeAllViews();
+        JSONObject todayLog = getOfficeDay(todayKey(), false);
+        long now = System.currentTimeMillis();
+        long officeMs = officeDuration(todayLog, now);
+        long commuteMs = commuteDuration(todayLog, now);
+        boolean inside = hasOpenOfficeSession(todayLog);
+        boolean travelling = hasOpenCommute(todayLog);
+
+        LinearLayout status = surfaceCard();
+        status.addView(text(inside ? "CURRENTLY AT THE OFFICE" : travelling ? "COMMUTE IN PROGRESS" : "OFFICE STATUS",
+                10, color("#2E8060"), true));
+        status.addView(text(inside ? "Clocked in" : travelling ? "Commute running" : "Not clocked in",
+                24, color("#18372E"), true));
+        status.addView(text("Office today  " + fmtMillis(officeMs) + "\nCommute today  " + fmtMillis(commuteMs),
+                13, color("#687A70"), false));
+        Button check = primaryButton(inside ? "Check out" : "Check in", () -> {
+            toggleOfficeAttendance();
+            renderOfficePage();
+        });
+        LinearLayout.LayoutParams checkLp = new LinearLayout.LayoutParams(-1, dp(48));
+        checkLp.topMargin = dp(12);
+        status.addView(check, checkLp);
+        Button travel = secondaryButton(travelling ? "Finish commute" : "Start commute", () -> {
+            toggleCommute();
+            renderOfficePage();
+        });
+        LinearLayout.LayoutParams travelLp = new LinearLayout.LayoutParams(-1, dp(42));
+        travelLp.topMargin = dp(8);
+        status.addView(travel, travelLp);
+        officePageContent.addView(status);
+
+        LinearLayout week = surfaceCard();
+        week.addView(text("THIS WEEK", 10, color("#A76821"), true));
+        long totalWeek = 0L;
+        int activeDays = 0;
+        Calendar monday = Calendar.getInstance();
+        int dow = monday.get(Calendar.DAY_OF_WEEK);
+        monday.add(Calendar.DAY_OF_YEAR, -(dow == Calendar.SUNDAY ? 6 : dow - Calendar.MONDAY));
+        for (int i = 0; i < 7; i++) {
+            String key = keyForDate(monday.getTime());
+            JSONObject log = getOfficeDay(key, false);
+            long ref = key.equals(todayKey()) ? now : monday.getTimeInMillis();
+            long value = officeDuration(log, ref);
+            if (value > 0) {
+                totalWeek += value;
+                activeDays++;
+            }
+            monday.add(Calendar.DAY_OF_YEAR, 1);
+        }
+        week.addView(text(fmtMillis(totalWeek), 22, color("#18372E"), true));
+        week.addView(text("Across " + activeDays + " recorded office days this week", 12, color("#687A70"), false));
+        week.addView(secondaryButton("Correct a day's attendance", () -> editAttendanceDay(todayKey())));
+        officePageContent.addView(week);
+
+        LinearLayout history = surfaceCard();
+        history.setTag("officeHistory");
+        history.addView(text("DAILY ATTENDANCE LEDGER", 10, color("#2E8060"), true));
+        history.addView(text("Last 31 days · tap a recorded day to inspect sessions or correct times.",
+                12, color("#687A70"), false));
+        Calendar cursor = Calendar.getInstance();
+        for (int i = 0; i < 31; i++) {
+            String key = keyForDate(cursor.getTime());
+            JSONObject log = getOfficeDay(key, false);
+            long ref = key.equals(todayKey()) ? now : cursor.getTimeInMillis();
+            long office = officeDuration(log, ref);
+            long commute = commuteDuration(log, ref);
+
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(10), dp(10), dp(8), dp(10));
+            row.setBackground(bg(i == 0 ? "#DCEBE2" : "#FFFFFF", 12));
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.bottomMargin = dp(6);
+            history.addView(row, rowLp);
+
+            LinearLayout info = vertical();
+            LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, -2, 1);
+            infoLp.rightMargin = dp(8);
+            row.addView(info, infoLp);
+            String dateText = new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(cursor.getTime());
+            info.addView(text(dateText, 13, color("#18372E"), true));
+            String detail = log == null || office <= 0 ? "No office record"
+                    : fmtMillis(office) + " in office" + (commute > 0 ? "  •  " + fmtMillis(commute) + " commute" : "")
+                    + (hasOpenOfficeSession(log) ? "  •  active" : "");
+            info.addView(text(detail, 10, color("#687A70"), false));
+
+            TextView marker = text(log != null && office > 0 ? "●" : "○", 16,
+                    log != null && office > 0 ? color("#2E8060") : color("#A8BAAE"), true);
+            row.addView(marker, new LinearLayout.LayoutParams(dp(24), -2));
+            if (log != null) {
+                String detailDate = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(cursor.getTime());
+                row.setOnClickListener(v -> showAttendanceDayDetail(detailDate, key, log));
+            } else if (key.equals(todayKey())) {
+                row.setOnClickListener(v -> toggleOfficeAttendance());
+            }
+            cursor.add(Calendar.DAY_OF_YEAR, -1);
+        }
+        officePageContent.addView(history);
+
+        LinearLayout note = surfaceCard();
+        note.addView(text("No inferred attendance", 14, color("#18372E"), true));
+        note.addView(text("Only your explicit check-ins, check-outs and commute actions count. Editing a timetable never creates office hours.",
+                12, color("#687A70"), false));
+        officePageContent.addView(note);
     }
 
     private void buildMorePage() {
@@ -3363,91 +3457,7 @@ public class MainActivity extends Activity {
     }
 
     private void showAttendanceHistory() {
-        try {
-            LinearLayout content = vertical();
-            content.setPadding(dp(18), dp(4), dp(18), dp(4));
-
-            TextView summary = text("", 14, Color.WHITE, true);
-            content.addView(summary);
-
-            ScrollView scroll = new ScrollView(this);
-            scroll.setFillViewport(false);
-            LinearLayout days = vertical();
-            days.setPadding(0, dp(10), 0, dp(12));
-            scroll.addView(days);
-
-            long totalWeek = 0;
-            int weekDays = 0;
-            Calendar cursor = Calendar.getInstance();
-            int dow = cursor.get(Calendar.DAY_OF_WEEK);
-            // Move to Monday of the current week.
-            int daysSinceMonday = dow == Calendar.SUNDAY ? 6 : dow - Calendar.MONDAY;
-            cursor.add(Calendar.DAY_OF_YEAR, -daysSinceMonday);
-
-            for (int i = 0; i < 7; i++) {
-                String k = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cursor.getTime());
-                JSONObject day = getOfficeDay(k, false);
-                long ref = k.equals(todayKey()) ? System.currentTimeMillis() : cursor.getTimeInMillis();
-                long d = officeDuration(day, ref);
-                if (d > 0) {
-                    totalWeek += d;
-                    weekDays++;
-                }
-                cursor.add(Calendar.DAY_OF_YEAR, 1);
-            }
-            summary.setText("This week  •  " + weekDays + " office days  •  " + fmtMillis(totalWeek));
-
-            Calendar c = Calendar.getInstance();
-            for (int i = 0; i < 31; i++) {
-                String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
-                JSONObject day = getOfficeDay(key, false);
-                long ref = key.equals(todayKey()) ? System.currentTimeMillis() : c.getTimeInMillis();
-                long office = officeDuration(day, ref);
-                long commute = commuteDuration(day, ref);
-
-                LinearLayout row = horizontal();
-                row.setPadding(dp(10), dp(10), dp(10), dp(10));
-                row.setBackground(bg(i == 0 ? "#214036" : "#1B2621", 14));
-                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
-                rp.bottomMargin = dp(7);
-                days.addView(row, rp);
-
-                LinearLayout info = vertical();
-                TextView date = text(new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(c.getTime()), 13, Color.WHITE, true);
-                info.addView(date);
-
-                String detail = "No office record";
-                if (day != null && office > 0) {
-                    detail = fmtMillis(office) + " in office";
-                    if (commute > 0) detail += "  •  " + fmtMillis(commute) + " commute";
-                    if (hasOpenOfficeSession(day)) detail += "  •  active";
-                }
-                info.addView(text(detail, 10, color("#91A197"), false));
-                row.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
-
-                TextView marker = text((day != null && office > 0) ? "●" : "○",
-                        17, (day != null && office > 0) ? color("#6FD6A3") : color("#47584D"), true);
-                row.addView(marker, new LinearLayout.LayoutParams(dp(26), -2));
-
-                if (day != null) {
-                    final JSONObject detailDay = day;
-                    final String detailDate = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(c.getTime());
-                    final String detailKey = key;
-                    row.setOnClickListener(v -> showAttendanceDayDetail(detailDate, detailKey, detailDay));
-                }
-                c.add(Calendar.DAY_OF_YEAR, -1);
-            }
-
-            content.addView(scroll, new LinearLayout.LayoutParams(-1, dp(500)));
-
-            new AlertDialog.Builder(this)
-                    .setTitle("Office attendance")
-                    .setView(content)
-                    .setPositiveButton("Done", null)
-                    .show();
-        } catch (Exception ignored) {
-            Toast.makeText(this, "Couldn't load attendance history.", Toast.LENGTH_SHORT).show();
-        }
+        switchPage("office");
     }
 
     private void showAttendanceDayDetail(String date, String dayKey, JSONObject day) {
