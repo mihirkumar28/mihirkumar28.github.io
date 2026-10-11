@@ -64,17 +64,41 @@ public class MainActivity extends Activity {
 
     private static class Block {
         long id;
-        String start, end, title, priority, status;
+        String start, end, title, priority, rigidity, status;
         long actualMs, actualStartedAt;
-        Block(long id, String start, String end, String title, String priority, String status) {
+        Block(long id, String start, String end, String title, String legacyBehavior, String status) {
+            this(id, start, end, title, importanceFromBehavior(legacyBehavior), rigidityFromBehavior(legacyBehavior), status);
+        }
+        Block(long id, String start, String end, String title, String priority, String rigidity, String status) {
             this.id = id;
             this.start = start;
             this.end = end;
             this.title = title;
-            this.priority = priority;
+            this.priority = normalizeImportance(priority);
+            this.rigidity = "fixed".equals(rigidity) ? "fixed" : "flexible";
             this.status = status;
             this.actualMs = 0L;
             this.actualStartedAt = 0L;
+        }
+        private static String importanceFromBehavior(String behavior) {
+            if (behavior == null) return "normal";
+            if (behavior.contains(":")) return normalizeImportance(behavior.substring(behavior.indexOf(':') + 1));
+            if ("fixed".equals(behavior) || "important".equals(behavior)) return "important";
+            if ("optional".equals(behavior)) return "optional";
+            if ("critical".equals(behavior)) return "critical";
+            return "normal";
+        }
+        private static String rigidityFromBehavior(String behavior) {
+            if (behavior == null) return "flexible";
+            if (behavior.contains(":")) return "fixed".equals(behavior.substring(0, behavior.indexOf(':'))) ? "fixed" : "flexible";
+            return "fixed".equals(behavior) ? "fixed" : "flexible";
+        }
+        private static String normalizeImportance(String importance) {
+            if ("critical".equals(importance) || "important".equals(importance)
+                    || "normal".equals(importance) || "optional".equals(importance)) return importance;
+            if ("fixed".equals(importance)) return "important";
+            if ("flexible".equals(importance)) return "normal";
+            return "normal";
         }
     }
 
@@ -750,7 +774,7 @@ public class MainActivity extends Activity {
 
         LinearLayout details = vertical();
         TextView title = text(b.title, 15, Color.WHITE, true);
-        TextView meta = text(priorityLabel(b.priority) + " • " + fmt(mins(b.end) - mins(b.start)), 11, color("#8E98AA"), false);
+        TextView meta = text(blockBehaviorLabel(b) + " • " + fmt(mins(b.end) - mins(b.start)), 11, color("#8E98AA"), false);
         details.addView(title);
         details.addView(meta);
 
@@ -791,9 +815,31 @@ public class MainActivity extends Activity {
     }
 
     private String priorityLabel(String value) {
-        if (value == null || value.isEmpty()) return "Flexible";
+        if (value == null || value.isEmpty()) return "Normal";
         String result = value;
         return Character.toUpperCase(result.charAt(0)) + result.substring(1);
+    }
+
+    private String blockBehaviorLabel(Block b) {
+        return ("fixed".equals(b.rigidity) ? "Fixed" : "Flexible") + " • " + priorityLabel(b.priority);
+    }
+
+    private Block blockFromJson(JSONObject o, String statusFallback) {
+        String priority = o.optString("priority", "flexible");
+        String status = o.optString("status", statusFallback);
+        Block b;
+        if (o.has("rigidity")) {
+            b = new Block(o.optLong("id", System.currentTimeMillis()),
+                    o.optString("start", "06:00"), o.optString("end", "07:00"),
+                    o.optString("title", "Block"), priority, o.optString("rigidity", "flexible"), status);
+        } else {
+            b = new Block(o.optLong("id", System.currentTimeMillis()),
+                    o.optString("start", "06:00"), o.optString("end", "07:00"),
+                    o.optString("title", "Block"), priority, status);
+        }
+        b.actualMs = o.optLong("actualMs", 0L);
+        b.actualStartedAt = o.optLong("actualStartedAt", 0L);
+        return b;
     }
 
     private void showBlockOptions(Block b) {
@@ -1164,8 +1210,7 @@ public class MainActivity extends Activity {
             JSONArray arr = new JSONArray(raw);
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
-                result.add(new Block(o.getLong("id"), o.getString("start"), o.getString("end"),
-                        o.getString("title"), o.getString("priority"), o.getString("status")));
+                result.add(blockFromJson(o, "pending"));
             }
         } catch (Exception ignored) {
         }
@@ -1297,7 +1342,7 @@ public class MainActivity extends Activity {
         }
         for (Block b : blocks) {
             if (!"pending".equals(b.status) || b == active) continue;
-            if ("fixed".equals(b.priority)) {
+            if ("fixed".equals(b.rigidity)) {
                 if (mins(b.end) <= nowMins) overdueFixed++;
                 else remainingMovable++; // fixed future commitments are anchors, not moved work
             } else {
@@ -1319,10 +1364,11 @@ public class MainActivity extends Activity {
     }
 
     private int recoveryRank(Block block) {
-        if ("important".equals(block.priority)) return 0;
-        if ("flexible".equals(block.priority)) return 1;
-        if ("optional".equals(block.priority)) return 2;
-        return 1;
+        if ("critical".equals(block.priority)) return 0;
+        if ("important".equals(block.priority)) return 1;
+        if ("normal".equals(block.priority)) return 2;
+        if ("optional".equals(block.priority)) return 3;
+        return 2;
     }
 
     private void reflowRemainingDay(int activeIndex) {
@@ -1337,7 +1383,7 @@ public class MainActivity extends Activity {
 
         for (Block block : blocks) {
             if (!"pending".equals(block.status) || block == active) continue;
-            if ("fixed".equals(block.priority)) {
+            if ("fixed".equals(block.rigidity)) {
                 if (mins(block.end) > nowMins) anchors.add(block);
             } else {
                 // Include both future work and overdue work that was left pending.
@@ -1789,12 +1835,7 @@ public class MainActivity extends Activity {
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.optJSONObject(i);
                 if (o == null) continue;
-                result.add(new Block(o.optLong("id", System.currentTimeMillis() + i),
-                        o.optString("start", "06:00"),
-                        o.optString("end", "07:00"),
-                        o.optString("title", "Block"),
-                        o.optString("priority", "flexible"),
-                        "pending"));
+                result.add(blockFromJson(o, "pending"));
             }
         } catch (Exception ignored) {
         }
@@ -1892,7 +1933,7 @@ public class MainActivity extends Activity {
                 blocks.clear();
                 for (Block source : template) {
                     blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
-                            source.start, source.end, source.title, source.priority, "pending"));
+                            source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
                 }
                 save();
                 Toast.makeText(this, templateLabel(key) + " template saved and applied.", Toast.LENGTH_SHORT).show();
@@ -1930,7 +1971,7 @@ public class MainActivity extends Activity {
 
             LinearLayout details = vertical();
             details.addView(text(b.title, 14, Color.WHITE, true));
-            details.addView(text(time12(b.start) + " – " + time12(b.end) + "  •  " + priorityLabel(b.priority),
+            details.addView(text(time12(b.start) + " – " + time12(b.end) + "  •  " + blockBehaviorLabel(b),
                     11, color("#8E98AA"), false));
             row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
 
@@ -2058,7 +2099,7 @@ public class MainActivity extends Activity {
         blocks.clear();
         for (Block source : getTemplateBlocks(key)) {
             blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
-                    source.start, source.end, source.title, source.priority, "pending"));
+                    source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
         }
         save();
     }
@@ -2746,11 +2787,7 @@ public class MainActivity extends Activity {
                 JSONArray arr = new JSONArray(raw);
                 for (int i = 0; i < arr.length(); i++) {
                     JSONObject o = arr.getJSONObject(i);
-                    Block loaded = new Block(o.getLong("id"), o.getString("start"), o.getString("end"),
-                            o.getString("title"), o.getString("priority"), o.getString("status"));
-                    loaded.actualMs = o.optLong("actualMs", 0L);
-                    loaded.actualStartedAt = o.optLong("actualStartedAt", 0L);
-                    blocks.add(loaded);
+                    blocks.add(blockFromJson(o, "pending"));
                 }
             } else if (!isBeforeToday(selectedDateKey)) {
                 loadTemplateSilent();
@@ -2889,7 +2926,7 @@ public class MainActivity extends Activity {
     private void loadTemplateSilent() {
         for (Block source : getTemplateBlocks(mode)) {
             blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
-                    source.start, source.end, source.title, source.priority, "pending"));
+                    source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
         }
     }
 }
