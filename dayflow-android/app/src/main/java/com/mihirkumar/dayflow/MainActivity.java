@@ -191,6 +191,17 @@ public class MainActivity extends Activity {
         return c.getTimeInMillis();
     }
 
+    private long millisAtDateMinute(String dateKey, int minuteOfDay) {
+        Calendar c = Calendar.getInstance();
+        Date date = parseDateKey(dateKey);
+        if (date != null) c.setTime(date);
+        c.set(Calendar.HOUR_OF_DAY, Math.max(0, Math.min(23, minuteOfDay / 60)));
+        c.set(Calendar.MINUTE, Math.max(0, Math.min(59, minuteOfDay % 60)));
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
+    }
+
     private String formatCountdown(long millis) {
         long seconds = Math.max(0L, (millis + 999L) / 1000L);
         long hours = seconds / 3600L;
@@ -757,6 +768,7 @@ public class MainActivity extends Activity {
             dlp.leftMargin = dp(8);
             card.addView(done, dlp);
             done.setOnClickListener(v -> {
+                stopFocusForBlock(b, System.currentTimeMillis());
                 b.status = "done";
                 save();
             });
@@ -801,15 +813,18 @@ public class MainActivity extends Activity {
                     String a = actions.get(which);
                     if ("Edit block".equals(a)) editBlockDialog(b);
                     else if ("Delete block".equals(a)) {
+                        stopFocusForBlock(b, System.currentTimeMillis());
                         blocks.remove(b);
                         save();
                     } else if ("Undo completion".equals(a) || "Restore block".equals(a)) {
                         b.status = "pending";
                         save();
                     } else if ("Mark done".equals(a)) {
+                        stopFocusForBlock(b, System.currentTimeMillis());
                         b.status = "done";
                         save();
                     } else if ("Skip block".equals(a)) {
+                        stopFocusForBlock(b, System.currentTimeMillis());
                         b.status = "skipped";
                         save();
                     }
@@ -821,11 +836,20 @@ public class MainActivity extends Activity {
     private long getActualDuration(Block b, long now) {
         long total = Math.max(0L, b.actualMs);
         if (b.actualStartedAt > 0) {
-            long end = millisAtMinute(mins(b.end));
+            long end = millisAtDateMinute(selectedDateKey, mins(b.end));
             long effectiveEnd = Math.min(now, end);
             if (effectiveEnd > b.actualStartedAt) total += effectiveEnd - b.actualStartedAt;
         }
         return total;
+    }
+
+    private void stopFocusForBlock(Block block, long now) {
+        if (block == null || block.actualStartedAt <= 0) return;
+        long scheduledEnd = millisAtDateMinute(selectedDateKey, mins(block.end));
+        long stopAt = Math.min(now, scheduledEnd);
+        if (stopAt > block.actualStartedAt) block.actualMs += stopAt - block.actualStartedAt;
+        block.actualStartedAt = 0L;
+        debugLog("Focus stopped: " + block.title + " actualMs=" + block.actualMs);
     }
 
     private boolean closeExpiredFocusSessions() {
@@ -833,7 +857,7 @@ public class MainActivity extends Activity {
         boolean changed = false;
         for (Block block : blocks) {
             if (block.actualStartedAt <= 0) continue;
-            long end = millisAtMinute(mins(block.end));
+            long end = millisAtDateMinute(selectedDateKey, mins(block.end));
             if (now >= end) {
                 block.actualMs += Math.max(0L, end - block.actualStartedAt);
                 block.actualStartedAt = 0L;
@@ -867,7 +891,7 @@ public class MainActivity extends Activity {
         } else {
             for (Block other : blocks) {
                 if (other != current && other.actualStartedAt > 0) {
-                    long otherEnd = millisAtMinute(mins(other.end));
+                    long otherEnd = millisAtDateMinute(selectedDateKey, mins(other.end));
                     other.actualMs += Math.max(0L, Math.min(now, otherEnd) - other.actualStartedAt);
                     other.actualStartedAt = 0L;
                     debugLog("Focus auto-stopped when switching tasks: " + other.title);
@@ -884,6 +908,7 @@ public class MainActivity extends Activity {
                 + Calendar.getInstance().get(Calendar.MINUTE);
         for (Block b : blocks) {
             if ("pending".equals(b.status) && mins(b.start) <= nowMins && nowMins < mins(b.end)) {
+                stopFocusForBlock(b, System.currentTimeMillis());
                 b.status = "done";
                 save();
                 return;
