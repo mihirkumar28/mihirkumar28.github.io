@@ -66,6 +66,7 @@ public class MainActivity extends Activity {
     private LinearLayout planList, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
     private LinearLayout bottomNavigation;
     private TextView syllabusSummaryView, screenTimeSummaryView;
+    private LinearLayout syllabusBreakdown;
     private EditText syllabusSearch;
     private String activePage = "home";
     private String syllabusFilter = "All";
@@ -499,7 +500,7 @@ public class MainActivity extends Activity {
         ProgressBar cseBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);cseBar.setMax(Math.max(1,cseTotal));cseBar.setProgress(cseDone);cseBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));cse.addView(cseBar);
         Button openCse=primaryButton("Open CSE syllabus",()->{syllabusFilter="All";showSyllabusTracker();});LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(-1,dp(42));openLp.topMargin=dp(10);cse.addView(openCse,openLp);progressContent.addView(cse);
         LinearLayout career=surfaceCard();career.addView(text("SOFTWARE INTERVIEW PREP",11,color("#D5B56E"),true));career.addView(text(intDone+" / "+intTotal+" topics complete",22,color("#F2F7F3"),true));
-        career.addView(text("Month 6 • Tier 3/4 readiness\nMonth 9 • Tier 1/2 strong-hire target\n12–13 hours/week planned for interview preparation.",12,color("#9AABA0"),false));
+        career.addView(text("Month 6 • Tier 3/4 readiness\nMonth 9 • Tier 1/2 strong-hire target\nInterview-prep commitment: 12–13 hours (track actual sessions with Focus).\nCareer outcome: ₹2.5–2.75L monthly take-home after taxes/deductions; bonus and ESOPs excluded.\nExperience context: about 6 years; evaluate IC and EM paths on fit rather than assuming title alone.",12,color("#9AABA0"),false));
         ProgressBar intBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);intBar.setMax(Math.max(1,intTotal));intBar.setProgress(intDone);intBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#D5B56E")));career.addView(intBar);
         Button openCareer=secondaryButton("Open interview roadmap",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";showSyllabusTracker();});LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,dp(42));careerLp.topMargin=dp(10);career.addView(openCareer,careerLp);progressContent.addView(career);
         LinearLayout focus=surfaceCard();long actual=0;int planned=0;long now=System.currentTimeMillis();
@@ -560,8 +561,11 @@ public class MainActivity extends Activity {
         pageHeading(pageSyllabus,"Learning ledger","Syllabus & interview prep","Track completed topics. UPSC CSE and software interviews keep separate progress and deadlines.");
         LinearLayout actions=horizontal();actions.addView(secondaryButton("‹ Progress",()->switchPage("progress")),new LinearLayout.LayoutParams(dp(105),dp(40)));
         Button target=secondaryButton("Target date",()->chooseSyllabusTargetDate());LinearLayout.LayoutParams targetLp=new LinearLayout.LayoutParams(0,dp(40),1);targetLp.leftMargin=dp(7);actions.addView(target,targetLp);pageSyllabus.addView(actions);
-        syllabusSummaryView=text("",13,color("#B7C7BC"),false);syllabusSummaryView.setPadding(dp(14),dp(12),dp(14),dp(12));syllabusSummaryView.setBackground(bg("#18231E",16));
-        LinearLayout.LayoutParams sumLp=new LinearLayout.LayoutParams(-1,-2);sumLp.topMargin=dp(12);sumLp.bottomMargin=dp(12);pageSyllabus.addView(syllabusSummaryView,sumLp);
+        syllabusSummaryView=text("",14,color("#D6E4DA"),true);syllabusSummaryView.setPadding(dp(14),dp(12),dp(14),dp(12));syllabusSummaryView.setBackground(bg("#18231E",16));
+        LinearLayout.LayoutParams sumLp=new LinearLayout.LayoutParams(-1,-2);sumLp.topMargin=dp(12);sumLp.bottomMargin=dp(8);pageSyllabus.addView(syllabusSummaryView,sumLp);
+        HorizontalScrollView overviewScroll=new HorizontalScrollView(this);overviewScroll.setHorizontalScrollBarEnabled(false);
+        syllabusBreakdown=horizontal();overviewScroll.addView(syllabusBreakdown);
+        LinearLayout.LayoutParams breakdownLp=new LinearLayout.LayoutParams(-1,-2);breakdownLp.bottomMargin=dp(12);pageSyllabus.addView(overviewScroll,breakdownLp);
         LinearLayout topicActions=horizontal();
         topicActions.addView(primaryButton("＋ Add topic",()->editSyllabusTopic(null)),new LinearLayout.LayoutParams(0,dp(42),1));
         Button imp=secondaryButton("Import list",()->importSyllabusTopics());LinearLayout.LayoutParams impLp=new LinearLayout.LayoutParams(0,dp(42),1);impLp.leftMargin=dp(6);topicActions.addView(imp,impLp);
@@ -575,7 +579,11 @@ public class MainActivity extends Activity {
         syllabusList=vertical();pageSyllabus.addView(syllabusList);refreshSyllabusRows();
     }
     private void refreshSyllabusRows() {
-        if(syllabusList==null||syllabusSummaryView==null)return;ArrayList<SyllabusTopic> topics=readSyllabusTopics();syllabusSummaryView.setText(syllabusSummary(topics));syllabusList.removeAllViews();
+        if(syllabusList==null||syllabusSummaryView==null)return;
+        ArrayList<SyllabusTopic> topics=readSyllabusTopics();
+        syllabusSummaryView.setText(syllabusOverview(topics));
+        renderSyllabusBreakdown(topics);
+        syllabusList.removeAllViews();
         String query=syllabusQuery.trim().toLowerCase(Locale.US);int shown=0;
         for(SyllabusTopic topic:topics){
             if(!"All".equals(syllabusFilter)&&!syllabusFilter.equals(topic.subject))continue;
@@ -590,6 +598,41 @@ public class MainActivity extends Activity {
         }
         if(shown==0)syllabusList.addView(text("No topics match these filters. Try All or clear the search.",13,color("#9AABA0"),false));
     }
+    private String syllabusOverview(ArrayList<SyllabusTopic> topics) {
+        int done=0,cseTotal=0,cseDone=0,interviewTotal=0,interviewDone=0;
+        for(SyllabusTopic topic:topics){
+            boolean interview="Software Interview Prep".equals(topic.subject);
+            if(interview){interviewTotal++;if(topic.done)interviewDone++;}
+            else{cseTotal++;if(topic.done)cseDone++;}
+            if(topic.done)done++;
+        }
+        return "OVERALL  "+done+" / "+topics.size()+" complete  •  "+(topics.isEmpty()?0:Math.round(done*100f/topics.size()))+"%"
+                +"\nUPSC CSE  "+cseDone+" / "+cseTotal+"     •     SOFTWARE INTERVIEWS  "+interviewDone+" / "+interviewTotal;
+    }
+
+    private void renderSyllabusBreakdown(ArrayList<SyllabusTopic> topics) {
+        if(syllabusBreakdown==null)return;
+        syllabusBreakdown.removeAllViews();
+        for(String subject:SYLLABUS_SUBJECTS){
+            int total=0,done=0;
+            for(SyllabusTopic topic:topics)if(subject.equals(topic.subject)){total++;if(topic.done)done++;}
+            LinearLayout card=surfaceCard();card.setPadding(dp(12),dp(11),dp(12),dp(11));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(164),dp(104));lp.rightMargin=dp(7);card.setLayoutParams(lp);
+            TextView label=text(subject,11,color("#B7C7BC"),true);label.setMaxLines(2);label.setMinHeight(dp(28));card.addView(label);
+            card.addView(text(done+"/"+total,20,color("#F2F7F3"),true));
+            ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(Math.max(1,total));bar.setProgress(done);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(5));bp.topMargin=dp(5);card.addView(bar,bp);
+            card.setOnClickListener(v->{syllabusFilter=subject;syllabusQuery="";if(syllabusSearch!=null)syllabusSearch.setText("");refreshSyllabusRows();});
+            syllabusBreakdown.addView(card);
+        }
+        LinearLayout roadmap=surfaceCard();roadmap.setPadding(dp(12),dp(11),dp(12),dp(11));
+        LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(dp(210),dp(104));rp.rightMargin=dp(7);roadmap.setLayoutParams(rp);
+        roadmap.addView(text("ROADMAP",11,color("#D5B56E"),true));
+        String start=getPrefs().getString(INTERVIEW_PLAN_START_KEY,todayKey());
+        Date sd=parseDateKey(start);Calendar six=Calendar.getInstance();if(sd!=null)six.setTime(sd);six.add(Calendar.MONTH,6);
+        roadmap.addView(text("CSE checkpoint  1 Apr 2027\nCSE target  1 Jan 2028\nTier 3/4  "+keyForDate(six.getTime())+"\nTier 1/2  "+getPrefs().getString(INTERVIEW_TARGET_KEY,"2027-07-11"),10,color("#D6E4DA"),false));
+        syllabusBreakdown.addView(roadmap);
+    }
+
     private ArrayList<SyllabusTopic> readSyllabusTopicsWith(SyllabusTopic changed) {
         ArrayList<SyllabusTopic> all=readSyllabusTopics();for(int i=0;i<all.size();i++)if(all.get(i).id==changed.id){all.set(i,changed);break;}return all;
     }
@@ -597,7 +640,7 @@ public class MainActivity extends Activity {
     private void buildScreenTimePage() {
         pageHeading(pageScreenTime,"Digital wellbeing","Screen time","A local historical ledger of phone screen-interactive time. Android permission is required; older days are available only while Android exposes events.");
         LinearLayout controls=horizontal();controls.addView(secondaryButton("‹ Progress",()->switchPage("progress")),new LinearLayout.LayoutParams(dp(105),dp(40)));
-        Button refresh=primaryButton("Refresh history",()->{if(ScreenTimeTracker.hasUsageAccess(this))ScreenTimeTracker.refreshRecentDays(this,30);renderScreenTimePage();});
+        Button refresh=primaryButton("Refresh history",()->{if(ScreenTimeTracker.hasUsageAccess(this))ScreenTimeTracker.refreshRecentDays(this,7);renderScreenTimePage();});
         LinearLayout.LayoutParams refreshLp=new LinearLayout.LayoutParams(0,dp(40),1);refreshLp.leftMargin=dp(8);controls.addView(refresh,refreshLp);pageScreenTime.addView(controls);
         screenTimeSummaryView=text("",13,color("#B7C7BC"),false);screenTimeSummaryView.setPadding(dp(14),dp(12),dp(14),dp(12));screenTimeSummaryView.setBackground(bg("#18231E",16));
         LinearLayout.LayoutParams summLp=new LinearLayout.LayoutParams(-1,-2);summLp.topMargin=dp(12);summLp.bottomMargin=dp(12);pageScreenTime.addView(screenTimeSummaryView,summLp);
@@ -610,7 +653,7 @@ public class MainActivity extends Activity {
             LinearLayout card=surfaceCard();card.addView(text("How to enable",15,color("#F2F7F3"),true));card.addView(text("Settings → Apps → Special app access → Usage access → DayFlow → Allow.",12,color("#9AABA0"),false));
             card.addView(primaryButton("Open Usage access settings",()->{try{startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));}catch(Exception e){Toast.makeText(this,"Open Usage access from Android Settings.",Toast.LENGTH_LONG).show();}}));screenTimeList.addView(card);return;
         }
-        ScreenTimeTracker.refreshRecentDays(this,30);TreeSet<String> dates=new TreeSet<>(Collections.reverseOrder());
+        ScreenTimeTracker.refreshRecentDays(this,7);TreeSet<String> dates=new TreeSet<>(Collections.reverseOrder());
         for(String k:getPrefs().getAll().keySet())if(k.startsWith("screenTimeMs_")){String date=k.substring("screenTimeMs_".length());if(date.matches("\\d{4}-\\d{2}-\\d{2}"))dates.add(date);}
         for(int i=0;i<30;i++){Calendar c=Calendar.getInstance();c.add(Calendar.DAY_OF_YEAR,-i);dates.add(keyForDate(c.getTime()));}
         long total7=0,total30=0;int count7=0,count30=0;String d7=dayOffsetKey(6),d30=dayOffsetKey(29);
@@ -713,7 +756,7 @@ public class MainActivity extends Activity {
         rp.topMargin = dp(8);
         card.addView(row, rp);
 
-        currentTime = text("—", 13, color("#A8B0C2"), false);
+        currentTime = text("—", 13, color("#A5B5AA"), false);
         currentCountdown = text("—", 13, color("#FFFFFF"), true);
         row.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1));
         row.addView(currentCountdown);
@@ -725,7 +768,7 @@ public class MainActivity extends Activity {
         markDone.setTag("currentDone");
         markDone.setOnClickListener(v -> completeCurrent());
 
-        focusAction = actionButton("Start focus", color("#D9E2F3"), "#263243");
+        focusAction = actionButton("Start focus", color("#D6E4DA"), "#263A31");
         LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(40));
         focusLp.topMargin = dp(8);
         card.addView(focusAction, focusLp);
@@ -768,7 +811,7 @@ public class MainActivity extends Activity {
 
     private void buildOfficeCardContents() {
         LinearLayout titleRow = horizontal();
-        TextView title = text("OFFICE DAY", 12, color("#9FAFC4"), true);
+        TextView title = text("OFFICE DAY", 12, color("#A5B5AA"), true);
         titleRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
 
         Button history = actionButton("History", color("#DCE7DF"), "#263A31");
@@ -829,7 +872,7 @@ public class MainActivity extends Activity {
         modeLabel.setTag("modeHeader");
         row.addView(modeLabel);
 
-        Button more = actionButton("•••", color("#A8B0C2"), "#1B2621");
+        Button more = actionButton("•••", color("#A5B5AA"), "#1B2621");
         more.setTextSize(14);
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(44), dp(34));
         mp.leftMargin = dp(7);
@@ -1292,7 +1335,7 @@ public class MainActivity extends Activity {
         title.setSingleLine(true);
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
 
-        TextView startLabel = text("START", 10, color("#6F7C91"), true);
+        TextView startLabel = text("START", 10, color("#91A197"), true);
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
         slp.topMargin = dp(10);
         form.addView(startLabel, slp);
@@ -1324,7 +1367,7 @@ public class MainActivity extends Activity {
             }
         }
 
-        TextView durationLabel = text("DURATION", 10, color("#6F7C91"), true);
+        TextView durationLabel = text("DURATION", 10, color("#91A197"), true);
         LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-1, -2);
         dlp.topMargin = dp(12);
         form.addView(durationLabel, dlp);
@@ -1356,7 +1399,7 @@ public class MainActivity extends Activity {
         durations.addView(custom, customLp);
         custom.setOnClickListener(v -> durationChoice[0] = -1);
 
-        TextView rigidityLabel = text("RIGIDITY", 10, color("#6F7C91"), true);
+        TextView rigidityLabel = text("RIGIDITY", 10, color("#91A197"), true);
         LinearLayout.LayoutParams rigidityLabelLp = new LinearLayout.LayoutParams(-1, -2);
         rigidityLabelLp.topMargin = dp(12);
         form.addView(rigidityLabel, rigidityLabelLp);
@@ -1385,7 +1428,7 @@ public class MainActivity extends Activity {
             });
         }
 
-        TextView priorityTitle = text("PRIORITY", 10, color("#6F7C91"), true);
+        TextView priorityTitle = text("PRIORITY", 10, color("#91A197"), true);
         LinearLayout.LayoutParams priorityTitleLp = new LinearLayout.LayoutParams(-1, -2);
         priorityTitleLp.topMargin = dp(10);
         form.addView(priorityTitle, priorityTitleLp);
@@ -1411,7 +1454,7 @@ public class MainActivity extends Activity {
             });
         }
 
-        TextView repeatLabel = text("REPEAT", 10, color("#6F7C91"), true);
+        TextView repeatLabel = text("REPEAT", 10, color("#91A197"), true);
         LinearLayout.LayoutParams repeatLabelLp = new LinearLayout.LayoutParams(-1, -2);
         repeatLabelLp.topMargin = dp(12);
         form.addView(repeatLabel, repeatLabelLp);
@@ -1652,7 +1695,7 @@ public class MainActivity extends Activity {
             picker.show();
         });
 
-        TextView rigidityLabel = text("RIGIDITY", 10, color("#6F7C91"), true);
+        TextView rigidityLabel = text("RIGIDITY", 10, color("#91A197"), true);
         LinearLayout.LayoutParams rigidityLabelLp = new LinearLayout.LayoutParams(-1, -2);
         rigidityLabelLp.topMargin = dp(12);
         form.addView(rigidityLabel, rigidityLabelLp);
@@ -1680,7 +1723,7 @@ public class MainActivity extends Activity {
             });
         }
 
-        TextView priorityTitle = text("PRIORITY", 10, color("#6F7C91"), true);
+        TextView priorityTitle = text("PRIORITY", 10, color("#91A197"), true);
         LinearLayout.LayoutParams priorityTitleLp = new LinearLayout.LayoutParams(-1, -2);
         priorityTitleLp.topMargin = dp(10);
         form.addView(priorityTitle, priorityTitleLp);
@@ -2652,7 +2695,7 @@ public class MainActivity extends Activity {
             picker.show();
         });
 
-        TextView rigidityLabel = text("RIGIDITY", 10, color("#6F7C91"), true);
+        TextView rigidityLabel = text("RIGIDITY", 10, color("#91A197"), true);
         LinearLayout.LayoutParams rigidityLabelLp = new LinearLayout.LayoutParams(-1, -2);
         rigidityLabelLp.topMargin = dp(12);
         form.addView(rigidityLabel, rigidityLabelLp);
@@ -2679,7 +2722,7 @@ public class MainActivity extends Activity {
             });
         }
 
-        TextView priorityTitle = text("PRIORITY", 10, color("#6F7C91"), true);
+        TextView priorityTitle = text("PRIORITY", 10, color("#91A197"), true);
         LinearLayout.LayoutParams priorityTitleLp = new LinearLayout.LayoutParams(-1, -2);
         priorityTitleLp.topMargin = dp(10);
         form.addView(priorityTitle, priorityTitleLp);
@@ -2772,7 +2815,7 @@ public class MainActivity extends Activity {
             } else {
                 officeStatus.setText(day == null ? "No office record" : "OFFICE RECORD");
                 officeAction.setText("EDIT TIMES");
-                officeAction.setBackground(bg("#334B63", 12));
+                officeAction.setBackground(bg("#34483D", 12));
                 officeAction.setEnabled(true);
             }
 
@@ -3035,7 +3078,7 @@ public class MainActivity extends Activity {
 
                 LinearLayout row = horizontal();
                 row.setPadding(dp(10), dp(10), dp(10), dp(10));
-                row.setBackground(bg(i == 0 ? "#20213A" : "#1B2621", 14));
+                row.setBackground(bg(i == 0 ? "#214036" : "#1B2621", 14));
                 LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
                 rp.bottomMargin = dp(7);
                 days.addView(row, rp);
@@ -3050,11 +3093,11 @@ public class MainActivity extends Activity {
                     if (commute > 0) detail += "  •  " + fmtMillis(commute) + " commute";
                     if (hasOpenOfficeSession(day)) detail += "  •  active";
                 }
-                info.addView(text(detail, 10, color("#8792A6"), false));
+                info.addView(text(detail, 10, color("#91A197"), false));
                 row.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
 
                 TextView marker = text((day != null && office > 0) ? "●" : "○",
-                        17, (day != null && office > 0) ? color("#6FD6A3") : color("#4A5364"), true);
+                        17, (day != null && office > 0) ? color("#6FD6A3") : color("#47584D"), true);
                 row.addView(marker, new LinearLayout.LayoutParams(dp(26), -2));
 
                 if (day != null) {
