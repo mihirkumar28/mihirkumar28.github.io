@@ -293,9 +293,8 @@ public class MainActivity extends Activity {
                 return Color.parseColor("#2E8060");
             case "#203E30": case "#172B22": case "#DCEBE3":
                 return Color.parseColor("#DCEBE2");
-            case "#3A2729": case "#F8E8E6":
-                return Color.parseColor("#B44248");
-            case "#B84B5C": case "#B44248": case "#FFC5C9":
+            case "#3A2729": case "#F8E8E6": case "#B84B5C":
+            case "#B44248": case "#FFC5C9":
                 return Color.parseColor("#B44248");
             case "#D5B56E": return Color.parseColor("#A76821");
             case "#F2F7F3": case "#F1F6F2": case "#F5FBF7": case "#F5F6F1":
