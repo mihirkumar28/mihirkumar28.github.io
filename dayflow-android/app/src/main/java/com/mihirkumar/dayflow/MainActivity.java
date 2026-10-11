@@ -520,6 +520,17 @@ public class MainActivity extends Activity {
         shell.addView(bottomNavigation,new LinearLayout.LayoutParams(-1,dp(64)));
     }
 
+    private void refreshCurrentWorkspace() {
+        if ("home".equals(activePage)) renderHome();
+        else if ("plan".equals(activePage)) renderPlanPage();
+        else if ("progress".equals(activePage)) renderProgressPage();
+        else if ("office".equals(activePage)) renderOfficePage();
+        else if ("more".equals(activePage)) renderMorePage();
+        else if ("syllabus".equals(activePage)) renderSyllabusRows();
+        else if ("screenTime".equals(activePage)) renderScreenTimePage();
+        renderBottomNavOnly();
+    }
+
     private void switchPage(String page) {
         if(screenFrame==null)return;
         if("office".equals(page)&&!todayKey().equals(selectedDateKey)){
@@ -3063,81 +3074,133 @@ public class MainActivity extends Activity {
     private void openTemplateEditor(String key) {
         ArrayList<Block> template = getTemplateBlocks(key);
         LinearLayout list = vertical();
-        list.setPadding(dp(16), dp(4), dp(16), 0);
+        list.setPadding(dp(16), dp(8), dp(16), dp(16));
+
+        final android.app.Dialog editor = new android.app.Dialog(this);
+        editor.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout shell = vertical();
+        shell.setBackgroundColor(color("#F4F6F1"));
+
+        LinearLayout header = horizontal();
+        header.setPadding(dp(18), dp(12), dp(18), dp(12));
+        header.addView(secondaryButton("‹", editor::dismiss), new LinearLayout.LayoutParams(dp(44), dp(42)));
+        LinearLayout heading = vertical();
+        LinearLayout.LayoutParams headingLp = new LinearLayout.LayoutParams(0, -2, 1);
+        headingLp.leftMargin = dp(12);
+        header.addView(heading, headingLp);
+        heading.addView(text("ROUTINE EDITOR", 10, color("#2E8060"), true));
+        heading.addView(text(templateLabel(key) + " routine", 22, color("#18372E"), true));
+        TextView subtitle = text("Edit the reusable routine. Save + apply is the only action that changes the selected day.", 11, color("#687A70"), false);
+        subtitle.setLineSpacing(dp(2), 1f);
+        heading.addView(subtitle);
+        shell.addView(header, new LinearLayout.LayoutParams(-1, -2));
+
         ScrollView scroll = new ScrollView(this);
-        scroll.addView(list, new ScrollView.LayoutParams(-1, -1));
+        scroll.setFillViewport(false);
+        scroll.setClipToPadding(false);
+        scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        AlertDialog editor = new AlertDialog.Builder(this)
-                .setTitle("Edit " + templateLabel(key) + " template")
-                .setView(scroll)
-                .setPositiveButton("Save template", null)
-                .setNeutralButton("Save + apply", null)
-                .setNegativeButton("Cancel", null)
-                .create();
-
-        editor.setOnShowListener(dialog -> {
-            AlertDialog d = (AlertDialog) dialog;
-            d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                saveTemplate(key, template);
-                Toast.makeText(this, templateLabel(key) + " template saved.", Toast.LENGTH_SHORT).show();
-                d.dismiss();
-            });
-            d.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
-                saveTemplate(key, template);
-                mode = key;
-                blocks.clear();
-                for (Block source : template) {
-                    blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
-                            source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
-                }
-                save();
-                Toast.makeText(this, templateLabel(key) + " template saved and applied.", Toast.LENGTH_SHORT).show();
-                d.dismiss();
-            });
-            renderTemplateEditorRows(list, template, editor);
+        LinearLayout footer = vertical();
+        footer.setPadding(dp(14), dp(9), dp(14), dp(12));
+        footer.setBackgroundColor(Color.WHITE);
+        LinearLayout row = horizontal();
+        row.addView(secondaryButton("Cancel", editor::dismiss), new LinearLayout.LayoutParams(0, dp(44), 1));
+        Button saveTemplate = secondaryButton("Save template", () -> {
+            saveTemplate(key, template);
+            editor.dismiss();
+            Toast.makeText(this, templateLabel(key) + " template saved.", Toast.LENGTH_SHORT).show();
+            refreshCurrentWorkspace();
         });
+        LinearLayout.LayoutParams saveLp = new LinearLayout.LayoutParams(0, dp(44), 1);
+        saveLp.leftMargin = dp(8);
+        row.addView(saveTemplate, saveLp);
+        footer.addView(row);
+        Button saveApply = primaryButton("Save + apply to selected day", () -> {
+            saveTemplate(key, template);
+            mode = key;
+            getPrefs().edit().putString(modeKey(selectedDateKey), mode).apply();
+            if (selectedDateKey.equals(todayKey())) getPrefs().edit().putString(MODE_KEY, mode).apply();
+            blocks.clear();
+            for (Block source : template) {
+                blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
+                        source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
+            }
+            save();
+            editor.dismiss();
+            Toast.makeText(this, templateLabel(key) + " routine saved and applied.", Toast.LENGTH_SHORT).show();
+            refreshCurrentWorkspace();
+        });
+        LinearLayout.LayoutParams applyLp = new LinearLayout.LayoutParams(-1, dp(46));
+        applyLp.topMargin = dp(8);
+        footer.addView(saveApply, applyLp);
+        shell.addView(footer, new LinearLayout.LayoutParams(-1, -2));
+
+        editor.setContentView(shell);
+        android.view.Window window = editor.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color("#F4F6F1")));
+            window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
         editor.show();
+        if (window != null) window.setLayout(android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT);
+        renderTemplateEditorRows(list, template, editor);
     }
 
-    private void renderTemplateEditorRows(LinearLayout list, ArrayList<Block> template, AlertDialog editor) {
+    private void renderTemplateEditorRows(LinearLayout list, ArrayList<Block> template, android.app.Dialog editor) {
         list.removeAllViews();
-        TextView hint = text("Edit, add, or remove blocks. Existing days are unchanged unless you choose Save + apply.",
-                11, color("#91A197"), false);
-        hint.setPadding(0, 0, 0, dp(10));
-        list.addView(hint);
+        LinearLayout intro = surfaceCard();
+        intro.addView(text("YOUR ROUTINE", 10, color("#2E8060"), true));
+        intro.addView(text("Tap a block to edit its timing, rigidity and priority. Remove blocks with ×. The order is chronological.", 12, color("#687A70"), false));
+        list.addView(intro);
 
-        Button add = actionButton("＋  Add template block", Color.WHITE, "#40B58A");
-        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(44));
+        Button add = primaryButton("＋  Add template block", () -> editTemplateBlockDialog(template, -1,
+                () -> renderTemplateEditorRows(list, template, editor)));
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(46));
         addLp.bottomMargin = dp(10);
         list.addView(add, addLp);
-        add.setOnClickListener(v -> editTemplateBlockDialog(template, -1, () ->
-                renderTemplateEditorRows(list, template, editor)));
 
         Collections.sort(template, Comparator.comparingInt(b -> mins(b.start)));
         for (int i = 0; i < template.size(); i++) {
             final int index = i;
             Block b = template.get(i);
             LinearLayout row = horizontal();
-            row.setPadding(dp(10), dp(8), dp(6), dp(8));
-            row.setBackground(bg("#1B2621", 14));
+            row.setPadding(dp(10), dp(10), dp(8), dp(10));
+            row.setBackground(surfaceBackground(14));
             LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
             rowLp.bottomMargin = dp(7);
             list.addView(row, rowLp);
 
-            LinearLayout details = vertical();
-            details.addView(text(b.title, 14, Color.WHITE, true));
-            details.addView(text(time12(b.start) + " – " + time12(b.end) + "  •  " + blockBehaviorLabel(b),
-                    11, color("#A5B5AA"), false));
-            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+            LinearLayout time = vertical();
+            time.addView(text(time12(b.start), 12, color("#286B55"), true));
+            time.addView(text(time12(b.end), 10, color("#687A70"), false));
+            row.addView(time, new LinearLayout.LayoutParams(dp(70), -2));
 
-            Button del = actionButton("×", color("#FFC5C9"), "#3A2729");
-            row.addView(del, new LinearLayout.LayoutParams(dp(42), dp(40)));
-            row.setOnClickListener(v -> editTemplateBlockDialog(template, index, () ->
-                    renderTemplateEditorRows(list, template, editor)));
-            del.setOnClickListener(v -> {
-                template.remove(index);
-                renderTemplateEditorRows(list, template, editor);
-            });
+            LinearLayout details = vertical();
+            LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(0, -2, 1);
+            detailsLp.leftMargin = dp(8);
+            detailsLp.rightMargin = dp(6);
+            row.addView(details, detailsLp);
+            details.addView(text(b.title, 13, color("#18372E"), true));
+            details.addView(text(blockBehaviorLabel(b), 10, color("#687A70"), false));
+            row.addView(secondaryButton("›", () -> editTemplateBlockDialog(template, index,
+                    () -> renderTemplateEditorRows(list, template, editor))),
+                    new LinearLayout.LayoutParams(dp(38), dp(38)));
+            Button del = secondaryButton("×", () -> new AlertDialog.Builder(this)
+                    .setTitle("Remove this block?")
+                    .setMessage(b.title + " will be removed from the reusable routine. Existing days are unchanged.")
+                    .setPositiveButton("Remove", (d, w) -> {
+                        template.remove(index);
+                        renderTemplateEditorRows(list, template, editor);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show());
+            LinearLayout.LayoutParams delLp = new LinearLayout.LayoutParams(dp(38), dp(38));
+            delLp.leftMargin = dp(5);
+            row.addView(del, delLp);
+            row.setOnClickListener(v -> editTemplateBlockDialog(template, index,
+                    () -> renderTemplateEditorRows(list, template, editor)));
         }
     }
 
