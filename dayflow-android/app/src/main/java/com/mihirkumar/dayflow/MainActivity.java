@@ -681,9 +681,22 @@ public class MainActivity extends Activity {
         updateLiveOfficeMetrics();
         if (doneView != null) {
             long actualMs = 0L;
+            long actualStudyMs = 0L;
+            int plannedStudyMinutes = 0;
             long now = System.currentTimeMillis();
-            for (Block block : blocks) actualMs += getActualDuration(block, now);
-            doneView.setText(fmtPreciseMillis(actualMs) + " actual");
+            for (Block block : blocks) {
+                long actual = getActualDuration(block, now);
+                actualMs += actual;
+                if (isStudyBlock(block.title)) {
+                    actualStudyMs += actual;
+                    plannedStudyMinutes += Math.max(0, mins(block.end) - mins(block.start));
+                }
+            }
+            doneView.setText(fmtPreciseMillis(actualMs) + " focus");
+            if (studyActualView != null) {
+                studyActualView.setText("Study actual " + fmtMillisForLabel(actualStudyMs)
+                        + " / " + fmtShort(plannedStudyMinutes) + " planned");
+            }
         }
     }
 
@@ -1760,15 +1773,41 @@ public class MainActivity extends Activity {
                 }).setNegativeButton("Cancel", null).show();
     }
 
+
+    private void loadStarterSyllabus() {
+        String[][] seed = [["General Studies","Prelims: Current events of national and international importance"],["General Studies","Prelims: History of India and Indian National Movement"],["General Studies","Prelims: Indian and World Geography (physical, social and economic)"],["General Studies","Prelims: Indian Polity and Governance (Constitution, political system, Panchayati Raj, public policy and rights)"],["General Studies","Prelims: Economic and Social Development (sustainable development, poverty, inclusion, demographics and social sector)"],["General Studies","Prelims: Environment, biodiversity and climate change"],["General Studies","Prelims: General Science"],["General Studies","GS-I: Indian culture (art forms, literature and architecture)"],["General Studies","GS-I: Modern Indian history from the mid-18th century"],["General Studies","GS-I: Freedom struggle (stages, contributors and regional contributions)"],["General Studies","GS-I: Post-independence consolidation and reorganisation"],["General Studies","GS-I: World history since the 18th century"],["General Studies","GS-I: Indian society and diversity"],["General Studies","GS-I: Women, population, poverty, development and urbanisation"],["General Studies","GS-I: Globalisation and Indian society"],["General Studies","GS-I: Social empowerment, communalism, regionalism and secularism"],["General Studies","GS-I: World physical geography"],["General Studies","GS-I: Natural resources and location of industries"],["General Studies","GS-I: Geophysical phenomena and geographical changes"],["General Studies","GS-II: Constitution (history, evolution, features, amendments and basic structure)"],["General Studies","GS-II: Federalism, Union-State relations and local devolution"],["General Studies","GS-II: Separation of powers and dispute-redress institutions"],["General Studies","GS-II: Comparison of constitutional schemes"],["General Studies","GS-II: Parliament and State legislatures"],["General Studies","GS-II: Executive, judiciary, ministries and pressure groups"],["General Studies","GS-II: Representation of the People Act"],["General Studies","GS-II: Constitutional, statutory, regulatory and quasi-judicial bodies"],["General Studies","GS-II: Government policies and interventions"],["General Studies","GS-II: NGOs, SHGs and development stakeholders"],["General Studies","GS-II: Welfare schemes for vulnerable sections"],["General Studies","GS-II: Health, education and human resources"],["General Studies","GS-II: Poverty and hunger"],["General Studies","GS-II: Governance, transparency, accountability and e-governance"],["General Studies","GS-II: Role of civil services in democracy"],["General Studies","GS-II: India and its neighbourhood"],["General Studies","GS-II: Bilateral, regional and global groupings"],["General Studies","GS-II: Foreign policies, Indian interests and diaspora"],["General Studies","GS-II: International institutions and agencies"],["General Studies","GS-III: Economy, planning, resources, growth, development and employment"],["General Studies","GS-III: Inclusive growth and government budgeting"],["General Studies","GS-III: Agriculture, crops, irrigation, storage, transport and marketing"],["General Studies","GS-III: Farm subsidies, MSP, PDS, buffer stocks and food security"],["General Studies","GS-III: Food processing and supply chains"],["General Studies","GS-III: Land reforms"],["General Studies","GS-III: Liberalisation and industrial policy"],["General Studies","GS-III: Infrastructure and investment models"],["General Studies","GS-III: Science and technology applications"],["General Studies","GS-III: Space, IT, robotics, nanotechnology, biotechnology and IPR"],["General Studies","GS-III: Conservation, pollution, degradation and environmental impact assessment"],["General Studies","GS-III: Disaster management"],["General Studies","GS-III: Extremism and internal security"],["General Studies","GS-III: Cybersecurity, money laundering and communications networks"],["General Studies","GS-III: Border security, organised crime and terrorism"],["General Studies","GS-III: Security forces and agencies"],["General Studies","GS-IV: Ethics and human interface"],["General Studies","GS-IV: Human values and lessons from leaders and administrators"],["General Studies","GS-IV: Attitude, social influence and persuasion"],["General Studies","GS-IV: Civil service aptitude and foundational values"],["General Studies","GS-IV: Emotional intelligence in administration"],["General Studies","GS-IV: Moral thinkers and philosophers"],["General Studies","GS-IV: Public-service ethics, dilemmas and ethical guidance"],["General Studies","GS-IV: Accountability, ethical governance and probity"],["General Studies","GS-IV: Case-study practice"],["CSAT","CSAT: Comprehension"],["CSAT","CSAT: Interpersonal and communication skills"],["CSAT","CSAT: Logical reasoning and analytical ability"],["CSAT","CSAT: Decision-making and problem-solving"],["CSAT","CSAT: General mental ability"],["CSAT","CSAT: Basic numeracy"],["CSAT","CSAT: Data interpretation (charts, graphs, tables and data sufficiency)"],["Maths Optional","Maths Optional Paper I: Linear Algebra"],["Maths Optional","Maths Optional Paper I: Calculus"],["Maths Optional","Maths Optional Paper I: Analytic Geometry"],["Maths Optional","Maths Optional Paper I: Ordinary Differential Equations"],["Maths Optional","Maths Optional Paper I: Dynamics and Statics"],["Maths Optional","Maths Optional Paper I: Vector Analysis"],["Maths Optional","Maths Optional Paper II: Algebra"],["Maths Optional","Maths Optional Paper II: Real Analysis"],["Maths Optional","Maths Optional Paper II: Complex Analysis"],["Maths Optional","Maths Optional Paper II: Linear Programming"],["Maths Optional","Maths Optional Paper II: Partial Differential Equations"],["Maths Optional","Maths Optional Paper II: Numerical Analysis"],["Maths Optional","Maths Optional Paper II: Computer Programming"],["Maths Optional","Maths Optional Paper II: Mechanics and Fluid Dynamics"],["Essay","Essay practice: Society, diversity and social change"],["Essay","Essay practice: Governance, democracy and public institutions"],["Essay","Essay practice: Economy, technology and development"],["Essay","Essay practice: Ethics, philosophy and human values"],["Essay","Essay practice: Environment, science and international relations"],["Essay","Timed essay writing and self-review"],["Interview","Interview: DAF, education, work experience and hometown"],["Interview","Interview: State and district issues"],["Interview","Interview: Current affairs and balanced judgement"],["Interview","Interview: Public-service motivation and ethical dilemmas"],["Interview","Interview: Mock interview and feedback review"]];
+        ArrayList<SyllabusTopic> all = readSyllabusTopics();
+        HashSet<String> known = new HashSet<>();
+        for (SyllabusTopic topic : all) {
+            known.add((topic.subject + "|" + topic.title).toLowerCase(Locale.US));
+        }
+        int added = 0;
+        for (String[] row : seed) {
+            if (row.length < 2) continue;
+            String key = (row[0] + "|" + row[1]).toLowerCase(Locale.US);
+            if (!known.add(key)) continue;
+            all.add(new SyllabusTopic(System.currentTimeMillis() + added, row[0], row[1], false, 0L));
+            added++;
+        }
+        if (added > 0 && !getPrefs().contains(SYLLABUS_START_KEY)) {
+            getPrefs().edit().putString(SYLLABUS_START_KEY, todayKey()).apply();
+        }
+        persistSyllabusTopics(all);
+        Toast.makeText(this, added + " syllabus items added.", Toast.LENGTH_LONG).show();
+        debugLog("UPSC syllabus starter loaded: newItems=" + added + " source=UPSC CSE 2026 notice");
+        showSyllabusTracker();
+    }
+
     private void showSyllabusTracker() {
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
-        String[] rows = new String[topics.size() + 3];
+        String[] rows = new String[topics.size() + 4];
         rows[0] = "＋ Add one topic";
         rows[1] = "Import topic list (one topic per line)";
-        rows[2] = "Set target date";
+        rows[2] = "Load UPSC CSE syllabus starter (2026 notice)";
+        rows[3] = "Set target date";
         for (int i = 0; i < topics.size(); i++) {
             SyllabusTopic topic = topics.get(i);
-            rows[i + 3] = (topic.done ? "✓ " : "○ ") + topic.subject + " • " + topic.title;
+            rows[i + 4] = (topic.done ? "✓ " : "○ ") + topic.subject + " • " + topic.title;
         }
         new AlertDialog.Builder(this)
                 .setTitle("Syllabus tracker")
@@ -1776,8 +1815,9 @@ public class MainActivity extends Activity {
                 .setItems(rows, (dialog, which) -> {
                     if (which == 0) editSyllabusTopic(null);
                     else if (which == 1) importSyllabusTopics();
-                    else if (which == 2) chooseSyllabusTargetDate();
-                    else showSyllabusTopicActions(topics.get(which - 3));
+                    else if (which == 2) loadStarterSyllabus();
+                    else if (which == 3) chooseSyllabusTargetDate();
+                    else showSyllabusTopicActions(topics.get(which - 4));
                 })
                 .setNegativeButton("Close", null)
                 .show();
