@@ -548,10 +548,25 @@ public class MainActivity extends Activity {
         dateRow.addView(secondaryButton("‹",()->{changeSelectedDate(-1);renderPlanPage();}),new LinearLayout.LayoutParams(dp(45),dp(40)));
         TextView date=text("",14,color("#F1F6F2"),true);date.setGravity(Gravity.CENTER);date.setTag("planDate");dateRow.addView(date,new LinearLayout.LayoutParams(0,dp(40),1));
         dateRow.addView(secondaryButton("›",()->{changeSelectedDate(1);renderPlanPage();}),new LinearLayout.LayoutParams(dp(45),dp(40)));dateCard.addView(dateRow);
-        LinearLayout modes=horizontal();String[][] choices={{"WFH","wfh"},{"Office","office"},{"Weekend","weekend"}};
-        for(String[] choice:choices){Button b=secondaryButton(choice[0],()->chooseMode(choice[1]));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(40),1);lp.leftMargin=dp(4);lp.rightMargin=dp(4);lp.topMargin=dp(10);modes.addView(b,lp);}dateCard.addView(modes);
+        TextView modeLabel=text("DAY TYPE",10,color("#687A70"),true);
+        LinearLayout.LayoutParams modeLabelLp=new LinearLayout.LayoutParams(-1,-2);modeLabelLp.topMargin=dp(12);dateCard.addView(modeLabel,modeLabelLp);
+        LinearLayout modes=horizontal();
+        String[][] choices={{"WFH","wfh"},{"Office","office"},{"Weekend","weekend"}};
+        for(String[] choice:choices){
+            Button b=secondaryButton(choice[0],()->chooseMode(choice[1]));
+            b.setTag("plan-mode-chip-"+choice[1]);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(40),1);
+            if(modes.getChildCount()>0)lp.leftMargin=dp(6);
+            modes.addView(b,lp);
+        }
+        LinearLayout.LayoutParams modesLp=new LinearLayout.LayoutParams(-1,dp(42));modesLp.topMargin=dp(6);dateCard.addView(modes,modesLp);
         LinearLayout templateRow=horizontal();
-        for(String[] choice:choices){Button b=secondaryButton("Load "+choice[0],()->chooseTemplateDirect(choice[1]));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(38),1);lp.leftMargin=dp(3);lp.rightMargin=dp(3);lp.topMargin=dp(8);templateRow.addView(b,lp);}dateCard.addView(templateRow);pagePlan.addView(dateCard);
+        Button applyRoutine=primaryButton("Apply saved routine",()->showTemplatePicker());
+        templateRow.addView(applyRoutine,new LinearLayout.LayoutParams(0,dp(42),1));
+        Button editRoutine=secondaryButton("Edit template",()->openTemplateEditor(mode));
+        LinearLayout.LayoutParams editRoutineLp=new LinearLayout.LayoutParams(0,dp(42),1);editRoutineLp.leftMargin=dp(8);
+        templateRow.addView(editRoutine,editRoutineLp);
+        LinearLayout.LayoutParams templateRowLp=new LinearLayout.LayoutParams(-1,dp(44));templateRowLp.topMargin=dp(10);dateCard.addView(templateRow,templateRowLp);pagePlan.addView(dateCard);
         Button add=primaryButton("＋  Add a block",()->openAddDialog());LinearLayout.LayoutParams addLp=new LinearLayout.LayoutParams(-1,dp(48));addLp.bottomMargin=dp(15);pagePlan.addView(add,addLp);
         TextView section=text("YOUR BLOCKS",11,color("#9AABA0"),true);LinearLayout.LayoutParams secLp=new LinearLayout.LayoutParams(-1,-2);secLp.bottomMargin=dp(9);pagePlan.addView(section,secLp);
         planList=vertical();pagePlan.addView(planList);renderPlanPage();
@@ -560,8 +575,22 @@ public class MainActivity extends Activity {
     private void renderPlanPage() {
         if(planList==null)return;
         TextView date=(TextView)pagePlan.findViewWithTag("planDate");
-        if(date!=null){Date d=parseDateKey(selectedDateKey);date.setText((d==null?selectedDateKey:new SimpleDateFormat("EEE, d MMM",Locale.getDefault()).format(d))+"  •  "+mode.toUpperCase(Locale.US));}
-        planList.removeAllViews();ArrayList<Block> ordered=new ArrayList<>(blocks);Collections.sort(ordered,Comparator.comparingInt(b->mins(b.start)));
+        if(date!=null){
+            Date d=parseDateKey(selectedDateKey);
+            String dayState=selectedDateKey.equals(todayKey())?"TODAY":selectedDateKey.compareTo(todayKey())<0?"PAST":"PLANNED";
+            date.setText((d==null?selectedDateKey:new SimpleDateFormat("EEE, d MMM",Locale.getDefault()).format(d))+"  •  "+dayState);
+        }
+        for(String key:new String[]{"wfh","office","weekend"}){
+            View choice=pagePlan.findViewWithTag("plan-mode-chip-"+key);
+            if(choice instanceof Button){
+                boolean selected=mode.equals(key);
+                ((Button)choice).setTextColor(selected?Color.WHITE:color("#496257"));
+                choice.setBackground(bg(selected?"#286B55":"#FFFFFF",12));
+            }
+        }
+        planList.removeAllViews();
+        ArrayList<Block> ordered=new ArrayList<>(blocks);
+        Collections.sort(ordered,Comparator.comparingInt(b->mins(b.start)));
         if(ordered.isEmpty()){planList.addView(text("Nothing planned yet. Add a block or load a saved routine.",14,color("#9AABA0"),false));return;}
         for(Block block:ordered){
             LinearLayout card=surfaceCard();LinearLayout row=horizontal();row.setGravity(Gravity.TOP);
@@ -2663,6 +2692,17 @@ public class MainActivity extends Activity {
                     }
                 })
                 .setNegativeButton("Not now", null)
+                .show();
+    }
+
+    private void showTemplatePicker() {
+        String[] labels={"Work from home","Office day","Weekend"};
+        String[] keys={"wfh","office","weekend"};
+        new AlertDialog.Builder(this)
+                .setTitle("Apply a saved routine")
+                .setMessage("Applying a routine replaces the selected day's blocks. Office attendance and historical records are kept.")
+                .setItems(labels,(dialog,which)->chooseTemplateDirect(keys[which]))
+                .setNegativeButton("Cancel",null)
                 .show();
     }
 
