@@ -258,6 +258,16 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_commute,
                 officeMode ? android.view.View.VISIBLE : android.view.View.GONE);
 
+        views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_controls,
+                officeMode ? android.view.View.VISIBLE : android.view.View.GONE);
+        String todayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        long screenTimeMs = ScreenTimeTracker.getStoredMillis(context, todayKey);
+        String screenTimeText;
+        if (!ScreenTimeTracker.hasUsageAccess(context)) screenTimeText = "SCREEN TIME • Enable access in DayFlow";
+        else if (screenTimeMs < 0) screenTimeText = "SCREEN TIME • Collecting history";
+        else screenTimeText = "SCREEN " + ScreenTimeTracker.formatDuration(screenTimeMs) + " today";
+        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_screen_time, screenTimeText);
+
         if (officeMode) {
             views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, inOffice ? "OUT" : "IN");
 

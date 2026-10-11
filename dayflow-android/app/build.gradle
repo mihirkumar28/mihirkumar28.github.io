@@ -1,5 +1,9 @@
 plugins { id "com.android.application" }
 
+dependencies {
+    implementation "androidx.work:work-runtime:2.12.0"
+}
+
 def ciRun = System.getenv("GITHUB_RUN_NUMBER")
 def resolvedVersionCode = ciRun != null ? ciRun.toInteger() : 1
 def resolvedVersionName = "1.0." + (ciRun != null ? ciRun : "dev")

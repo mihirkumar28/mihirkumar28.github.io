@@ -89,9 +89,21 @@
                 android:singleLine="true"
                 android:ellipsize="end" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_screen_time"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="SCREEN TIME • Collecting history"
+            android:textColor="#7F899D"
+            android:textSize="9sp" />
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/widget_controls"
         android:layout_width="54dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="6dp"
