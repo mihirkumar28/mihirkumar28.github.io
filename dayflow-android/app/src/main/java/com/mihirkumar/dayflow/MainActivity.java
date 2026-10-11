@@ -1158,10 +1158,16 @@ public class MainActivity extends Activity {
     }
 
     private void recoveryMode() {
+        if (!selectedDateKey.equals(todayKey())) {
+            Toast.makeText(this, "Catch up is available for today.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Collections.sort(blocks, Comparator.comparingInt(b -> mins(b.start)));
-
         int nowMins = currentMinutes();
         int activeIndex = -1;
+        int overdueMovable = 0;
+        int overdueFixed = 0;
+        int remainingMovable = 0;
         Block active = null;
 
         for (int i = 0; i < blocks.size(); i++) {
@@ -1172,111 +1178,111 @@ public class MainActivity extends Activity {
                 break;
             }
         }
-
-        if (active == null) {
-            Toast.makeText(this, "No active block to catch up from.", Toast.LENGTH_SHORT).show();
-            return;
+        for (Block b : blocks) {
+            if (!"pending".equals(b.status) || b == active) continue;
+            if ("fixed".equals(b.priority)) {
+                if (mins(b.end) <= nowMins) overdueFixed++;
+                else remainingMovable++; // fixed future commitments are anchors, not moved work
+            } else {
+                remainingMovable++;
+                if (mins(b.end) <= nowMins) overdueMovable++;
+            }
         }
 
+        String message = "Overdue movable blocks: " + overdueMovable
+                + "\nFixed commitments missed/past: " + overdueFixed
+                + "\n\nRecovery rules: keep the active block and Fixed anchors unchanged; reschedule overdue work; Important first, Flexible next, Optional last; preserve each duration; never overlap fixed anchors. Work that cannot fit remains unchanged and is reported.";
         final int selectedActiveIndex = activeIndex;
         new AlertDialog.Builder(this)
-                .setTitle("Catch up?")
-                .setMessage("Fixed blocks stay exactly where they are. Flexible, important, and optional blocks will be reflowed in order around those fixed anchors.")
-                .setPositiveButton("Reflow day", (d, w) -> reflowRemainingDay(selectedActiveIndex))
+                .setTitle("Build a recovery plan?")
+                .setMessage(message)
+                .setPositiveButton("Rebuild remaining day", (d, w) -> reflowRemainingDay(selectedActiveIndex))
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void reflowRemainingDay(int activeIndex) {
-        int cursor = mins(blocks.get(activeIndex).end);
-        int fixedIndex = activeIndex + 1;
-        int moved = 0;
+    private int recoveryRank(Block block) {
+        if ("important".equals(block.priority)) return 0;
+        if ("flexible".equals(block.priority)) return 1;
+        if ("optional".equals(block.priority)) return 2;
+        return 1;
+    }
 
-        // Fixed blocks are hard anchors. Everything else that is still pending
-        // is movable and keeps its duration + relative order.
-        while (fixedIndex < blocks.size()) {
-            Block fixed = blocks.get(fixedIndex);
-            if ("pending".equals(fixed.status) && "fixed".equals(fixed.priority)) break;
-            fixedIndex++;
+    private void reflowRemainingDay(int activeIndex) {
+        Collections.sort(blocks, Comparator.comparingInt(b -> mins(b.start)));
+        int nowMins = currentMinutes();
+        Block active = activeIndex >= 0 && activeIndex < blocks.size() ? blocks.get(activeIndex) : null;
+        if (active != null && !"pending".equals(active.status)) active = null;
+
+        int cursor = active == null ? roundUp5(nowMins) : Math.max(nowMins, mins(active.end));
+        ArrayList<Block> anchors = new ArrayList<>();
+        ArrayList<Block> movable = new ArrayList<>();
+
+        for (Block block : blocks) {
+            if (!"pending".equals(block.status) || block == active) continue;
+            if ("fixed".equals(block.priority)) {
+                if (mins(block.end) > nowMins) anchors.add(block);
+            } else {
+                // Include both future work and overdue work that was left pending.
+                movable.add(block);
+            }
         }
 
-        for (int i = activeIndex + 1; i < blocks.size(); i++) {
-            Block block = blocks.get(i);
-            if (!"pending".equals(block.status)) continue;
+        anchors.sort(Comparator.comparingInt(b -> mins(b.start)));
+        movable.sort((a, b) -> {
+            int priority = Integer.compare(recoveryRank(a), recoveryRank(b));
+            return priority != 0 ? priority : Integer.compare(mins(a.start), mins(b.start));
+        });
 
-            // If this block itself is fixed, it becomes the next hard anchor.
-            if ("fixed".equals(block.priority)) {
-                cursor = Math.max(cursor, mins(block.end));
-                fixedIndex = i + 1;
-                while (fixedIndex < blocks.size()) {
-                    Block next = blocks.get(fixedIndex);
-                    if ("pending".equals(next.status) && "fixed".equals(next.priority)) break;
-                    fixedIndex++;
-                }
-                continue;
-            }
+        int anchorIndex = 0;
+        int moved = 0;
+        int overdueRecovered = 0;
+        int couldNotFit = 0;
 
+        for (Block block : movable) {
             int duration = Math.max(1, mins(block.end) - mins(block.start));
+            while (anchorIndex < anchors.size() && mins(anchors.get(anchorIndex).start) < cursor) {
+                cursor = Math.max(cursor, mins(anchors.get(anchorIndex).end));
+                anchorIndex++;
+            }
 
-            // Skip anchors that we've already passed.
-            while (fixedIndex < blocks.size() &&
-                    mins(blocks.get(fixedIndex).start) < cursor) {
-                cursor = Math.max(cursor, mins(blocks.get(fixedIndex).end));
-                fixedIndex++;
-                while (fixedIndex < blocks.size()) {
-                    Block next = blocks.get(fixedIndex);
-                    if ("pending".equals(next.status) && "fixed".equals(next.priority)) break;
-                    fixedIndex++;
+            if (anchorIndex < anchors.size() && cursor + duration > mins(anchors.get(anchorIndex).start)) {
+                // The task cannot fit before this fixed anchor. Try after that commitment.
+                cursor = Math.max(cursor, mins(anchors.get(anchorIndex).end));
+                anchorIndex++;
+                while (anchorIndex < anchors.size() && mins(anchors.get(anchorIndex).start) < cursor) {
+                    cursor = Math.max(cursor, mins(anchors.get(anchorIndex).end));
+                    anchorIndex++;
                 }
             }
 
-            if (fixedIndex < blocks.size()) {
-                Block nextFixed = blocks.get(fixedIndex);
-                int fixedStart = mins(nextFixed.start);
-
-                // Use the free gap before the anchor where possible.
-                if (cursor + duration > fixedStart) {
-                    cursor = mins(nextFixed.end);
-                    fixedIndex++;
-                    while (fixedIndex < blocks.size()) {
-                        Block next = blocks.get(fixedIndex);
-                        if ("pending".equals(next.status) && "fixed".equals(next.priority)) break;
-                        fixedIndex++;
-                    }
-                }
-            }
-
-            int newStart = cursor;
-            int newEnd = newStart + duration;
-
-            if (newEnd > 1440) {
-                // Never truncate work or move a fixed anchor. Leave this block
-                // unchanged when the remaining day has no legal space.
+            if (cursor + duration > 1440) {
+                couldNotFit++;
                 continue;
             }
 
             String oldStart = block.start;
             String oldEnd = block.end;
-            block.start = toTime(newStart);
-            block.end = toTime(newEnd);
-            cursor = newEnd;
+            boolean wasOverdue = mins(oldEnd) <= nowMins;
+            block.start = toTime(cursor);
+            block.end = toTime(cursor + duration);
+            cursor += duration;
 
-            if (!oldStart.equals(block.start) || !oldEnd.equals(block.end)) moved++;
+            if (!oldStart.equals(block.start) || !oldEnd.equals(block.end)) {
+                moved++;
+                if (wasOverdue) overdueRecovered++;
+            }
         }
 
         save();
-
-        if (moved == 0) {
-            Toast.makeText(this, "Nothing needed reflowing.", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this,
-                    moved + " movable block" + (moved == 1 ? "" : "s") +
-                            " reflowed around fixed blocks.",
-                    Toast.LENGTH_SHORT).show();
-        }
+        String result = moved + " blocks reflowed; " + overdueRecovered + " overdue blocks recovered.";
+        if (couldNotFit > 0) result += " " + couldNotFit + " block(s) did not fit and were left unchanged.";
+        Toast.makeText(this, result, Toast.LENGTH_LONG).show();
+        debugLog("Catch up result: moved=" + moved + " recoveredOverdue=" + overdueRecovered
+                + " unplaced=" + couldNotFit + " active=" + (active == null ? "none" : active.title));
     }
 
-    private void chooseMode(String key) {
+        private void chooseMode(String key) {
         if (mode.equals(key)) return;
         String label = key.equals("office") ? "Office" : key.equals("weekend") ? "Weekend" : "WFH";
         new AlertDialog.Builder(this)
