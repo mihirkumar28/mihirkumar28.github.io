@@ -47,6 +47,7 @@ public class MainActivity extends Activity {
     private static final String SYLLABUS_KEY = "syllabusTopics";
     private static final String SYLLABUS_TARGET_KEY = "syllabusTargetDate";
     private static final String SYLLABUS_START_KEY = "syllabusStartDate";
+    private static final String ROUTINE_MIGRATION_V2_KEY = "routineDefaultMigrationV2";
     private static final String STARTER_SEEDED_KEY = "starterSyllabusSeeded_v2";
     private static final String INTERVIEW_PLAN_START_KEY = "softwareInterviewPlanStart";
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
@@ -158,6 +159,7 @@ public class MainActivity extends Activity {
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
 
         selectedDateKey = todayKey();
+        migrateUneditedDefaultTemplates();
         load();
         buildUi();
         ensureStarterPlans();
@@ -2630,10 +2632,24 @@ public class MainActivity extends Activity {
         }
         int cseRemaining = Math.max(0, cseTotal - cseDone);
         int interviewRemaining = Math.max(0, interviewTotal - interviewDone);
+        Calendar aprilCheckpoint = Calendar.getInstance();
+        Date aprilDate = parseDateKey("2027-04-01");
+        if (aprilDate != null) aprilCheckpoint.setTime(aprilDate);
+        aprilCheckpoint.set(Calendar.HOUR_OF_DAY, 0);
+        aprilCheckpoint.set(Calendar.MINUTE, 0);
+        aprilCheckpoint.set(Calendar.SECOND, 0);
+        aprilCheckpoint.set(Calendar.MILLISECOND, 0);
+        long daysToApril = Math.max(0L, (aprilCheckpoint.getTimeInMillis() - today.getTimeInMillis()) / 86400000L);
         StringBuilder summary = new StringBuilder();
         summary.append("Overall: ").append(done).append("/").append(topics.size())
-                .append(" complete (").append(topics.isEmpty() ? 0 : Math.round(done * 100f / topics.size())).append("%)")
-                .append("\n\nCSE syllabus target: ").append(target).append(" • ").append(daysLeft).append(" days left");
+                .append(" complete (").append(topics.isEmpty() ? 0 : Math.round(done * 100f / topics.size())).append("%)");
+        summary.append("\n\nCSE checkpoint: 1 Apr 2027 • ").append(daysToApril).append(" days left");
+        if (cseTotal > 0 && daysToApril > 0) {
+            summary.append("\nPace needed by April checkpoint: ")
+                    .append(String.format(Locale.US, "%.2f", cseRemaining / (double) daysToApril))
+                    .append(" topics/day from your current CSE list");
+        }
+        summary.append("\nCSE syllabus target: ").append(target).append(" • ").append(daysLeft).append(" days left");
         if (cseTotal > 0 && daysLeft > 0) {
             summary.append("\nCSE pace needed: ").append(String.format(Locale.US, "%.2f", cseRemaining / (double) daysLeft))
                     .append(" topics/day (software interview topics excluded)");
@@ -2656,10 +2672,12 @@ public class MainActivity extends Activity {
             summary.append("\nInterview topics remaining: ").append(interviewRemaining);
         }
         summary.append("\n\nRoutine anchors from your saved plan:")
-                .append("\n• WFH: protect GS, Maths Optional and the 08:00–09:30 interview-prep slot.")
-                .append("\n• Office: Maths Optional is after work, not in the morning.")
+                .append("\n• Workweek: 3 WFH days and 2 office days.")
+                .append("\n• WFH target: 2h GS + 2h Maths Optional; protect 08:00–09:30 for interview preparation.")
+                .append("\n• Default WFH routine places Maths Optional after work so it does not overlap the protected interview slot; adjust it if your work hours differ.")
+                .append("\n• Office: Maths Optional only after work, not in the morning.")
                 .append("\n• Weekends: 6 hours CSE — 3 hours GS + 3 hours Maths Optional.")
-                .append("\n• Interview target: Tier 3/4 readiness around month 6; Tier 1/2 strong-hire target around month 9.");
+                .append("\n• Interview prep: 12–13 hours planned; Tier 3/4 readiness around month 6, Tier 1/2 strong-hire target around month 9.");
         for (Map.Entry<String, int[]> entry : counts.entrySet()) {
             int[] values = entry.getValue();
             summary.append("\n").append(entry.getKey()).append(": ").append(values[0]).append("/")
@@ -3217,6 +3235,50 @@ public class MainActivity extends Activity {
         if ("office".equals(key)) {
             return new String[][]{
                     {"06:00","06:30","Wake up + routine","fixed"},
+                    {"06:30","08:00","GS study","important"},
+                    {"08:00","09:00","Breakfast + commute","fixed"},
+                    {"09:00","18:30","Work","fixed"},
+                    {"18:30","19:15","Reset","flexible"},
+                    {"19:15","21:15","Maths Optional","important"},
+                    {"21:15","22:00","Dinner","fixed"},
+                    {"22:00","23:00","Interview preparation","important"},
+                    {"23:00","23:30","Wind down","flexible"}
+            };
+        }
+        if ("weekend".equals(key)) {
+            return new String[][]{
+                    {"06:30","07:00","Morning routine","fixed"},
+                    {"07:00","10:00","GS study","important"},
+                    {"10:00","11:00","Breakfast + break","flexible"},
+                    {"11:00","14:00","Maths Optional","important"},
+                    {"14:00","15:00","Lunch","fixed"},
+                    {"15:00","17:00","Rest / personal buffer","flexible"},
+                    {"17:00","18:00","Exercise","important"},
+                    {"18:00","20:00","Personal time","flexible"},
+                    {"20:00","21:00","Dinner","fixed"},
+                    {"21:00","22:30","Interview preparation","important"}
+            };
+        }
+        return new String[][]{
+                {"05:00","05:15","Wake up","fixed"},
+                {"05:15","05:45","Morning routine","flexible"},
+                {"05:45","07:45","GS study","important"},
+                {"07:45","08:00","Breakfast / transition","flexible"},
+                {"08:00","09:30","Interview preparation","fixed"},
+                {"09:30","13:00","Work","fixed"},
+                {"13:00","14:00","Lunch","fixed"},
+                {"14:00","18:30","Work","fixed"},
+                {"18:30","19:15","Exercise","important"},
+                {"19:15","21:15","Maths Optional","important"},
+                {"21:15","21:45","Dinner","fixed"},
+                {"21:45","22:15","Wind down","flexible"}
+        };
+    }
+
+    private String[][] legacyDefaultTemplate(String key) {
+        if ("office".equals(key)) {
+            return new String[][]{
+                    {"06:00","06:30","Wake up + routine","fixed"},
                     {"06:30","08:00","Maths Optional","important"},
                     {"08:00","09:00","Breakfast + commute","fixed"},
                     {"09:00","18:30","Work","fixed"},
@@ -3257,7 +3319,48 @@ public class MainActivity extends Activity {
         };
     }
 
-    private void openTemplateEditor(String key) {
+    private boolean matchesLegacyTemplate(String key, String raw) {
+        try {
+            JSONArray saved = new JSONArray(raw);
+            String[][] legacy = legacyDefaultTemplate(key);
+            if (saved.length() != legacy.length) return false;
+            for (int i = 0; i < legacy.length; i++) {
+                JSONObject record = saved.optJSONObject(i);
+                if (record == null) return false;
+                String[] expected = legacy[i];
+                if (!expected[0].equals(record.optString("start"))
+                        || !expected[1].equals(record.optString("end"))
+                        || !expected[2].equals(record.optString("title"))) return false;
+                Block wanted = new Block(i, expected[0], expected[1], expected[2], expected[3], "pending");
+                Block actual = blockFromJson(record, "pending");
+                if (!wanted.priority.equals(actual.priority) || !wanted.rigidity.equals(actual.rigidity)) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            debugLog("Routine migration check failed for " + key + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    private void migrateUneditedDefaultTemplates() {
+        SharedPreferences prefs = getPrefs();
+        if (prefs.getBoolean(ROUTINE_MIGRATION_V2_KEY, false)) return;
+        for (String key : new String[]{"wfh", "office", "weekend"}) {
+            String saved = prefs.getString(templateKey(key), null);
+            if (saved == null || !matchesLegacyTemplate(key, saved)) continue;
+            ArrayList<Block> updated = new ArrayList<>();
+            String[][] defaults = defaultTemplate(key);
+            for (int i = 0; i < defaults.length; i++) {
+                updated.add(new Block(System.currentTimeMillis() + i, defaults[i][0], defaults[i][1],
+                        defaults[i][2], defaults[i][3], "pending"));
+            }
+            saveTemplate(key, updated);
+            debugLog("Updated untouched built-in " + key + " routine. User-edited templates are preserved.");
+        }
+        prefs.edit().putBoolean(ROUTINE_MIGRATION_V2_KEY, true).apply();
+    }
+
+        private void openTemplateEditor(String key) {
         ArrayList<Block> template = getTemplateBlocks(key);
         LinearLayout list = vertical();
         list.setPadding(dp(16), dp(8), dp(16), dp(16));
