@@ -2262,6 +2262,68 @@ public class MainActivity extends Activity {
         Toast.makeText(this, templateLabel(mode) + " day type selected. Use Apply saved routine if you want to replace the timeline.", Toast.LENGTH_LONG).show();
     }
 
+    private void showFullScreenViewer(String eyebrow, String title, String subtitle,
+                                       View content, String primaryLabel, Runnable primaryAction) {
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout shell = vertical();
+        shell.setBackgroundColor(color("#F4F6F1"));
+
+        LinearLayout header = horizontal();
+        header.setPadding(dp(18), dp(12), dp(18), dp(12));
+        Button back = secondaryButton("‹", dialog::dismiss);
+        LinearLayout.LayoutParams backLp = new LinearLayout.LayoutParams(dp(44), dp(42));
+        backLp.rightMargin = dp(12);
+        header.addView(back, backLp);
+        LinearLayout heading = vertical();
+        heading.addView(text(eyebrow.toUpperCase(Locale.US), 10, color("#2E8060"), true));
+        TextView titleView = text(title, 22, color("#18372E"), true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.topMargin = dp(2);
+        heading.addView(titleView, titleLp);
+        TextView sub = text(subtitle, 11, color("#687A70"), false);
+        sub.setLineSpacing(dp(2), 1f);
+        heading.addView(sub);
+        header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+        shell.addView(header, new LinearLayout.LayoutParams(-1, -2));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.setClipToPadding(false);
+        if (content.getParent() instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) content.getParent()).removeView(content);
+        }
+        scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        LinearLayout footer = horizontal();
+        footer.setPadding(dp(16), dp(10), dp(16), dp(12));
+        footer.setBackgroundColor(Color.WHITE);
+        if (primaryLabel == null || primaryLabel.trim().isEmpty()) {
+            footer.addView(secondaryButton("Close", dialog::dismiss), new LinearLayout.LayoutParams(-1, dp(46)));
+        } else {
+            footer.addView(secondaryButton("Close", dialog::dismiss), new LinearLayout.LayoutParams(0, dp(46), 1));
+            Button action = primaryButton(primaryLabel, () -> {
+                dialog.dismiss();
+                if (primaryAction != null) primaryAction.run();
+            });
+            LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(0, dp(46), 1);
+            actionLp.leftMargin = dp(8);
+            footer.addView(action, actionLp);
+        }
+        shell.addView(footer, new LinearLayout.LayoutParams(-1, -2));
+
+        dialog.setContentView(shell);
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color("#F4F6F1")));
+            window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        dialog.show();
+        if (window != null) window.setLayout(android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT);
+    }
+
     private void showFullScreenEditor(String eyebrow, String title, String subtitle,
                                       View form, java.util.function.BooleanSupplier saveAction) {
         final android.app.Dialog dialog = new android.app.Dialog(this);
@@ -2457,24 +2519,36 @@ public class MainActivity extends Activity {
 
     private void importSyllabusTopics() {
         LinearLayout form = vertical();
-        form.setPadding(dp(18), dp(4), dp(18), dp(4));
+        form.setPadding(dp(18), dp(6), dp(18), dp(16));
+        TextView helper = text("Each non-empty line becomes one topic. Duplicate topics under the same subject are skipped.",
+                12, color("#687A70"), false);
+        helper.setLineSpacing(dp(2), 1f);
+        form.addView(helper);
         Spinner subject = new Spinner(this);
         subject.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, SYLLABUS_SUBJECTS));
-        form.addView(subject, new LinearLayout.LayoutParams(-1, dp(44)));
+        LinearLayout.LayoutParams subjectLp = new LinearLayout.LayoutParams(-1, dp(48));
+        subjectLp.topMargin = dp(10);
+        form.addView(subject, subjectLp);
         EditText lines = new EditText(this);
-        lines.setGravity(Gravity.TOP);
-        lines.setMinLines(6);
+        lines.setGravity(Gravity.TOP | Gravity.START);
+        lines.setMinLines(8);
         lines.setHint("Paste topics, one per line");
         lines.setTextColor(color("#18372E"));
         lines.setHintTextColor(color("#82948A"));
-        form.addView(lines, new LinearLayout.LayoutParams(-1, dp(160)));
-        new AlertDialog.Builder(this).setTitle("Import topic list")
-                .setMessage("Each non-empty line becomes one topic under the selected subject.")
-                .setView(form).setPositiveButton("Import", (d, w) -> {
+        lines.setPadding(dp(12), dp(12), dp(12), dp(12));
+        lines.setBackground(bg("#FFFFFF", 12));
+        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(-1, dp(220));
+        inputLp.topMargin = dp(10);
+        form.addView(lines, inputLp);
+
+        showFullScreenEditor("SYLLABUS TOOLS", "Import topic list",
+                "Choose a subject, then paste your topic list.", form, () -> {
                     String selectedSubject = subject.getSelectedItem().toString();
                     ArrayList<SyllabusTopic> all = readSyllabusTopics();
                     HashSet<String> existing = new HashSet<>();
-                    for (SyllabusTopic topic : all) existing.add((topic.subject + "|" + topic.title).toLowerCase(Locale.US));
+                    for (SyllabusTopic topic : all) {
+                        existing.add((topic.subject + "|" + topic.title).toLowerCase(Locale.US));
+                    }
                     int added = 0;
                     for (String raw : lines.getText().toString().split("\\r?\\n")) {
                         String name = raw.trim();
@@ -2488,9 +2562,9 @@ public class MainActivity extends Activity {
                     persistSyllabusTopics(all);
                     Toast.makeText(this, added + " topics imported.", Toast.LENGTH_SHORT).show();
                     showSyllabusTracker();
-                }).setNegativeButton("Cancel", null).show();
+                    return true;
+                });
     }
-
 
     private void loadStarterSyllabus() {
         loadStarterSyllabus(true);
@@ -3462,9 +3536,6 @@ public class MainActivity extends Activity {
 
     private void showAttendanceDayDetail(String date, String dayKey, JSONObject day) {
         try {
-            LinearLayout content = vertical();
-            content.setPadding(dp(20), dp(2), dp(20), dp(2));
-
             if (day == null) {
                 Toast.makeText(this, "No attendance record for this day.", Toast.LENGTH_SHORT).show();
                 return;
@@ -3473,293 +3544,57 @@ public class MainActivity extends Activity {
             long office = officeDuration(day, dayKey.equals(todayKey()) ? now : 0);
             long commute = commuteDuration(day, dayKey.equals(todayKey()) ? now : 0);
 
-            TextView summary = text("Office " + fmtMillis(office) + "  •  Commute " + fmtMillis(commute),
-                    15, Color.WHITE, true);
+            LinearLayout content = vertical();
+            content.setPadding(dp(18), dp(8), dp(18), dp(16));
+            LinearLayout summary = surfaceCard();
+            summary.addView(text("RECORDED TOTALS", 10, color("#2E8060"), true));
+            summary.addView(text("Office  " + fmtMillis(office), 21, color("#18372E"), true));
+            summary.addView(text("Commute  " + fmtMillis(commute), 13, color("#687A70"), false));
             content.addView(summary);
 
+            TextView sessionsTitle = text("OFFICE SESSIONS", 10, color("#2E8060"), true);
+            LinearLayout.LayoutParams stp = new LinearLayout.LayoutParams(-1, -2);
+            stp.topMargin = dp(14);
+            stp.bottomMargin = dp(6);
+            content.addView(sessionsTitle, stp);
             JSONArray sessions = day.optJSONArray("sessions");
+            boolean anySession = false;
             if (sessions != null) {
                 for (int i = 0; i < sessions.length(); i++) {
-                    JSONObject s = sessions.optJSONObject(i);
-                    if (s == null) continue;
-                    long in = s.optLong("in", 0);
-                    long out = s.optLong("out", 0);
-                    String value = "Office session " + (i + 1) + ": " + (in > 0 ? clock(in) : "—")
-                            + " → " + (out > 0 ? clock(out) : "Active");
-                    TextView t = text(value, 12, color("#D6E1D8"), false);
-                    t.setPadding(0, dp(10), 0, dp(2));
-                    content.addView(t);
+                    JSONObject session = sessions.optJSONObject(i);
+                    if (session == null) continue;
+                    anySession = true;
+                    long in = session.optLong("in", 0);
+                    long out = session.optLong("out", 0);
+                    String value = "Session " + (i + 1);
+                    String times = (in > 0 ? clock(in) : "Not recorded") + "  →  " + (out > 0 ? clock(out) : "Still open");
+                    addManageRow(content, value, times, () -> editAttendanceDay(dayKey));
                 }
             }
+            if (!anySession) content.addView(text("No office sessions recorded.", 12, color("#687A70"), false));
 
-            long ciS = day.optLong("commuteInStart", 0);
-            long ciE = day.optLong("commuteInEnd", 0);
-            long coS = day.optLong("commuteOutStart", 0);
-            long coE = day.optLong("commuteOutEnd", 0);
-            if (ciS > 0 || ciE > 0) content.addView(text("To office: " + clock(ciS) + " → " + (ciE > 0 ? clock(ciE) : "Active"), 12, color("#D6E1D8"), false));
-            if (coS > 0 || coE > 0) content.addView(text("Home: " + clock(coS) + " → " + (coE > 0 ? clock(coE) : "Active"), 12, color("#D6E1D8"), false));
+            long ciStart = day.optLong("commuteInStart", 0);
+            long ciEnd = day.optLong("commuteInEnd", 0);
+            long coStart = day.optLong("commuteOutStart", 0);
+            long coEnd = day.optLong("commuteOutEnd", 0);
+            LinearLayout travel = surfaceCard();
+            LinearLayout.LayoutParams travelLp = new LinearLayout.LayoutParams(-1, -2);
+            travelLp.topMargin = dp(10);
+            content.addView(travel, travelLp);
+            sectionLabel(travel, "Commute records");
+            travel.addView(text("To office", 12, color("#18372E"), true));
+            travel.addView(text(timeLabel(ciStart) + "  →  " + timeLabel(ciEnd), 12, color("#687A70"), false));
+            LinearLayout.LayoutParams homeLp = new LinearLayout.LayoutParams(-1, -2);
+            homeLp.topMargin = dp(10);
+            travel.addView(text("Home", 12, color("#18372E"), true), homeLp);
+            travel.addView(text(timeLabel(coStart) + "  →  " + timeLabel(coEnd), 12, color("#687A70"), false));
 
-            new AlertDialog.Builder(this)
-                    .setTitle(date)
-                    .setView(content)
-                    .setNeutralButton("Edit times", (d, w) -> editAttendanceDay(dayKey))
-                    .setPositiveButton("Done", null)
-                    .show();
-        } catch (Exception ignored) {
+            showFullScreenViewer("ATTENDANCE HISTORY", date,
+                    "Exact office and commute records for this day.", content, "Edit recorded times",
+                    () -> editAttendanceDay(dayKey));
+        } catch (Exception e) {
+            debugLog("Attendance detail open failed: " + e.getMessage());
             Toast.makeText(this, "Couldn't load that day.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-
-    private void ensureScreenTimeWorker() {
-        try {
-            PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
-                    ScreenTimeWorker.class, 15, java.util.concurrent.TimeUnit.MINUTES).build();
-            WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork(
-                    "dayflow-screen-time-history", ExistingPeriodicWorkPolicy.KEEP, request);
-        } catch (Exception e) {
-            debugLog("Screen-time work scheduling failed: " + e.getMessage());
-        }
-    }
-
-    private void showScreenTimeTracker() { switchPage("screenTime"); }
-
-    private void requestExportBackup() {
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "dayflow-backup-" + todayKey() + ".json");
-        try { startActivityForResult(intent, REQUEST_EXPORT_BACKUP); }
-        catch (Exception e) { Toast.makeText(this, "No file picker is available.", Toast.LENGTH_LONG).show(); }
-    }
-
-    private void requestImportBackup() {
-        new AlertDialog.Builder(this).setTitle("Import DayFlow backup?")
-                .setMessage("Restoring a backup replaces all current local DayFlow data. Export the current data first if it needs to be kept.")
-                .setPositiveButton("Choose file", (d, w) -> {
-                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                    intent.addCategory(Intent.CATEGORY_OPENABLE);
-                    intent.setType("application/json");
-                    try { startActivityForResult(intent, REQUEST_IMPORT_BACKUP); }
-                    catch (Exception e) { Toast.makeText(this, "No file picker is available.", Toast.LENGTH_LONG).show(); }
-                }).setNegativeButton("Cancel", null).show();
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        if (requestCode == REQUEST_EXPORT_BACKUP) writeBackup(data.getData());
-        else if (requestCode == REQUEST_IMPORT_BACKUP) readBackupForRestore(data.getData());
-    }
-
-    private JSONObject buildBackupDocument() throws Exception {
-        JSONObject root = new JSONObject();
-        root.put("app", "DayFlow");
-        root.put("formatVersion", 1);
-        root.put("exportedAt", System.currentTimeMillis());
-        JSONObject values = new JSONObject();
-        for (Map.Entry<String, ?> entry : getPrefs().getAll().entrySet()) {
-            Object value = entry.getValue();
-            JSONObject typed = new JSONObject();
-            if (value instanceof String) { typed.put("type", "string"); typed.put("value", value); }
-            else if (value instanceof Boolean) { typed.put("type", "boolean"); typed.put("value", value); }
-            else if (value instanceof Integer) { typed.put("type", "int"); typed.put("value", value); }
-            else if (value instanceof Long) { typed.put("type", "long"); typed.put("value", value); }
-            else if (value instanceof Float) { typed.put("type", "float"); typed.put("value", value); }
-            else if (value instanceof Set) {
-                JSONArray set = new JSONArray();
-                for (Object item : (Set<?>) value) set.put(String.valueOf(item));
-                typed.put("type", "stringSet");
-                typed.put("value", set);
-            } else continue;
-            values.put(entry.getKey(), typed);
-        }
-        root.put("preferences", values);
-        return root;
-    }
-
-    private void writeBackup(Uri uri) {
-        try (java.io.OutputStream output = getContentResolver().openOutputStream(uri)) {
-            if (output == null) throw new java.io.IOException("Could not open backup destination");
-            output.write(buildBackupDocument().toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            output.flush();
-            debugLog("Backup exported");
-            Toast.makeText(this, "DayFlow backup exported.", Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            debugLog("Backup export failed: " + e.getMessage());
-            Toast.makeText(this, "Backup export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void readBackupForRestore(Uri uri) {
-        try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
-            if (input == null) throw new java.io.IOException("Could not open backup file");
-            java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
-            byte[] bytes = new byte[4096];
-            int count;
-            while ((count = input.read(bytes)) != -1) buffer.write(bytes, 0, count);
-            JSONObject root = new JSONObject(buffer.toString(java.nio.charset.StandardCharsets.UTF_8.name()));
-            if (!"DayFlow".equals(root.optString("app")) || root.optInt("formatVersion", 0) != 1
-                    || !(root.opt("preferences") instanceof JSONObject)) {
-                throw new IllegalArgumentException("This is not a supported DayFlow backup.");
-            }
-            JSONObject values = root.getJSONObject("preferences");
-            new AlertDialog.Builder(this).setTitle("Restore backup?")
-                    .setMessage("The backup contains " + values.length() + " values. It replaces current plans, attendance, syllabus and screen-time history.")
-                    .setPositiveButton("Restore", (d, w) -> restoreBackupValues(values))
-                    .setNegativeButton("Cancel", null).show();
-        } catch (Exception e) {
-            debugLog("Backup import failed: " + e.getMessage());
-            Toast.makeText(this, "Couldn't read backup: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void restoreBackupValues(JSONObject values) {
-        try {
-            SharedPreferences.Editor editor = getPrefs().edit().clear();
-            java.util.Iterator<String> keys = values.keys();
-            while (keys.hasNext()) {
-                String key = keys.next();
-                JSONObject typed = values.optJSONObject(key);
-                if (typed == null) continue;
-                String type = typed.optString("type");
-                Object value = typed.opt("value");
-                if ("string".equals(type)) editor.putString(key, value == null ? "" : String.valueOf(value));
-                else if ("boolean".equals(type)) editor.putBoolean(key, typed.optBoolean("value", false));
-                else if ("int".equals(type)) editor.putInt(key, typed.optInt("value", 0));
-                else if ("long".equals(type)) editor.putLong(key, typed.optLong("value", 0L));
-                else if ("float".equals(type)) editor.putFloat(key, (float) typed.optDouble("value", 0.0));
-                else if ("stringSet".equals(type) && value instanceof JSONArray) {
-                    HashSet<String> set = new HashSet<>();
-                    JSONArray list = (JSONArray) value;
-                    for (int i = 0; i < list.length(); i++) set.add(list.optString(i));
-                    editor.putStringSet(key, set);
-                }
-            }
-            editor.apply();
-            selectedDateKey = todayKey();
-            load();
-            render();
-            ensureScreenTimeWorker();
-            DayFlowWidgetProvider.refreshAll(this);
-            Toast.makeText(this, "DayFlow backup restored.", Toast.LENGTH_LONG).show();
-            debugLog("Backup restored");
-        } catch (Exception e) {
-            debugLog("Backup restore failed: " + e.getMessage());
-            Toast.makeText(this, "Backup restore failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void showDiagnostics() {
-        String log = getPrefs().getString(DEBUG_LOG_KEY, "No diagnostics recorded yet.");
-        if (log.length() > 12000) log = log.substring(log.length() - 12000);
-        TextView view = text(log, 11, color("#DEE8E0"), false);
-        view.setTextIsSelectable(true);
-        view.setPadding(dp(16), dp(12), dp(16), dp(12));
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(color("#111A16"));
-        scroll.addView(view, new ScrollView.LayoutParams(-1, -1));
-
-        new AlertDialog.Builder(this)
-                .setTitle("DayFlow diagnostics")
-                .setView(scroll)
-                .setPositiveButton("Close", null)
-                .show();
-    }
-
-    private void clearDay() {
-        new AlertDialog.Builder(this)
-                .setTitle("Clear selected day's plan?")
-                .setMessage("All blocks for the selected day will be removed from this device.")
-                .setPositiveButton("Clear", (d, w) -> {
-                    blocks.clear();
-                    save();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private Date parseDateKey(String key) {
-        try {
-            return new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(key);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private String keyForDate(Date date) {
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date);
-    }
-
-    private boolean isBeforeToday(String key) {
-        return key.compareTo(todayKey()) < 0;
-    }
-
-    private void changeSelectedDate(int delta) {
-        save();
-        Calendar c = Calendar.getInstance();
-        Date d = parseDateKey(selectedDateKey);
-        if (d == null) d = new Date();
-        c.setTime(d);
-        c.add(Calendar.DAY_OF_YEAR, delta);
-        selectedDateKey = keyForDate(c.getTime());
-        loadSelectedDate();
-        render();
-    }
-
-    private void openDatePicker() {
-        Date d = parseDateKey(selectedDateKey);
-        Calendar c = Calendar.getInstance();
-        if (d != null) c.setTime(d);
-        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
-            Calendar chosen = Calendar.getInstance();
-            chosen.set(Calendar.YEAR, year);
-            chosen.set(Calendar.MONTH, month);
-            chosen.set(Calendar.DAY_OF_MONTH, day);
-            save();
-            selectedDateKey = keyForDate(chosen.getTime());
-            loadSelectedDate();
-            render();
-        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
-        picker.show();
-    }
-
-    private String blocksKey(String dayKey) {
-        return "blocks_" + dayKey;
-    }
-
-    private String modeKey(String dayKey) {
-        return "mode_" + dayKey;
-    }
-
-    private void loadSelectedDate() {
-        blocks.clear();
-        SharedPreferences p = getPrefs();
-        mode = p.getString(modeKey(selectedDateKey), p.getString(MODE_KEY, "wfh"));
-        String raw = p.getString(blocksKey(selectedDateKey), null);
-
-        try {
-            if (raw == null && selectedDateKey.equals(todayKey())) {
-                raw = p.getString(KEY, null);
-                if (raw != null) {
-                    p.edit().putString(blocksKey(selectedDateKey), raw).putString(modeKey(selectedDateKey), mode).apply();
-                }
-            }
-
-            if (raw != null) {
-                JSONArray arr = new JSONArray(raw);
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject o = arr.getJSONObject(i);
-                    blocks.add(blockFromJson(o, "pending"));
-                }
-            } else if (!isBeforeToday(selectedDateKey)) {
-                loadTemplateSilent();
-                save();
-            }
-        } catch (Exception e) {
-            blocks.clear();
         }
     }
 
