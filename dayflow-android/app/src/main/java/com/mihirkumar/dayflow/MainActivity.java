@@ -1396,7 +1396,7 @@ public class MainActivity extends Activity {
 
         EditText title = new EditText(this);
         title.setHint("What are you doing?");
-        title.setTextColor(Color.WHITE);
+        title.setTextColor(color("#18372E"));
         title.setHintTextColor(color("#82948A"));
         title.setSingleLine(true);
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
@@ -1549,53 +1549,82 @@ public class MainActivity extends Activity {
             });
         }
 
-        AlertDialog addDialog = new AlertDialog.Builder(this)
-                .setTitle("Add to your day")
-                .setView(form)
-                .setPositiveButton("Add block", null)
-                .setNegativeButton("Cancel", null)
-                .create();
+        form.setBackgroundColor(color("#F4F6F1"));
+        android.app.Dialog addDialog = new android.app.Dialog(this);
+        addDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-        addDialog.setOnShowListener(dialog -> {
-                    AlertDialog d = (AlertDialog) dialog;
-                    d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                        String name = title.getText().toString().trim();
-                        if (name.isEmpty()) {
-                            title.setError("Give this block a name");
-                            title.requestFocus();
-                            return;
-                        }
-                        int start = startChoice[0] == 0 ? nextFreeStart() :
-                                startChoice[0] == 1 ? currentMinutes() : -1;
-                        if (startChoice[0] == 2) {
-                            d.dismiss();
-                            int defaultStart = suggestedStart >= 0 ? suggestedStart : currentMinutes();
-                            TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
-                                finishAddBlockRecurring(name, h * 60 + m, durationChoice[0], selectedBehavior[0], selectedRepeat[0]);
-                            }, defaultStart / 60, defaultStart % 60, true);
-                            picker.setTitle("Start time");
-                            picker.show();
-                            return;
-                        }
-                        if (durationChoice[0] == -1) {
-                            d.dismiss();
-                            TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
-                                int end = h * 60 + m;
-                                addCustomTimedBlockRecurring(name, start, end, selectedBehavior[0], selectedRepeat[0]);
-                            }, Math.min(23, start / 60), start % 60, true);
-                            picker.setTitle("End time");
-                            picker.show();
-                            return;
-                        }
-                        d.dismiss();
-                        finishAddBlockRecurring(name, start, durationChoice[0], selectedBehavior[0], selectedRepeat[0]);
-                    });
-                    title.requestFocus();
-                    if (d.getWindow() != null) {
-                        d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-                    }
-                });
+        LinearLayout editor = vertical();
+        editor.setBackgroundColor(color("#F4F6F1"));
+        LinearLayout topBar = horizontal();
+        topBar.setPadding(dp(18), dp(12), dp(18), dp(10));
+        Button back = secondaryButton("‹", () -> addDialog.dismiss());
+        LinearLayout.LayoutParams backLp = new LinearLayout.LayoutParams(dp(44), dp(42));
+        backLp.rightMargin = dp(12);
+        topBar.addView(back, backLp);
+        LinearLayout heading = vertical();
+        heading.addView(text("PLAN A TASK", 10, color("#2E8060"), true));
+        heading.addView(text("Add to your day", 22, color("#18372E"), true));
+        heading.addView(text("Choose the time, duration and importance.", 11, color("#687A70"), false));
+        topBar.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+        editor.addView(topBar, new LinearLayout.LayoutParams(-1, -2));
+
+        ScrollView formScroll = new ScrollView(this);
+        formScroll.setFillViewport(false);
+        formScroll.addView(form, new ScrollView.LayoutParams(-1, -2));
+        editor.addView(formScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        LinearLayout footer = horizontal();
+        footer.setPadding(dp(16), dp(10), dp(16), dp(12));
+        footer.setBackgroundColor(Color.WHITE);
+        Button cancel = secondaryButton("Cancel", () -> addDialog.dismiss());
+        Button saveBlock = primaryButton("Add block", () -> {
+            String name = title.getText().toString().trim();
+            if (name.isEmpty()) {
+                title.setError("Give this block a name");
+                title.requestFocus();
+                return;
+            }
+            int start = startChoice[0] == 0 ? nextFreeStart()
+                    : startChoice[0] == 1 ? currentMinutes() : -1;
+            if (startChoice[0] == 2) {
+                addDialog.dismiss();
+                int defaultStart = suggestedStart >= 0 ? suggestedStart : currentMinutes();
+                TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) ->
+                        finishAddBlockRecurring(name, h * 60 + m, durationChoice[0], selectedBehavior[0], selectedRepeat[0]),
+                        defaultStart / 60, defaultStart % 60, true);
+                picker.setTitle("Start time");
+                picker.show();
+                return;
+            }
+            if (durationChoice[0] == -1) {
+                addDialog.dismiss();
+                TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) ->
+                        addCustomTimedBlockRecurring(name, start, h * 60 + m, selectedBehavior[0], selectedRepeat[0]),
+                        Math.min(23, start / 60), start % 60, true);
+                picker.setTitle("End time");
+                picker.show();
+                return;
+            }
+            addDialog.dismiss();
+            finishAddBlockRecurring(name, start, durationChoice[0], selectedBehavior[0], selectedRepeat[0]);
+        });
+        footer.addView(cancel, new LinearLayout.LayoutParams(0, dp(46), 1));
+        LinearLayout.LayoutParams saveLp = new LinearLayout.LayoutParams(0, dp(46), 1);
+        saveLp.leftMargin = dp(8);
+        footer.addView(saveBlock, saveLp);
+        editor.addView(footer, new LinearLayout.LayoutParams(-1, -2));
+
+        addDialog.setContentView(editor);
+        android.view.Window win = addDialog.getWindow();
+        if (win != null) {
+            win.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(color("#F4F6F1")));
+            win.setLayout(android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT);
+            win.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
         addDialog.show();
+        if (win != null) win.setLayout(android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT);
     }
 
     private void finishAddBlockRecurring(String name, int start, int duration, String behavior, String repeat) {
