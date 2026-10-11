@@ -3797,4 +3797,233 @@ public class MainActivity extends Activity {
                     source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
         }
     }
+
+    // Restored utility methods kept independent from the workspace UI refactor.
+
+private void ensureScreenTimeWorker() {
+        try {
+            PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
+                    ScreenTimeWorker.class, 15, java.util.concurrent.TimeUnit.MINUTES).build();
+            WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork(
+                    "dayflow-screen-time-history", ExistingPeriodicWorkPolicy.KEEP, request);
+        } catch (Exception e) {
+            debugLog("Screen-time work scheduling failed: " + e.getMessage());
+        }
+    }
+
+private void showScreenTimeTracker() { switchPage("screenTime"); }
+
+private void requestExportBackup() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        intent.putExtra(Intent.EXTRA_TITLE, "dayflow-backup-" + todayKey() + ".json");
+        try { startActivityForResult(intent, REQUEST_EXPORT_BACKUP); }
+        catch (Exception e) { Toast.makeText(this, "No file picker is available.", Toast.LENGTH_LONG).show(); }
+    }
+
+private void requestImportBackup() {
+        new AlertDialog.Builder(this).setTitle("Import DayFlow backup?")
+                .setMessage("Restoring a backup replaces all current local DayFlow data. Export the current data first if it needs to be kept.")
+                .setPositiveButton("Choose file", (d, w) -> {
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("application/json");
+                    try { startActivityForResult(intent, REQUEST_IMPORT_BACKUP); }
+                    catch (Exception e) { Toast.makeText(this, "No file picker is available.", Toast.LENGTH_LONG).show(); }
+                }).setNegativeButton("Cancel", null).show();
+    }
+
+@Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (requestCode == REQUEST_EXPORT_BACKUP) writeBackup(data.getData());
+        else if (requestCode == REQUEST_IMPORT_BACKUP) readBackupForRestore(data.getData());
+    }
+
+private void writeBackup(Uri uri) {
+        try (java.io.OutputStream output = getContentResolver().openOutputStream(uri)) {
+            if (output == null) throw new java.io.IOException("Could not open backup destination");
+            output.write(buildBackupDocument().toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            output.flush();
+            debugLog("Backup exported");
+            Toast.makeText(this, "DayFlow backup exported.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            debugLog("Backup export failed: " + e.getMessage());
+            Toast.makeText(this, "Backup export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+private void readBackupForRestore(Uri uri) {
+        try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+            if (input == null) throw new java.io.IOException("Could not open backup file");
+            java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+            byte[] bytes = new byte[4096];
+            int count;
+            while ((count = input.read(bytes)) != -1) buffer.write(bytes, 0, count);
+            JSONObject root = new JSONObject(buffer.toString(java.nio.charset.StandardCharsets.UTF_8.name()));
+            if (!"DayFlow".equals(root.optString("app")) || root.optInt("formatVersion", 0) != 1
+                    || !(root.opt("preferences") instanceof JSONObject)) {
+                throw new IllegalArgumentException("This is not a supported DayFlow backup.");
+            }
+            JSONObject values = root.getJSONObject("preferences");
+            new AlertDialog.Builder(this).setTitle("Restore backup?")
+                    .setMessage("The backup contains " + values.length() + " values. It replaces current plans, attendance, syllabus and screen-time history.")
+                    .setPositiveButton("Restore", (d, w) -> restoreBackupValues(values))
+                    .setNegativeButton("Cancel", null).show();
+        } catch (Exception e) {
+            debugLog("Backup import failed: " + e.getMessage());
+            Toast.makeText(this, "Couldn't read backup: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+private void restoreBackupValues(JSONObject values) {
+        try {
+            SharedPreferences.Editor editor = getPrefs().edit().clear();
+            java.util.Iterator<String> keys = values.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                JSONObject typed = values.optJSONObject(key);
+                if (typed == null) continue;
+                String type = typed.optString("type");
+                Object value = typed.opt("value");
+                if ("string".equals(type)) editor.putString(key, value == null ? "" : String.valueOf(value));
+                else if ("boolean".equals(type)) editor.putBoolean(key, typed.optBoolean("value", false));
+                else if ("int".equals(type)) editor.putInt(key, typed.optInt("value", 0));
+                else if ("long".equals(type)) editor.putLong(key, typed.optLong("value", 0L));
+                else if ("float".equals(type)) editor.putFloat(key, (float) typed.optDouble("value", 0.0));
+                else if ("stringSet".equals(type) && value instanceof JSONArray) {
+                    HashSet<String> set = new HashSet<>();
+                    JSONArray list = (JSONArray) value;
+                    for (int i = 0; i < list.length(); i++) set.add(list.optString(i));
+                    editor.putStringSet(key, set);
+                }
+            }
+            editor.apply();
+            selectedDateKey = todayKey();
+            load();
+            render();
+            ensureScreenTimeWorker();
+            DayFlowWidgetProvider.refreshAll(this);
+            Toast.makeText(this, "DayFlow backup restored.", Toast.LENGTH_LONG).show();
+            debugLog("Backup restored");
+        } catch (Exception e) {
+            debugLog("Backup restore failed: " + e.getMessage());
+            Toast.makeText(this, "Backup restore failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+private void showDiagnostics() {
+        String log = getPrefs().getString(DEBUG_LOG_KEY, "No diagnostics recorded yet.");
+        if (log.length() > 12000) log = log.substring(log.length() - 12000);
+        TextView view = text(log, 11, color("#DEE8E0"), false);
+        view.setTextIsSelectable(true);
+        view.setPadding(dp(16), dp(12), dp(16), dp(12));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(color("#111A16"));
+        scroll.addView(view, new ScrollView.LayoutParams(-1, -1));
+
+        new AlertDialog.Builder(this)
+                .setTitle("DayFlow diagnostics")
+                .setView(scroll)
+                .setPositiveButton("Close", null)
+                .show();
+    }
+
+private void clearDay() {
+        new AlertDialog.Builder(this)
+                .setTitle("Clear selected day's plan?")
+                .setMessage("All blocks for the selected day will be removed from this device.")
+                .setPositiveButton("Clear", (d, w) -> {
+                    blocks.clear();
+                    save();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+private Date parseDateKey(String key) {
+        try {
+            return new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(key);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+private String keyForDate(Date date) {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date);
+    }
+
+private boolean isBeforeToday(String key) {
+        return key.compareTo(todayKey()) < 0;
+    }
+
+private void changeSelectedDate(int delta) {
+        save();
+        Calendar c = Calendar.getInstance();
+        Date d = parseDateKey(selectedDateKey);
+        if (d == null) d = new Date();
+        c.setTime(d);
+        c.add(Calendar.DAY_OF_YEAR, delta);
+        selectedDateKey = keyForDate(c.getTime());
+        loadSelectedDate();
+        render();
+    }
+
+private void openDatePicker() {
+        Date d = parseDateKey(selectedDateKey);
+        Calendar c = Calendar.getInstance();
+        if (d != null) c.setTime(d);
+        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar chosen = Calendar.getInstance();
+            chosen.set(Calendar.YEAR, year);
+            chosen.set(Calendar.MONTH, month);
+            chosen.set(Calendar.DAY_OF_MONTH, day);
+            save();
+            selectedDateKey = keyForDate(chosen.getTime());
+            loadSelectedDate();
+            render();
+        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
+        picker.show();
+    }
+
+private String blocksKey(String dayKey) {
+        return "blocks_" + dayKey;
+    }
+
+private String modeKey(String dayKey) {
+        return "mode_" + dayKey;
+    }
+
+private void loadSelectedDate() {
+        blocks.clear();
+        SharedPreferences p = getPrefs();
+        mode = p.getString(modeKey(selectedDateKey), p.getString(MODE_KEY, "wfh"));
+        String raw = p.getString(blocksKey(selectedDateKey), null);
+
+        try {
+            if (raw == null && selectedDateKey.equals(todayKey())) {
+                raw = p.getString(KEY, null);
+                if (raw != null) {
+                    p.edit().putString(blocksKey(selectedDateKey), raw).putString(modeKey(selectedDateKey), mode).apply();
+                }
+            }
+
+            if (raw != null) {
+                JSONArray arr = new JSONArray(raw);
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject o = arr.getJSONObject(i);
+                    blocks.add(blockFromJson(o, "pending"));
+                }
+            } else if (!isBeforeToday(selectedDateKey)) {
+                loadTemplateSilent();
+                save();
+            }
+        } catch (Exception e) {
+            blocks.clear();
+        }
+    }
+
 }
