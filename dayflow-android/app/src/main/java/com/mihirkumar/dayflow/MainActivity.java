@@ -19,6 +19,8 @@ import android.os.Bundle;
 import android.os.Build;
 import android.os.Handler;
 import android.view.Gravity;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.Window;
 import android.provider.Settings;
@@ -59,6 +61,16 @@ public class MainActivity extends Activity {
     private final Handler handler = new Handler();
 
     private LinearLayout root, timeline, officeCard;
+    private FrameLayout screenFrame;
+    private LinearLayout pagePlan, pageProgress, pageOffice, pageMore, pageSyllabus, pageScreenTime;
+    private LinearLayout planList, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
+    private LinearLayout bottomNavigation;
+    private TextView syllabusSummaryView, screenTimeSummaryView;
+    private EditText syllabusSearch;
+    private String activePage = "home";
+    private String syllabusFilter = "All";
+    private String syllabusQuery = "";
+    private final Map<String, TextView> navItems = new LinkedHashMap<>();
     private TextView dateView, modeView, completionView, progressPercent;
     private TextView currentTitle, currentTime, currentCountdown, plannedView, doneView, studyActualView;
     private TextView officeStatus, officeTimes, commuteView;
@@ -139,8 +151,8 @@ public class MainActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Window window = getWindow();
-        window.setStatusBarColor(color("#0B0D12"));
-        window.setNavigationBarColor(color("#0B0D12"));
+        window.setStatusBarColor(color("#0D1512"));
+        window.setNavigationBarColor(color("#0D1512"));
 
         selectedDateKey = todayKey();
         load();
@@ -294,7 +306,7 @@ public class MainActivity extends Activity {
     }
 
     private Button chip(String label) {
-        Button b = actionButton(label, color("#AEB7C9"), "#151A27");
+        Button b = actionButton(label, color("#D6E1D8"), "#1B2621");
         b.setTextSize(11);
         return b;
     }
@@ -325,20 +337,24 @@ public class MainActivity extends Activity {
     }
 
     private void buildUi() {
+        LinearLayout shell = vertical();
+        shell.setBackgroundColor(color("#0D1512"));
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
-        scroll.setBackgroundColor(color("#0B0D12"));
+        scroll.setBackgroundColor(color("#0D1512"));
 
+        screenFrame = new FrameLayout(this);
         root = vertical();
-        root.setPadding(dp(20), dp(12), dp(20), dp(34));
-        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
-        setContentView(scroll);
+        root.setPadding(dp(18), dp(10), dp(18), dp(20));
+        screenFrame.addView(root, new FrameLayout.LayoutParams(-1, -2));
+        scroll.addView(screenFrame, new ScrollView.LayoutParams(-1, -2));
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+        setContentView(shell);
 
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            int top = Math.max(dp(12), insets.getSystemWindowInsetTop() + dp(6));
-            int bottom = Math.max(dp(34), insets.getSystemWindowInsetBottom() + dp(20));
-            v.setPadding(dp(20), top, dp(20), bottom);
+            int top = Math.max(dp(10), insets.getSystemWindowInsetTop() + dp(4));
+            v.setPadding(dp(18), top, dp(18), dp(20));
             return insets;
         });
 
@@ -349,7 +365,7 @@ public class MainActivity extends Activity {
 
         officeCard = vertical();
         officeCard.setPadding(dp(16), dp(16), dp(16), dp(16));
-        officeCard.setBackground(bg("#151C23", 18));
+        officeCard.setBackground(bg("#17231D", 18));
         LinearLayout.LayoutParams ocp = new LinearLayout.LayoutParams(-1, -2);
         ocp.bottomMargin = dp(16);
         root.addView(officeCard, ocp);
@@ -360,9 +376,258 @@ public class MainActivity extends Activity {
         root.addView(timeline, new LinearLayout.LayoutParams(-1, -2));
         root.addView(spacer(8));
 
-        TextView footer = text("Saved on this device • safe to close the app", 12, color("#697386"), false);
+        TextView footer = text("Saved privately on this device", 11, color("#82948A"), false);
         footer.setGravity(Gravity.CENTER);
-        root.addView(footer, new LinearLayout.LayoutParams(-1, dp(34)));
+        root.addView(footer, new LinearLayout.LayoutParams(-1, dp(32)));
+
+        buildSecondaryPages();
+        buildBottomNavigation(shell);
+        switchPage("home");
+    }
+
+    private void buildSecondaryPages() {
+        pagePlan = vertical(); pageProgress = vertical(); pageOffice = vertical();
+        pageMore = vertical(); pageSyllabus = vertical(); pageScreenTime = vertical();
+        for (LinearLayout page : new LinearLayout[]{pagePlan,pageProgress,pageOffice,pageMore,pageSyllabus,pageScreenTime}) {
+            page.setPadding(dp(18),dp(18),dp(18),dp(24));
+            page.setVisibility(View.GONE);
+            screenFrame.addView(page,new FrameLayout.LayoutParams(-1,-2));
+        }
+        buildPlanPage(); buildProgressPage(); buildOfficePage(); buildMorePage(); buildSyllabusPage(); buildScreenTimePage();
+    }
+
+    private void pageHeading(LinearLayout page,String eyebrow,String title,String subtitle) {
+        TextView small=text(eyebrow.toUpperCase(Locale.US),10,color("#65C5A0"),true);
+        small.setLetterSpacing(0.1f);
+        LinearLayout.LayoutParams sm=new LinearLayout.LayoutParams(-1,-2); sm.bottomMargin=dp(5); page.addView(small,sm);
+        TextView heading=text(title,27,color("#F2F7F3"),true);
+        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2); hp.bottomMargin=dp(5); page.addView(heading,hp);
+        TextView detail=text(subtitle,13,color("#9AABA0"),false); detail.setLineSpacing(dp(2),1f);
+        LinearLayout.LayoutParams detailLp=new LinearLayout.LayoutParams(-1,-2); detailLp.bottomMargin=dp(18); page.addView(detail,detailLp);
+    }
+
+    private LinearLayout surfaceCard() {
+        LinearLayout card=vertical(); card.setPadding(dp(16),dp(15),dp(16),dp(15)); card.setBackground(bg("#18231E",18));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);card.setLayoutParams(lp);return card;
+    }
+
+    private Button primaryButton(String label,Runnable action) {
+        Button b=actionButton(label,color("#F5FBF7"),"#23845F");b.setTextSize(13);b.setMinHeight(dp(44));b.setPadding(dp(12),0,dp(12),0);b.setOnClickListener(v->action.run());return b;
+    }
+    private Button secondaryButton(String label,Runnable action) {
+        Button b=actionButton(label,color("#D6E4DA"),"#23352C");b.setTextSize(12);b.setMinHeight(dp(40));b.setPadding(dp(10),0,dp(10),0);b.setOnClickListener(v->action.run());return b;
+    }
+
+    private void buildBottomNavigation(LinearLayout shell) {
+        bottomNavigation=horizontal();bottomNavigation.setGravity(Gravity.CENTER);bottomNavigation.setPadding(dp(6),dp(7),dp(6),dp(8));bottomNavigation.setBackgroundColor(color("#131D18"));
+        String[][] items={{"⌂","Home","home"},{"▤","Plan","plan"},{"◔","Progress","progress"},{"◷","Office","office"},{"•••","More","more"}};
+        for(String[] item:items){
+            LinearLayout tab=vertical();tab.setGravity(Gravity.CENTER);tab.setPadding(dp(2),dp(5),dp(2),dp(4));
+            TextView icon=text(item[0],19,color("#91A197"),true);icon.setGravity(Gravity.CENTER);
+            TextView label=text(item[1],10,color("#91A197"),true);label.setGravity(Gravity.CENTER);
+            tab.addView(icon);tab.addView(label);tab.setContentDescription(item[1]);tab.setOnClickListener(v->switchPage(item[2]));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.leftMargin=dp(2);lp.rightMargin=dp(2);bottomNavigation.addView(tab,lp);navItems.put(item[2],label);
+        }
+        shell.addView(bottomNavigation,new LinearLayout.LayoutParams(-1,dp(64)));
+    }
+
+    private void switchPage(String page) {
+        if(screenFrame==null)return;
+        if("office".equals(page)&&!todayKey().equals(selectedDateKey)){
+            save();selectedDateKey=todayKey();loadSelectedDate();render();
+        }
+        activePage=page;
+        root.setVisibility("home".equals(page)?View.VISIBLE:View.GONE);
+        pagePlan.setVisibility("plan".equals(page)?View.VISIBLE:View.GONE);
+        pageProgress.setVisibility("progress".equals(page)?View.VISIBLE:View.GONE);
+        pageOffice.setVisibility("office".equals(page)?View.VISIBLE:View.GONE);
+        pageMore.setVisibility("more".equals(page)?View.VISIBLE:View.GONE);
+        pageSyllabus.setVisibility("syllabus".equals(page)?View.VISIBLE:View.GONE);
+        pageScreenTime.setVisibility("screenTime".equals(page)?View.VISIBLE:View.GONE);
+        renderBottomNavOnly();
+        if("plan".equals(page))renderPlanPage();
+        else if("progress".equals(page))renderProgressPage();
+        else if("office".equals(page))renderOfficePage();
+        else if("more".equals(page))renderMorePage();
+        else if("syllabus".equals(page))refreshSyllabusRows();
+        else if("screenTime".equals(page))renderScreenTimePage();
+    }
+
+    private void buildPlanPage() {
+        pageHeading(pagePlan,"Build your day","Plan","Edit the selected date without hunting through the timeline. Fixed times stay anchored; flexible tasks can move.");
+        LinearLayout dateCard=surfaceCard();LinearLayout dateRow=horizontal();
+        dateRow.addView(secondaryButton("‹",()->{changeSelectedDate(-1);renderPlanPage();}),new LinearLayout.LayoutParams(dp(45),dp(40)));
+        TextView date=text("",14,color("#F1F6F2"),true);date.setGravity(Gravity.CENTER);date.setTag("planDate");dateRow.addView(date,new LinearLayout.LayoutParams(0,dp(40),1));
+        dateRow.addView(secondaryButton("›",()->{changeSelectedDate(1);renderPlanPage();}),new LinearLayout.LayoutParams(dp(45),dp(40)));dateCard.addView(dateRow);
+        LinearLayout modes=horizontal();String[][] choices={{"WFH","wfh"},{"Office","office"},{"Weekend","weekend"}};
+        for(String[] choice:choices){Button b=secondaryButton(choice[0],()->chooseMode(choice[1]));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(40),1);lp.leftMargin=dp(4);lp.rightMargin=dp(4);lp.topMargin=dp(10);modes.addView(b,lp);}dateCard.addView(modes);
+        LinearLayout templateRow=horizontal();
+        for(String[] choice:choices){Button b=secondaryButton("Load "+choice[0],()->chooseTemplateDirect(choice[1]));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(38),1);lp.leftMargin=dp(3);lp.rightMargin=dp(3);lp.topMargin=dp(8);templateRow.addView(b,lp);}dateCard.addView(templateRow);pagePlan.addView(dateCard);
+        Button add=primaryButton("＋  Add a block",()->openAddDialog());LinearLayout.LayoutParams addLp=new LinearLayout.LayoutParams(-1,dp(48));addLp.bottomMargin=dp(15);pagePlan.addView(add,addLp);
+        TextView section=text("YOUR BLOCKS",11,color("#9AABA0"),true);LinearLayout.LayoutParams secLp=new LinearLayout.LayoutParams(-1,-2);secLp.bottomMargin=dp(9);pagePlan.addView(section,secLp);
+        planList=vertical();pagePlan.addView(planList);renderPlanPage();
+    }
+
+    private void renderPlanPage() {
+        if(planList==null)return;
+        TextView date=(TextView)pagePlan.findViewWithTag("planDate");
+        if(date!=null){Date d=parseDateKey(selectedDateKey);date.setText((d==null?selectedDateKey:new SimpleDateFormat("EEE, d MMM",Locale.getDefault()).format(d))+"  •  "+mode.toUpperCase(Locale.US));}
+        planList.removeAllViews();ArrayList<Block> ordered=new ArrayList<>(blocks);Collections.sort(ordered,Comparator.comparingInt(b->mins(b.start)));
+        if(ordered.isEmpty()){planList.addView(text("Nothing planned yet. Add a block or load a saved routine.",14,color("#9AABA0"),false));return;}
+        for(Block block:ordered){
+            LinearLayout card=surfaceCard();LinearLayout row=horizontal();row.setGravity(Gravity.TOP);
+            LinearLayout time=vertical();time.addView(text(time12(block.start),12,color("#6BD0A6"),true));time.addView(text(time12(block.end),10,color("#8A9A90"),false));row.addView(time,new LinearLayout.LayoutParams(dp(72),-2));
+            LinearLayout details=vertical();details.addView(text(block.title,15,color("#F1F6F2"),true));details.addView(text(blockBehaviorLabel(block)+"  •  "+fmt(mins(block.end)-mins(block.start)),11,color("#9AABA0"),false));
+            String status="done".equals(block.status)?"Completed":"skipped".equals(block.status)?"Skipped":"Pending";details.addView(text(status,10,"done".equals(block.status)?color("#6BD0A6"):color("#9AABA0"),true));row.addView(details,new LinearLayout.LayoutParams(0,-2,1));
+            row.addView(secondaryButton("•••",()->showBlockOptions(block)),new LinearLayout.LayoutParams(dp(45),dp(38)));card.addView(row);
+            if("pending".equals(block.status)){Button done=primaryButton("Mark complete",()->{stopFocusForBlock(block,System.currentTimeMillis());block.status="done";save();});LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(-1,dp(40));dlp.topMargin=dp(10);card.addView(done,dlp);}
+            else if("done".equals(block.status)){Button undo=secondaryButton("Undo completion",()->{block.status="pending";save();});LinearLayout.LayoutParams ulp=new LinearLayout.LayoutParams(-1,dp(38));ulp.topMargin=dp(8);card.addView(undo,ulp);}
+            row.setOnClickListener(v->showBlockOptions(block));planList.addView(card);
+        }
+    }
+
+    private void buildProgressPage() {
+        pageHeading(pageProgress,"Long game","Progress","One honest view of preparation, real work completed, and phone use. Forecasts use your saved history—not invented completion.");
+        progressContent=vertical();pageProgress.addView(progressContent);renderProgressPage();
+    }
+    private void renderProgressPage() {
+        if(progressContent==null)return;progressContent.removeAllViews();ArrayList<SyllabusTopic> topics=readSyllabusTopics();
+        int cseTotal=0,cseDone=0,intTotal=0,intDone=0;
+        for(SyllabusTopic t:topics){boolean sw="Software Interview Prep".equals(t.subject);if(sw){intTotal++;if(t.done)intDone++;}else{cseTotal++;if(t.done)cseDone++;}}
+        LinearLayout cse=surfaceCard();cse.addView(text("UPSC CSE",11,color("#6BD0A6"),true));cse.addView(text(cseDone+" / "+cseTotal+" topics complete",22,color("#F2F7F3"),true));
+        cse.addView(text(cseTotal==0?"Load the syllabus starter to begin tracking.":Math.round(cseDone*100f/Math.max(1,cseTotal))+"% of your current topic list",12,color("#9AABA0"),false));
+        ProgressBar cseBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);cseBar.setMax(Math.max(1,cseTotal));cseBar.setProgress(cseDone);cseBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));cse.addView(cseBar);
+        Button openCse=primaryButton("Open CSE syllabus",()->{syllabusFilter="All";showSyllabusTracker();});LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(-1,dp(42));openLp.topMargin=dp(10);cse.addView(openCse,openLp);progressContent.addView(cse);
+        LinearLayout career=surfaceCard();career.addView(text("SOFTWARE INTERVIEW PREP",11,color("#D5B56E"),true));career.addView(text(intDone+" / "+intTotal+" topics complete",22,color("#F2F7F3"),true));
+        career.addView(text("Month 6 • Tier 3/4 readiness\nMonth 9 • Tier 1/2 strong-hire target\n12–13 hours/week planned for interview preparation.",12,color("#9AABA0"),false));
+        ProgressBar intBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);intBar.setMax(Math.max(1,intTotal));intBar.setProgress(intDone);intBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#D5B56E")));career.addView(intBar);
+        Button openCareer=secondaryButton("Open interview roadmap",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";showSyllabusTracker();});LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,dp(42));careerLp.topMargin=dp(10);career.addView(openCareer,careerLp);progressContent.addView(career);
+        LinearLayout focus=surfaceCard();long actual=0;int planned=0;long now=System.currentTimeMillis();
+        for(Block b:blocks){long d=getActualDuration(b,now);actual+=d;if(isStudyBlock(b.title))planned+=Math.max(0,mins(b.end)-mins(b.start));}
+        focus.addView(text("EXECUTION",11,color("#6BD0A6"),true));focus.addView(text(fmtPreciseMillis(actual)+" tracked focus",22,color("#F2F7F3"),true));
+        focus.addView(text("Study time planned today: "+fmtShort(planned)+" • actual focus is measured only when you start Focus.",12,color("#9AABA0"),false));focus.addView(secondaryButton("View today's plan",()->switchPage("plan")));progressContent.addView(focus);
+        LinearLayout screen=surfaceCard();screen.addView(text("PHONE SCREEN TIME",11,color("#D5B56E"),true));long t=ScreenTimeTracker.getStoredMillis(this,todayKey());
+        screen.addView(text(t<0?"Today's total not captured yet":ScreenTimeTracker.formatDuration(t)+" today",22,color("#F2F7F3"),true));
+        long week=0;int days=0;for(int i=0;i<7;i++){Calendar c=Calendar.getInstance();c.add(Calendar.DAY_OF_YEAR,-i);long ms=ScreenTimeTracker.getStoredMillis(this,keyForDate(c.getTime()));if(ms>=0){week+=ms;days++;}}
+        screen.addView(text(days==0?"Grant Usage access to begin a saved history.":"7-day average: "+ScreenTimeTracker.formatDuration(week/days)+" across "+days+" recorded days.",12,color("#9AABA0"),false));
+        Button viewTime=secondaryButton("Screen-time history",()->showScreenTimeTracker());LinearLayout.LayoutParams stp=new LinearLayout.LayoutParams(-1,dp(42));stp.topMargin=dp(10);screen.addView(viewTime,stp);progressContent.addView(screen);
+    }
+
+    private void buildOfficePage() {
+        pageHeading(pageOffice,"Time ledger","Office & commute","One-tap attendance, commute sessions and weekly totals. Presence is separate from timetable completion.");
+        officePageContent=vertical();pageOffice.addView(officePageContent);renderOfficePage();
+    }
+    private void renderOfficePage() {
+        if(officePageContent==null)return;officePageContent.removeAllViews();JSONObject day=getOfficeDay(todayKey(),false);long now=System.currentTimeMillis();
+        long officeMs=officeDuration(day,now),commuteMs=commuteDuration(day,now);boolean inside=hasOpenOfficeSession(day),travelling=hasOpenCommute(day);
+        LinearLayout status=surfaceCard();status.addView(text(inside?"CURRENTLY AT THE OFFICE":travelling?"COMMUTE IN PROGRESS":"OFFICE STATUS",11,color("#6BD0A6"),true));
+        status.addView(text(inside?"Clocked in":travelling?"Commute running":"Not clocked in",24,color("#F2F7F3"),true));
+        status.addView(text("Office total  "+fmtMillis(officeMs)+"\nCommute total  "+fmtMillis(commuteMs),13,color("#9AABA0"),false));
+        Button check=primaryButton(inside?"Check out":"Check in",()->{toggleOfficeAttendance();renderOfficePage();});LinearLayout.LayoutParams checkLp=new LinearLayout.LayoutParams(-1,dp(48));checkLp.topMargin=dp(12);status.addView(check,checkLp);
+        Button travel=secondaryButton(travelling?"Finish commute":"Start commute",()->{toggleCommute();renderOfficePage();});LinearLayout.LayoutParams travelLp=new LinearLayout.LayoutParams(-1,dp(42));travelLp.topMargin=dp(8);status.addView(travel,travelLp);pageOffice.addView(status);
+        LinearLayout week=surfaceCard();week.addView(text("THIS WEEK",11,color("#D5B56E"),true));long total=0;int count=0;Calendar cursor=Calendar.getInstance();int dow=cursor.get(Calendar.DAY_OF_WEEK);cursor.add(Calendar.DAY_OF_YEAR,-(dow==Calendar.SUNDAY?6:dow-Calendar.MONDAY));
+        for(int i=0;i<7;i++){String key=keyForDate(cursor.getTime());JSONObject log=getOfficeDay(key,false);long value=officeDuration(log,key.equals(todayKey())?now:cursor.getTimeInMillis());if(value>0){total+=value;count++;}cursor.add(Calendar.DAY_OF_YEAR,1);}
+        week.addView(text(fmtMillis(total)+" logged across "+count+" office days",18,color("#F2F7F3"),true));week.addView(secondaryButton("Attendance history & corrections",()->showAttendanceHistory()));pageOffice.addView(week);
+        LinearLayout note=surfaceCard();note.addView(text("No inferred attendance",14,color("#F2F7F3"),true));note.addView(text("Use Check in/out for presence and Start/finish commute for travel. Editing a timetable never fabricates office hours.",12,color("#9AABA0"),false));pageOffice.addView(note);
+    }
+
+    private void buildMorePage() {
+        pageHeading(pageMore,"Tools & preferences","More","Configuration and occasional actions stay out of your daily execution flow.");
+        moreContent=vertical();pageMore.addView(moreContent);renderMorePage();
+    }
+    private void addMoreRow(String title,String subtitle,String symbol,Runnable action) {
+        LinearLayout row=horizontal();row.setPadding(dp(14),dp(12),dp(10),dp(12));row.setBackground(bg("#18231E",16));
+        LinearLayout details=vertical();details.addView(text(title,14,color("#F2F7F3"),true));TextView sub=text(subtitle,11,color("#9AABA0"),false);sub.setPadding(0,dp(3),0,0);details.addView(sub);
+        row.addView(details,new LinearLayout.LayoutParams(0,-2,1));TextView arrow=text(symbol,18,color("#65C5A0"),true);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(32),dp(36)));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(9);moreContent.addView(row,lp);row.setOnClickListener(v->action.run());
+    }
+    private void renderMorePage() {
+        if(moreContent==null)return;moreContent.removeAllViews();
+        addMoreRow("Syllabus & interview roadmap","Topic completion, targets and pace","↗",()->showSyllabusTracker());
+        addMoreRow("Screen-time history","Daily totals retained on this device","↗",()->showScreenTimeTracker());
+        addMoreRow("Edit WFH routine","Change the reusable work-from-home template","↗",()->openTemplateEditor("wfh"));
+        addMoreRow("Edit office routine","Change the reusable office-day template","↗",()->openTemplateEditor("office"));
+        addMoreRow("Edit weekend routine","Change the reusable weekend template","↗",()->openTemplateEditor("weekend"));
+        addMoreRow("Precise widget timing","Schedule-boundary alarm setting","↗",()->enablePreciseLiveWidgetUpdates());
+        addMoreRow("Attendance history","Review and correct office hours","↗",()->showAttendanceHistory());
+        addMoreRow("Export backup","Save plans, attendance, syllabus and screen-time history","↗",()->requestExportBackup());
+        addMoreRow("Import backup","Restore a previously exported DayFlow backup","↗",()->requestImportBackup());
+        addMoreRow("Diagnostics","Inspect app and widget event logs","↗",()->showDiagnostics());
+        addMoreRow("Clear selected plan","Remove blocks from the selected date","↗",()->clearDay());
+    }
+
+    private void buildSyllabusPage() {
+        pageHeading(pageSyllabus,"Learning ledger","Syllabus & interview prep","Track completed topics. UPSC CSE and software interviews keep separate progress and deadlines.");
+        LinearLayout actions=horizontal();actions.addView(secondaryButton("‹ Progress",()->switchPage("progress")),new LinearLayout.LayoutParams(dp(105),dp(40)));
+        Button target=secondaryButton("Target date",()->chooseSyllabusTargetDate());LinearLayout.LayoutParams targetLp=new LinearLayout.LayoutParams(0,dp(40),1);targetLp.leftMargin=dp(7);actions.addView(target,targetLp);pageSyllabus.addView(actions);
+        syllabusSummaryView=text("",13,color("#B7C7BC"),false);syllabusSummaryView.setPadding(dp(14),dp(12),dp(14),dp(12));syllabusSummaryView.setBackground(bg("#18231E",16));
+        LinearLayout.LayoutParams sumLp=new LinearLayout.LayoutParams(-1,-2);sumLp.topMargin=dp(12);sumLp.bottomMargin=dp(12);pageSyllabus.addView(syllabusSummaryView,sumLp);
+        LinearLayout topicActions=horizontal();
+        topicActions.addView(primaryButton("＋ Add topic",()->editSyllabusTopic(null)),new LinearLayout.LayoutParams(0,dp(42),1));
+        Button imp=secondaryButton("Import list",()->importSyllabusTopics());LinearLayout.LayoutParams impLp=new LinearLayout.LayoutParams(0,dp(42),1);impLp.leftMargin=dp(6);topicActions.addView(imp,impLp);
+        Button starter=secondaryButton("Load syllabus",()->loadStarterSyllabus(true));LinearLayout.LayoutParams seedLp=new LinearLayout.LayoutParams(0,dp(42),1);seedLp.leftMargin=dp(6);topicActions.addView(starter,seedLp);pageSyllabus.addView(topicActions);
+        syllabusSearch=new EditText(this);syllabusSearch.setSingleLine(true);syllabusSearch.setTextColor(color("#F2F7F3"));syllabusSearch.setHintTextColor(color("#82948A"));syllabusSearch.setHint("Search topics, papers or subjects");syllabusSearch.setText(syllabusQuery);syllabusSearch.setPadding(dp(12),0,dp(12),0);syllabusSearch.setBackground(bg("#18231E",12));
+        LinearLayout.LayoutParams searchLp=new LinearLayout.LayoutParams(-1,dp(44));searchLp.topMargin=dp(10);searchLp.bottomMargin=dp(8);pageSyllabus.addView(syllabusSearch,searchLp);
+        syllabusSearch.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){} public void onTextChanged(CharSequence s,int st,int before,int count){syllabusQuery=s.toString();refreshSyllabusRows();} public void afterTextChanged(Editable e){}});
+        HorizontalScrollView fs=new HorizontalScrollView(this);fs.setHorizontalScrollBarEnabled(false);LinearLayout filters=horizontal();ArrayList<String> subjects=new ArrayList<>();subjects.add("All");subjects.addAll(Arrays.asList(SYLLABUS_SUBJECTS));
+        for(String subject:subjects){Button filter=chip(subject);boolean selected=subject.equals(syllabusFilter);filter.setTextColor(color(selected?"#F2F7F3":"#B7C7BC"));filter.setBackground(bg(selected?"#245B45":"#1B2621",12));LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-2,dp(34));fp.rightMargin=dp(6);filters.addView(filter,fp);filter.setOnClickListener(v->{syllabusFilter=subject;refreshSyllabusRows();});}
+        fs.addView(filters);LinearLayout.LayoutParams filterLp=new LinearLayout.LayoutParams(-1,dp(38));filterLp.bottomMargin=dp(8);pageSyllabus.addView(fs,filterLp);
+        syllabusList=vertical();pageSyllabus.addView(syllabusList);refreshSyllabusRows();
+    }
+    private void refreshSyllabusRows() {
+        if(syllabusList==null||syllabusSummaryView==null)return;ArrayList<SyllabusTopic> topics=readSyllabusTopics();syllabusSummaryView.setText(syllabusSummary(topics));syllabusList.removeAllViews();
+        String query=syllabusQuery.trim().toLowerCase(Locale.US);int shown=0;
+        for(SyllabusTopic topic:topics){
+            if(!"All".equals(syllabusFilter)&&!syllabusFilter.equals(topic.subject))continue;
+            if(!query.isEmpty()&&!topic.title.toLowerCase(Locale.US).contains(query)&&!topic.subject.toLowerCase(Locale.US).contains(query))continue;
+            shown++;LinearLayout row=horizontal();row.setGravity(Gravity.TOP);row.setPadding(dp(11),dp(10),dp(7),dp(10));row.setBackground(bg(topic.done?"#172B22":"#18231E",14));
+            LinearLayout.LayoutParams rowLp=new LinearLayout.LayoutParams(-1,-2);rowLp.bottomMargin=dp(7);syllabusList.addView(row,rowLp);
+            Button toggle=actionButton(topic.done?"✓":"○",color(topic.done?"#102017":"#A8BAAE"),topic.done?"#70D6A5":"#283A30");row.addView(toggle,new LinearLayout.LayoutParams(dp(38),dp(38)));
+            LinearLayout details=vertical();details.setPadding(dp(9),0,dp(3),0);details.addView(text(topic.title,13,color("#F2F7F3"),true));details.addView(text(topic.subject+(topic.done?" • Complete":" • Pending"),10,color("#9AABA0"),false));row.addView(details,new LinearLayout.LayoutParams(0,-2,1));
+            Button more=secondaryButton("⋮",()->showSyllabusTopicActions(topic));row.addView(more,new LinearLayout.LayoutParams(dp(36),dp(36)));
+            toggle.setOnClickListener(v->{topic.done=!topic.done;topic.completedAt=topic.done?System.currentTimeMillis():0L;persistSyllabusTopics(readSyllabusTopicsWith(topic));});
+            details.setOnClickListener(v->{syllabusFilter=topic.subject;syllabusQuery=topic.title;switchPage("syllabus");});
+        }
+        if(shown==0)syllabusList.addView(text("No topics match these filters. Try All or clear the search.",13,color("#9AABA0"),false));
+    }
+    private ArrayList<SyllabusTopic> readSyllabusTopicsWith(SyllabusTopic changed) {
+        ArrayList<SyllabusTopic> all=readSyllabusTopics();for(int i=0;i<all.size();i++)if(all.get(i).id==changed.id){all.set(i,changed);break;}return all;
+    }
+
+    private void buildScreenTimePage() {
+        pageHeading(pageScreenTime,"Digital wellbeing","Screen time","A local historical ledger of phone screen-interactive time. Android permission is required; older days are available only while Android exposes events.");
+        LinearLayout controls=horizontal();controls.addView(secondaryButton("‹ Progress",()->switchPage("progress")),new LinearLayout.LayoutParams(dp(105),dp(40)));
+        Button refresh=primaryButton("Refresh history",()->{if(ScreenTimeTracker.hasUsageAccess(this))ScreenTimeTracker.refreshRecentDays(this,30);renderScreenTimePage();});
+        LinearLayout.LayoutParams refreshLp=new LinearLayout.LayoutParams(0,dp(40),1);refreshLp.leftMargin=dp(8);controls.addView(refresh,refreshLp);pageScreenTime.addView(controls);
+        screenTimeSummaryView=text("",13,color("#B7C7BC"),false);screenTimeSummaryView.setPadding(dp(14),dp(12),dp(14),dp(12));screenTimeSummaryView.setBackground(bg("#18231E",16));
+        LinearLayout.LayoutParams summLp=new LinearLayout.LayoutParams(-1,-2);summLp.topMargin=dp(12);summLp.bottomMargin=dp(12);pageScreenTime.addView(screenTimeSummaryView,summLp);
+        screenTimeList=vertical();pageScreenTime.addView(screenTimeList);renderScreenTimePage();
+    }
+    private void renderScreenTimePage() {
+        if(screenTimeList==null||screenTimeSummaryView==null)return;screenTimeList.removeAllViews();
+        if(!ScreenTimeTracker.hasUsageAccess(this)){
+            screenTimeSummaryView.setText("Usage access is not enabled. DayFlow can only save screen-time totals after you grant Android's special Usage access permission.");
+            LinearLayout card=surfaceCard();card.addView(text("How to enable",15,color("#F2F7F3"),true));card.addView(text("Settings → Apps → Special app access → Usage access → DayFlow → Allow.",12,color("#9AABA0"),false));
+            card.addView(primaryButton("Open Usage access settings",()->{try{startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));}catch(Exception e){Toast.makeText(this,"Open Usage access from Android Settings.",Toast.LENGTH_LONG).show();}}));screenTimeList.addView(card);return;
+        }
+        ScreenTimeTracker.refreshRecentDays(this,30);TreeSet<String> dates=new TreeSet<>(Collections.reverseOrder());
+        for(String k:getPrefs().getAll().keySet())if(k.startsWith("screenTimeMs_")){String date=k.substring("screenTimeMs_".length());if(date.matches("\\d{4}-\\d{2}-\\d{2}"))dates.add(date);}
+        for(int i=0;i<30;i++){Calendar c=Calendar.getInstance();c.add(Calendar.DAY_OF_YEAR,-i);dates.add(keyForDate(c.getTime()));}
+        long total7=0,total30=0;int count7=0,count30=0;String d7=dayOffsetKey(6),d30=dayOffsetKey(29);
+        for(String key:dates){long value=ScreenTimeTracker.getStoredMillis(this,key);if(value<0)continue;if(key.compareTo(d7)>=0){total7+=value;count7++;}if(key.compareTo(d30)>=0){total30+=value;count30++;}}
+        long today=ScreenTimeTracker.getStoredMillis(this,todayKey());screenTimeSummaryView.setText("TODAY  "+(today<0?"Not recorded":ScreenTimeTracker.formatDuration(today))+"\nLAST 7 DAYS  "+ScreenTimeTracker.formatDuration(total7)+"  •  "+count7+" recorded days"+"\nLAST 30 DAYS  "+ScreenTimeTracker.formatDuration(total30)+"  •  "+count30+" recorded days"+"\nBlank dates mean Android has not provided a usable snapshot.");
+        long max=1;for(String key:dates)max=Math.max(max,Math.max(0,ScreenTimeTracker.getStoredMillis(this,key)));
+        for(String key:dates){Date d=parseDateKey(key);String label=d==null?key:new SimpleDateFormat("EEE, d MMM",Locale.getDefault()).format(d);long ms=ScreenTimeTracker.getStoredMillis(this,key);LinearLayout card=surfaceCard();
+            LinearLayout row=horizontal();row.addView(text(label,13,color("#F2F7F3"),true),new LinearLayout.LayoutParams(0,-2,1));row.addView(text(ms<0?"—":ScreenTimeTracker.formatDuration(ms),13,ms<0?color("#82948A"):color("#6BD0A6"),true));card.addView(row);
+            if(ms>=0){ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax((int)Math.min(Integer.MAX_VALUE,max));bar.setProgress((int)Math.min(Integer.MAX_VALUE,ms));bar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(5));bp.topMargin=dp(8);card.addView(bar,bp);if(ScreenTimeTracker.isEstimated(this,key))card.addView(text("Foreground-use estimate",10,color("#D5B56E"),false));}
+            screenTimeList.addView(card);
+        }
+    }
+    private String dayOffsetKey(int offset){Calendar c=Calendar.getInstance();c.add(Calendar.DAY_OF_YEAR,-offset);return keyForDate(c.getTime());}
+
+    private void renderBottomNavOnly() {
+        String tab=activePage.equals("syllabus")||activePage.equals("screenTime")?"progress":activePage;
+        for(Map.Entry<String,TextView> e:navItems.entrySet()){boolean sel=e.getKey().equals(tab);e.getValue().setTextColor(color(sel?"#6BD0A6":"#91A197"));((View)e.getValue().getParent()).setBackground(bg(sel?"#203E30":"#131D18",14));}
     }
 
     private void buildHeader() {
@@ -374,34 +639,21 @@ public class MainActivity extends Activity {
         TextView appName = text("DayFlow", 25, Color.WHITE, true);
         top.addView(appName, new LinearLayout.LayoutParams(0, -2, 1));
 
-        Button manage = actionButton("Manage", color("#D5DDF0"), "#191E2B");
-        manage.setTextSize(11);
-        manage.setContentDescription("Manage day, screen time, syllabus and backups");
-        manage.setOnClickListener(v -> openManageDialog());
-        LinearLayout.LayoutParams manageLp = new LinearLayout.LayoutParams(dp(70), dp(42));
-        manageLp.rightMargin = dp(5);
-        top.addView(manage, manageLp);
-
-        Button syllabus = actionButton("Study", color("#D5DDF0"), "#191E2B");
-        syllabus.setTextSize(11);
-        syllabus.setContentDescription("Open CSE and software interview progress");
-        syllabus.setOnClickListener(v -> showSyllabusTracker());
-        LinearLayout.LayoutParams syllabusLp = new LinearLayout.LayoutParams(dp(58), dp(42));
-        syllabusLp.rightMargin = dp(5);
-        top.addView(syllabus, syllabusLp);
-
-        Button add = actionButton("＋", Color.WHITE, "#191E2B");
-        add.setTextSize(22);
-        add.setContentDescription("Add block");
-        add.setOnClickListener(v -> openAddDialog());
-        top.addView(add, new LinearLayout.LayoutParams(dp(44), dp(42)));
+        Button manage = actionButton("Manage", color("#D6E4DA"), "#1B2621");
+        manage.setTextSize(11);manage.setContentDescription("Open tools and preferences");manage.setOnClickListener(v -> switchPage("more"));
+        LinearLayout.LayoutParams manageLp = new LinearLayout.LayoutParams(dp(66), dp(42));manageLp.rightMargin = dp(5);top.addView(manage, manageLp);
+        Button syllabus = actionButton("Study", color("#D6E4DA"), "#1B2621");
+        syllabus.setTextSize(11);syllabus.setContentDescription("Open syllabus and interview progress");syllabus.setOnClickListener(v -> showSyllabusTracker());
+        LinearLayout.LayoutParams syllabusLp = new LinearLayout.LayoutParams(dp(54), dp(42));syllabusLp.rightMargin = dp(5);top.addView(syllabus, syllabusLp);
+        Button add = actionButton("＋", Color.WHITE, "#23845F");add.setTextSize(21);add.setContentDescription("Add block");add.setOnClickListener(v -> openAddDialog());
+        top.addView(add, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
         LinearLayout nav = horizontal();
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, dp(42));
         np.bottomMargin = dp(14);
         root.addView(nav, np);
 
-        Button prev = actionButton("‹", Color.WHITE, "#151A27");
+        Button prev = actionButton("‹", Color.WHITE, "#1B2621");
         prev.setTextSize(24);
         prev.setContentDescription("Previous day");
         prev.setOnClickListener(v -> changeSelectedDate(-1));
@@ -413,7 +665,7 @@ public class MainActivity extends Activity {
         dateView.setOnClickListener(v -> openDatePicker());
         nav.addView(dateView, new LinearLayout.LayoutParams(0, -2, 1));
 
-        Button next = actionButton("›", Color.WHITE, "#151A27");
+        Button next = actionButton("›", Color.WHITE, "#1B2621");
         next.setTextSize(24);
         next.setContentDescription("Next day");
         next.setOnClickListener(v -> changeSelectedDate(1));
@@ -426,7 +678,7 @@ public class MainActivity extends Activity {
         rp.bottomMargin = dp(14);
         root.addView(row, rp);
 
-        modeView = text("", 12, color("#8E98AA"), false);
+        modeView = text("", 12, color("#A5B5AA"), false);
         row.addView(modeView, new LinearLayout.LayoutParams(0, -2, 1));
 
         String[] modes = {"WFH", "Office", "Weekend"};
@@ -443,12 +695,12 @@ public class MainActivity extends Activity {
     private void buildCurrentCard() {
         LinearLayout card = vertical();
         card.setPadding(dp(18), dp(18), dp(18), dp(18));
-        card.setBackground(bg("#171A2A", 20));
+        card.setBackground(bg("#1B2922", 20));
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.bottomMargin = dp(14);
         root.addView(card, cp);
 
-        TextView label = text("RIGHT NOW", 11, color("#A59DFF"), true);
+        TextView label = text("RIGHT NOW", 11, color("#7DD6B2"), true);
         card.addView(label);
 
         currentTitle = text("Loading…", 24, Color.WHITE, true);
@@ -466,7 +718,7 @@ public class MainActivity extends Activity {
         row.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1));
         row.addView(currentCountdown);
 
-        Button markDone = actionButton("Mark done", Color.WHITE, "#8B7CFF");
+        Button markDone = actionButton("Mark done", Color.WHITE, "#40B58A");
         LinearLayout.LayoutParams doneLp = new LinearLayout.LayoutParams(-1, dp(46));
         doneLp.topMargin = dp(16);
         card.addView(markDone, doneLp);
@@ -480,7 +732,7 @@ public class MainActivity extends Activity {
         focusAction.setTag("focusAction");
         focusAction.setOnClickListener(v -> toggleFocusCurrent());
 
-        Button recover = actionButton("Catch up", color("#DAD7FF"), "#2C2A4A");
+        Button recover = actionButton("Catch up", color("#D2F1E2"), "#27513E");
         LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(-1, dp(42));
         recLp.topMargin = dp(8);
         card.addView(recover, recLp);
@@ -496,18 +748,18 @@ public class MainActivity extends Activity {
 
         LinearLayout left = vertical();
         completionView = text("0 / 0 complete", 14, Color.WHITE, true);
-        progressPercent = text("0% of the plan", 12, color("#7F899D"), false);
+        progressPercent = text("0% of the plan", 12, color("#91A197"), false);
         left.addView(completionView);
         left.addView(progressPercent);
-        studyActualView = text("Study actual 0m / 0m planned", 11, color("#8E98AA"), false);
+        studyActualView = text("Study actual 0m / 0m planned", 11, color("#A5B5AA"), false);
         left.addView(studyActualView);
         summary.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
 
         LinearLayout metricBox = horizontal();
         metricBox.setPadding(dp(12), dp(8), dp(12), dp(8));
-        metricBox.setBackground(bg("#131722", 13));
+        metricBox.setBackground(bg("#152019", 13));
         plannedView = text("0h", 15, Color.WHITE, true);
-        doneView = text("0h done", 11, color("#8E98AA"), false);
+        doneView = text("0h done", 11, color("#A5B5AA"), false);
         metricBox.addView(plannedView);
         metricBox.addView(spacerHorizontal(8));
         metricBox.addView(doneView);
@@ -519,7 +771,7 @@ public class MainActivity extends Activity {
         TextView title = text("OFFICE DAY", 12, color("#9FAFC4"), true);
         titleRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
 
-        Button history = actionButton("History", color("#C7D3E6"), "#202936");
+        Button history = actionButton("History", color("#DCE7DF"), "#263A31");
         history.setTextSize(11);
         titleRow.addView(history, new LinearLayout.LayoutParams(dp(76), dp(34)));
         history.setOnClickListener(v -> showAttendanceHistory());
@@ -530,17 +782,17 @@ public class MainActivity extends Activity {
         sp.topMargin = dp(8);
         officeCard.addView(officeStatus, sp);
 
-        officeTimes = text("No office time logged today", 11, color("#8E98AA"), false);
+        officeTimes = text("No office time logged today", 11, color("#A5B5AA"), false);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
         tp.topMargin = dp(5);
         officeCard.addView(officeTimes, tp);
 
-        commuteView = text("Today • Office 0m  •  Commute 0m", 11, color("#8E98AA"), false);
+        commuteView = text("Today • Office 0m  •  Commute 0m", 11, color("#A5B5AA"), false);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.topMargin = dp(7);
         officeCard.addView(commuteView, cp);
 
-        officeAction = actionButton("CHECK IN", Color.WHITE, "#8B7CFF");
+        officeAction = actionButton("CHECK IN", Color.WHITE, "#40B58A");
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(48));
         ap.topMargin = dp(14);
         officeCard.addView(officeAction, ap);
@@ -549,7 +801,7 @@ public class MainActivity extends Activity {
             else editAttendanceDay(selectedDateKey);
         });
 
-        commuteAction = actionButton("Start commute", color("#C7D3E6"), "#202936");
+        commuteAction = actionButton("Start commute", color("#DCE7DF"), "#263A31");
         LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, dp(38));
         cmp.topMargin = dp(7);
         officeCard.addView(commuteAction, cmp);
@@ -558,7 +810,7 @@ public class MainActivity extends Activity {
             else showAttendanceDayDetail(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(parseDateKey(selectedDateKey)), selectedDateKey, getOfficeDay(selectedDateKey, false));
         });
 
-        TextView hint = text("Tap CHECK IN when you enter. Tap CHECK OUT when you leave.", 10, color("#627087"), false);
+        TextView hint = text("Tap CHECK IN when you enter. Tap CHECK OUT when you leave.", 10, color("#7F9689"), false);
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
         hp.topMargin = dp(8);
         officeCard.addView(hint, hp);
@@ -570,14 +822,14 @@ public class MainActivity extends Activity {
         rp.bottomMargin = dp(10);
         root.addView(row, rp);
 
-        TextView label = text("TODAY", 13, color("#8E98AA"), true);
+        TextView label = text("TODAY", 13, color("#A5B5AA"), true);
         row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
 
-        TextView modeLabel = text("", 11, color("#697386"), false);
+        TextView modeLabel = text("", 11, color("#82948A"), false);
         modeLabel.setTag("modeHeader");
         row.addView(modeLabel);
 
-        Button more = actionButton("•••", color("#A8B0C2"), "#151A27");
+        Button more = actionButton("•••", color("#A8B0C2"), "#1B2621");
         more.setTextSize(14);
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(44), dp(34));
         mp.leftMargin = dp(7);
@@ -652,7 +904,7 @@ public class MainActivity extends Activity {
 
         timeline.removeAllViews();
         if (blocks.isEmpty()) {
-            TextView empty = text("Your day is empty.\nTap ＋ to add your first block.", 15, color("#8E98AA"), false);
+            TextView empty = text("Your day is empty.\nTap ＋ to add your first block.", 15, color("#A5B5AA"), false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(0, dp(42), 0, dp(42));
             timeline.addView(empty);
@@ -663,7 +915,7 @@ public class MainActivity extends Activity {
                     final int gapStart = lastEnd;
                     LinearLayout gap = horizontal();
                     gap.setPadding(dp(8), 0, dp(8), 0);
-                    TextView gapText = text("＋  " + fmtShort(mins(b.start) - lastEnd) + " free  •  Add", 11, color("#7F899D"), false);
+                    TextView gapText = text("＋  " + fmtShort(mins(b.start) - lastEnd) + " free  •  Add", 11, color("#91A197"), false);
                     gapText.setGravity(Gravity.CENTER);
                     gap.addView(gapText, new LinearLayout.LayoutParams(-1, dp(32)));
                     gap.setOnClickListener(v -> openAddDialogAt(gapStart));
@@ -673,6 +925,11 @@ public class MainActivity extends Activity {
                 lastEnd = Math.max(lastEnd, mins(b.end));
             }
         }
+        if ("plan".equals(activePage)) renderPlanPage();
+        else if ("progress".equals(activePage)) renderProgressPage();
+        else if ("office".equals(activePage)) renderOfficePage();
+        else if ("more".equals(activePage)) renderMorePage();
+        else if ("syllabus".equals(activePage)) refreshSyllabusRows();
     }
 
     private void updateLiveBits() {
@@ -795,8 +1052,8 @@ public class MainActivity extends Activity {
 
         LinearLayout timeCol = vertical();
         timeCol.setGravity(Gravity.RIGHT);
-        timeCol.addView(text(time12(b.start), 12, color("#8E98AA"), true));
-        timeCol.addView(text(time12(b.end), 10, color("#606A7B"), false));
+        timeCol.addView(text(time12(b.start), 12, color("#A5B5AA"), true));
+        timeCol.addView(text(time12(b.end), 10, color("#75877C"), false));
         row.addView(timeCol, new LinearLayout.LayoutParams(dp(63), -2));
 
         LinearLayout card = horizontal();
@@ -804,13 +1061,13 @@ public class MainActivity extends Activity {
 
         String surface, border;
         if ("done".equals(b.status)) {
-            surface = "#111A16"; border = "#2F7B58";
+            surface = "#111A16"; border = "#40976D";
         } else if ("skipped".equals(b.status)) {
             surface = "#171214"; border = "#5C3038";
         } else if (current) {
-            surface = "#26233E"; border = "#8B7CFF";
+            surface = "#254C3C"; border = "#40B58A";
         } else {
-            surface = "#151A27"; border = "#252C3B";
+            surface = "#1B2621"; border = "#2D3C34";
         }
 
         GradientDrawable cardBg = bg(surface, 16);
@@ -823,12 +1080,12 @@ public class MainActivity extends Activity {
 
         LinearLayout details = vertical();
         TextView title = text(b.title, 15, Color.WHITE, true);
-        TextView meta = text(blockBehaviorLabel(b) + " • " + fmt(mins(b.end) - mins(b.start)), 11, color("#8E98AA"), false);
+        TextView meta = text(blockBehaviorLabel(b) + " • " + fmt(mins(b.end) - mins(b.start)), 11, color("#A5B5AA"), false);
         details.addView(title);
         details.addView(meta);
 
         if (current) {
-            TextView state = text("IN PROGRESS", 10, color("#A59DFF"), true);
+            TextView state = text("IN PROGRESS", 10, color("#7DD6B2"), true);
             state.setPadding(0, dp(6), 0, 0);
             details.addView(state);
         }
@@ -836,7 +1093,7 @@ public class MainActivity extends Activity {
         card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
 
         if ("pending".equals(b.status)) {
-            Button done = actionButton("✓", Color.WHITE, current ? "#8B7CFF" : "#202638");
+            Button done = actionButton("✓", Color.WHITE, current ? "#40B58A" : "#263A31");
             LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(44), dp(44));
             dlp.leftMargin = dp(8);
             card.addView(done, dlp);
@@ -846,11 +1103,11 @@ public class MainActivity extends Activity {
                 save();
             });
         } else if ("done".equals(b.status)) {
-            TextView check = text("✓", 20, color("#47D18C"), true);
+            TextView check = text("✓", 20, color("#6FD6A3"), true);
             check.setGravity(Gravity.CENTER);
             card.addView(check, new LinearLayout.LayoutParams(dp(44), dp(44)));
         } else {
-            Button undo = actionButton("↩", color("#FFB8C1"), "#2A2024");
+            Button undo = actionButton("↩", color("#FFC5C9"), "#3A2729");
             LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(dp(44), dp(44));
             ulp.leftMargin = dp(8);
             card.addView(undo, ulp);
@@ -1031,7 +1288,7 @@ public class MainActivity extends Activity {
         EditText title = new EditText(this);
         title.setHint("What are you doing?");
         title.setTextColor(Color.WHITE);
-        title.setHintTextColor(color("#697386"));
+        title.setHintTextColor(color("#82948A"));
         title.setSingleLine(true);
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
 
@@ -1054,16 +1311,16 @@ public class MainActivity extends Activity {
             b.setOnClickListener(v -> {
                 startChoice[0] = idx;
                 for (int j = 0; j < starts.getChildCount(); j++) {
-                    ((Button) starts.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    ((Button) starts.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    ((Button) starts.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    ((Button) starts.getChildAt(j)).setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
 
         if (suggestedStart >= 0 && starts.getChildCount() >= 3) {
             for (int j = 0; j < starts.getChildCount(); j++) {
-                ((Button) starts.getChildAt(j)).setTextColor(j == 2 ? Color.WHITE : color("#AEB7C9"));
-                ((Button) starts.getChildAt(j)).setBackground(bg(j == 2 ? "#413B73" : "#151A27", 12));
+                ((Button) starts.getChildAt(j)).setTextColor(j == 2 ? Color.WHITE : color("#D6E1D8"));
+                ((Button) starts.getChildAt(j)).setBackground(bg(j == 2 ? "#245B45" : "#1B2621", 12));
             }
         }
 
@@ -1087,8 +1344,8 @@ public class MainActivity extends Activity {
             b.setOnClickListener(v -> {
                 durationChoice[0] = value;
                 for (int j = 0; j < durations.getChildCount(); j++) {
-                    ((Button) durations.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    ((Button) durations.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    ((Button) durations.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    ((Button) durations.getChildAt(j)).setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
@@ -1113,8 +1370,8 @@ public class MainActivity extends Activity {
         for (int i = 0; i < rigidityNames.length; i++) {
             final int idx = i;
             Button b = chip(rigidityNames[i]);
-            b.setTextColor(i == 1 ? Color.WHITE : color("#AEB7C9"));
-            b.setBackground(bg(i == 1 ? "#413B73" : "#151A27", 12));
+            b.setTextColor(i == 1 ? Color.WHITE : color("#D6E1D8"));
+            b.setBackground(bg(i == 1 ? "#245B45" : "#1B2621", 12));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
             if (i > 0) lp.leftMargin = dp(6);
             rigidities.addView(b, lp);
@@ -1122,8 +1379,8 @@ public class MainActivity extends Activity {
                 selectedRigidity[0] = rigidityValues[idx];
                 selectedBehavior[0] = selectedRigidity[0] + ":" + selectedPriority[0];
                 for (int j = 0; j < rigidities.getChildCount(); j++) {
-                    ((Button) rigidities.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    ((Button) rigidities.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    ((Button) rigidities.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    ((Button) rigidities.getChildAt(j)).setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
@@ -1139,8 +1396,8 @@ public class MainActivity extends Activity {
         for (int i = 0; i < priorityNames.length; i++) {
             final int idx = i;
             Button b = chip(priorityNames[i]);
-            b.setTextColor(i == 2 ? Color.WHITE : color("#AEB7C9"));
-            b.setBackground(bg(i == 2 ? "#413B73" : "#151A27", 12));
+            b.setTextColor(i == 2 ? Color.WHITE : color("#D6E1D8"));
+            b.setBackground(bg(i == 2 ? "#245B45" : "#1B2621", 12));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
             if (i > 0) lp.leftMargin = dp(4);
             priorities.addView(b, lp);
@@ -1148,8 +1405,8 @@ public class MainActivity extends Activity {
                 selectedPriority[0] = priorityValues[idx];
                 selectedBehavior[0] = selectedRigidity[0] + ":" + selectedPriority[0];
                 for (int j = 0; j < priorities.getChildCount(); j++) {
-                    ((Button) priorities.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    ((Button) priorities.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    ((Button) priorities.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    ((Button) priorities.getChildAt(j)).setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
@@ -1169,7 +1426,7 @@ public class MainActivity extends Activity {
             Button b = chip(repeatNames[i]);
             if (i == 0) {
                 b.setTextColor(Color.WHITE);
-                b.setBackground(bg("#413B73", 12));
+                b.setBackground(bg("#245B45", 12));
             }
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1);
             if (i > 0) lp.leftMargin = dp(6);
@@ -1177,8 +1434,8 @@ public class MainActivity extends Activity {
             b.setOnClickListener(v -> {
                 selectedRepeat[0] = repeatValues[idx];
                 for (int j = 0; j < repeats.getChildCount(); j++) {
-                    ((Button) repeats.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    ((Button) repeats.getChildAt(j)).setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    ((Button) repeats.getChildAt(j)).setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    ((Button) repeats.getChildAt(j)).setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
@@ -1368,7 +1625,7 @@ public class MainActivity extends Activity {
         title.setText(b.title);
         title.setHint("Block name");
         title.setTextColor(Color.WHITE);
-        title.setHintTextColor(color("#697386"));
+        title.setHintTextColor(color("#82948A"));
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
         final int[] start = {mins(b.start)};
         final int[] end = {mins(b.end)};
@@ -1408,8 +1665,8 @@ public class MainActivity extends Activity {
             final int idx = i;
             Button button = chip(rigidityNames[i]);
             boolean selected = rigidityValues[i].equals(selectedRigidity[0]);
-            button.setTextColor(selected ? Color.WHITE : color("#AEB7C9"));
-            button.setBackground(bg(selected ? "#413B73" : "#151A27", 12));
+            button.setTextColor(selected ? Color.WHITE : color("#D6E1D8"));
+            button.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
             if (i > 0) lp.leftMargin = dp(6);
             rigidities.addView(button, lp);
@@ -1417,8 +1674,8 @@ public class MainActivity extends Activity {
                 selectedRigidity[0] = rigidityValues[idx];
                 for (int j = 0; j < rigidities.getChildCount(); j++) {
                     Button child = (Button) rigidities.getChildAt(j);
-                    child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    child.setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    child.setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
@@ -1436,8 +1693,8 @@ public class MainActivity extends Activity {
             final int idx = i;
             Button button = chip(priorityNames[i]);
             boolean selected = priorityValues[i].equals(selectedPriority[0]);
-            button.setTextColor(selected ? Color.WHITE : color("#AEB7C9"));
-            button.setBackground(bg(selected ? "#413B73" : "#151A27", 12));
+            button.setTextColor(selected ? Color.WHITE : color("#D6E1D8"));
+            button.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
             if (i > 0) lp.leftMargin = dp(4);
             priorities.addView(button, lp);
@@ -1445,8 +1702,8 @@ public class MainActivity extends Activity {
                 selectedPriority[0] = priorityValues[idx];
                 for (int j = 0; j < priorities.getChildCount(); j++) {
                     Button child = (Button) priorities.getChildAt(j);
-                    child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    child.setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    child.setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
@@ -1614,42 +1871,7 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    private void openManageDialog() {
-        String[] items = {
-                "Load WFH template",
-                "Load Office template",
-                "Load Weekend template",
-                "Edit WFH template",
-                "Edit Office template",
-                "Edit Weekend template",
-                "Screen time & history",
-                "Syllabus tracker",
-                "Enable precise live widget updates",
-                "Export DayFlow backup",
-                "Import DayFlow backup",
-                "View diagnostics",
-                "Clear selected day's plan"
-        };
-        new AlertDialog.Builder(this)
-                .setTitle("Manage day")
-                .setItems(items, (d, which) -> {
-                    if (which == 0) chooseTemplateDirect("wfh");
-                    else if (which == 1) chooseTemplateDirect("office");
-                    else if (which == 2) chooseTemplateDirect("weekend");
-                    else if (which == 3) openTemplateEditor("wfh");
-                    else if (which == 4) openTemplateEditor("office");
-                    else if (which == 5) openTemplateEditor("weekend");
-                    else if (which == 6) showScreenTimeTracker();
-                    else if (which == 7) showSyllabusTracker();
-                    else if (which == 8) enablePreciseLiveWidgetUpdates();
-                    else if (which == 9) requestExportBackup();
-                    else if (which == 10) requestImportBackup();
-                    else if (which == 11) showDiagnostics();
-                    else clearDay();
-                })
-                .setNegativeButton("Close", null)
-                .show();
-    }
+    private void openManageDialog() { switchPage("more"); }
 
     private ArrayList<SyllabusTopic> readSyllabusTopics() {
         ArrayList<SyllabusTopic> topics = new ArrayList<>();
@@ -1790,7 +2012,7 @@ public class MainActivity extends Activity {
         lines.setMinLines(6);
         lines.setHint("Paste topics, one per line");
         lines.setTextColor(Color.WHITE);
-        lines.setHintTextColor(color("#697386"));
+        lines.setHintTextColor(color("#82948A"));
         form.addView(lines, new LinearLayout.LayoutParams(-1, dp(160)));
         new AlertDialog.Builder(this).setTitle("Import topic list")
                 .setMessage("Each non-empty line becomes one topic under the selected subject.")
@@ -2052,30 +2274,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showSyllabusTracker() {
-        ArrayList<SyllabusTopic> topics = readSyllabusTopics();
-        String[] rows = new String[topics.size() + 4];
-        rows[0] = "＋ Add one topic";
-        rows[1] = "Import topic list (one topic per line)";
-        rows[2] = "Load UPSC CSE syllabus starter (2026 notice)";
-        rows[3] = "Set target date";
-        for (int i = 0; i < topics.size(); i++) {
-            SyllabusTopic topic = topics.get(i);
-            rows[i + 4] = (topic.done ? "✓ " : "○ ") + topic.subject + " • " + topic.title;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("Syllabus tracker")
-                .setMessage(syllabusSummary(topics))
-                .setItems(rows, (dialog, which) -> {
-                    if (which == 0) editSyllabusTopic(null);
-                    else if (which == 1) importSyllabusTopics();
-                    else if (which == 2) loadStarterSyllabus();
-                    else if (which == 3) chooseSyllabusTargetDate();
-                    else showSyllabusTopicActions(topics.get(which - 4));
-                })
-                .setNegativeButton("Close", null)
-                .show();
-    }
+    private void showSyllabusTracker() { switchPage("syllabus"); }
 
     private void showSyllabusTopicActions(SyllabusTopic topic) {
         String toggle = topic.done ? "Mark pending" : "Mark complete";
@@ -2111,11 +2310,11 @@ public class MainActivity extends Activity {
         title.setSingleLine(true);
         title.setHint("Exact topic / syllabus item");
         title.setTextColor(Color.WHITE);
-        title.setHintTextColor(color("#697386"));
+        title.setHintTextColor(color("#82948A"));
         if (existing != null) title.setText(existing.title);
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
 
-        TextView label = text("SUBJECT", 10, color("#8E98AA"), true);
+        TextView label = text("SUBJECT", 10, color("#A5B5AA"), true);
         LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, -2);
         labelLp.topMargin = dp(10);
         form.addView(label, labelLp);
@@ -2362,11 +2561,11 @@ public class MainActivity extends Activity {
     private void renderTemplateEditorRows(LinearLayout list, ArrayList<Block> template, AlertDialog editor) {
         list.removeAllViews();
         TextView hint = text("Edit, add, or remove blocks. Existing days are unchanged unless you choose Save + apply.",
-                11, color("#7F899D"), false);
+                11, color("#91A197"), false);
         hint.setPadding(0, 0, 0, dp(10));
         list.addView(hint);
 
-        Button add = actionButton("＋  Add template block", Color.WHITE, "#8B7CFF");
+        Button add = actionButton("＋  Add template block", Color.WHITE, "#40B58A");
         LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(44));
         addLp.bottomMargin = dp(10);
         list.addView(add, addLp);
@@ -2379,7 +2578,7 @@ public class MainActivity extends Activity {
             Block b = template.get(i);
             LinearLayout row = horizontal();
             row.setPadding(dp(10), dp(8), dp(6), dp(8));
-            row.setBackground(bg("#151A27", 14));
+            row.setBackground(bg("#1B2621", 14));
             LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
             rowLp.bottomMargin = dp(7);
             list.addView(row, rowLp);
@@ -2387,10 +2586,10 @@ public class MainActivity extends Activity {
             LinearLayout details = vertical();
             details.addView(text(b.title, 14, Color.WHITE, true));
             details.addView(text(time12(b.start) + " – " + time12(b.end) + "  •  " + blockBehaviorLabel(b),
-                    11, color("#8E98AA"), false));
+                    11, color("#A5B5AA"), false));
             row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
 
-            Button del = actionButton("×", color("#FFB8C1"), "#2A2024");
+            Button del = actionButton("×", color("#FFC5C9"), "#3A2729");
             row.addView(del, new LinearLayout.LayoutParams(dp(42), dp(40)));
             row.setOnClickListener(v -> editTemplateBlockDialog(template, index, () ->
                     renderTemplateEditorRows(list, template, editor)));
@@ -2421,7 +2620,7 @@ public class MainActivity extends Activity {
         title.setHint("Block name");
         title.setText(original.title);
         title.setTextColor(Color.WHITE);
-        title.setHintTextColor(color("#697386"));
+        title.setHintTextColor(color("#82948A"));
         form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
 
         final int[] start = {mins(original.start)};
@@ -2465,8 +2664,8 @@ public class MainActivity extends Activity {
             final int idx = i;
             Button b = chip(rigidityNames[i]);
             boolean selected = rigidityValues[i].equals(selectedRigidity[0]);
-            b.setTextColor(selected ? Color.WHITE : color("#AEB7C9"));
-            b.setBackground(bg(selected ? "#413B73" : "#151A27", 12));
+            b.setTextColor(selected ? Color.WHITE : color("#D6E1D8"));
+            b.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
             if (i > 0) lp.leftMargin = dp(6);
             rigidities.addView(b, lp);
@@ -2474,8 +2673,8 @@ public class MainActivity extends Activity {
                 selectedRigidity[0] = rigidityValues[idx];
                 for (int j = 0; j < rigidities.getChildCount(); j++) {
                     Button child = (Button) rigidities.getChildAt(j);
-                    child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    child.setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    child.setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
@@ -2492,8 +2691,8 @@ public class MainActivity extends Activity {
             final int idx = i;
             Button b = chip(priorityNames[i]);
             boolean selected = priorityValues[i].equals(selectedPriority[0]);
-            b.setTextColor(selected ? Color.WHITE : color("#AEB7C9"));
-            b.setBackground(bg(selected ? "#413B73" : "#151A27", 12));
+            b.setTextColor(selected ? Color.WHITE : color("#D6E1D8"));
+            b.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
             if (i > 0) lp.leftMargin = dp(4);
             priorities.addView(b, lp);
@@ -2501,8 +2700,8 @@ public class MainActivity extends Activity {
                 selectedPriority[0] = priorityValues[idx];
                 for (int j = 0; j < priorities.getChildCount(); j++) {
                     Button child = (Button) priorities.getChildAt(j);
-                    child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
-                    child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                    child.setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    child.setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
                 }
             });
         }
@@ -2568,7 +2767,7 @@ public class MainActivity extends Activity {
             } else if (viewingToday) {
                 officeStatus.setText(day == null ? "Ready for office" : "OUT OF OFFICE");
                 officeAction.setText("CHECK IN");
-                officeAction.setBackground(bg("#8B7CFF", 12));
+                officeAction.setBackground(bg("#40B58A", 12));
                 officeAction.setEnabled(true);
             } else {
                 officeStatus.setText(day == null ? "No office record" : "OFFICE RECORD");
@@ -2836,7 +3035,7 @@ public class MainActivity extends Activity {
 
                 LinearLayout row = horizontal();
                 row.setPadding(dp(10), dp(10), dp(10), dp(10));
-                row.setBackground(bg(i == 0 ? "#20213A" : "#151A27", 14));
+                row.setBackground(bg(i == 0 ? "#20213A" : "#1B2621", 14));
                 LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
                 rp.bottomMargin = dp(7);
                 days.addView(row, rp);
@@ -2855,7 +3054,7 @@ public class MainActivity extends Activity {
                 row.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
 
                 TextView marker = text((day != null && office > 0) ? "●" : "○",
-                        17, (day != null && office > 0) ? color("#47D18C") : color("#4A5364"), true);
+                        17, (day != null && office > 0) ? color("#6FD6A3") : color("#4A5364"), true);
                 row.addView(marker, new LinearLayout.LayoutParams(dp(26), -2));
 
                 if (day != null) {
@@ -2905,7 +3104,7 @@ public class MainActivity extends Activity {
                     long out = s.optLong("out", 0);
                     String value = "Office session " + (i + 1) + ": " + (in > 0 ? clock(in) : "—")
                             + " → " + (out > 0 ? clock(out) : "Active");
-                    TextView t = text(value, 12, color("#AEB7C9"), false);
+                    TextView t = text(value, 12, color("#D6E1D8"), false);
                     t.setPadding(0, dp(10), 0, dp(2));
                     content.addView(t);
                 }
@@ -2915,8 +3114,8 @@ public class MainActivity extends Activity {
             long ciE = day.optLong("commuteInEnd", 0);
             long coS = day.optLong("commuteOutStart", 0);
             long coE = day.optLong("commuteOutEnd", 0);
-            if (ciS > 0 || ciE > 0) content.addView(text("To office: " + clock(ciS) + " → " + (ciE > 0 ? clock(ciE) : "Active"), 12, color("#AEB7C9"), false));
-            if (coS > 0 || coE > 0) content.addView(text("Home: " + clock(coS) + " → " + (coE > 0 ? clock(coE) : "Active"), 12, color("#AEB7C9"), false));
+            if (ciS > 0 || ciE > 0) content.addView(text("To office: " + clock(ciS) + " → " + (ciE > 0 ? clock(ciE) : "Active"), 12, color("#D6E1D8"), false));
+            if (coS > 0 || coE > 0) content.addView(text("Home: " + clock(coS) + " → " + (coE > 0 ? clock(coE) : "Active"), 12, color("#D6E1D8"), false));
 
             new AlertDialog.Builder(this)
                     .setTitle(date)
@@ -2941,98 +3140,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showScreenTimeTracker() {
-        if (!ScreenTimeTracker.hasUsageAccess(this)) {
-            new AlertDialog.Builder(this)
-                    .setTitle("Enable screen-time history")
-                    .setMessage("DayFlow needs Android Usage access to read screen-interactive history. It stores daily totals locally on this device; it does not upload an app-by-app list. After access is granted, DayFlow snapshots recent days and keeps a durable local history.")
-                    .setPositiveButton("Open Usage access", (d, w) -> {
-                        try { startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)); }
-                        catch (Exception e) {
-                            Toast.makeText(this, "Settings → Apps → Special app access → Usage access → DayFlow.", Toast.LENGTH_LONG).show();
-                        }
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-            return;
-        }
-
-        ScreenTimeTracker.refreshRecentDays(this, 14);
-        java.util.TreeSet<String> historyDates = new java.util.TreeSet<>(Collections.reverseOrder());
-        for (String prefKey : getPrefs().getAll().keySet()) {
-            if (prefKey.startsWith("screenTimeMs_")) {
-                String key = prefKey.substring("screenTimeMs_".length());
-                if (key.matches("\\d{4}-\\d{2}-\\d{2}")) historyDates.add(key);
-            }
-        }
-        for (int i = 0; i < 14; i++) {
-            Calendar day = Calendar.getInstance();
-            day.add(Calendar.DAY_OF_YEAR, -i);
-            historyDates.add(keyForDate(day.getTime()));
-        }
-
-        Calendar today = Calendar.getInstance();
-        today.set(Calendar.HOUR_OF_DAY, 0);
-        today.set(Calendar.MINUTE, 0);
-        today.set(Calendar.SECOND, 0);
-        today.set(Calendar.MILLISECOND, 0);
-        Calendar weekStart = (Calendar) today.clone();
-        weekStart.add(Calendar.DAY_OF_YEAR, -6);
-        Calendar monthStart = (Calendar) today.clone();
-        monthStart.add(Calendar.DAY_OF_YEAR, -29);
-        String weekStartKey = keyForDate(weekStart.getTime());
-        String monthStartKey = keyForDate(monthStart.getTime());
-
-        long weekTotal = 0L, monthTotal = 0L;
-        int weekDays = 0, monthDays = 0;
-        for (String key : historyDates) {
-            long value = ScreenTimeTracker.getStoredMillis(this, key);
-            if (value < 0) continue;
-            if (key.compareTo(weekStartKey) >= 0) {
-                weekTotal += value;
-                weekDays++;
-            }
-            if (key.compareTo(monthStartKey) >= 0) {
-                monthTotal += value;
-                monthDays++;
-            }
-        }
-
-        StringBuilder report = new StringBuilder("PHONE SCREEN-INTERACTIVE TIME • SAVED LOCALLY\n");
-        report.append("Last 7 calendar days: ").append(ScreenTimeTracker.formatDuration(weekTotal))
-                .append(" (").append(weekDays).append(" recorded days)\n");
-        report.append("Last 30 calendar days: ").append(ScreenTimeTracker.formatDuration(monthTotal))
-                .append(" (").append(monthDays).append(" recorded days)\n\n");
-        report.append("DAILY HISTORY • ").append(historyDates.size()).append(" dates\n\n");
-        for (String key : historyDates) {
-            Date day = parseDateKey(key);
-            String label = day == null ? key
-                    : new SimpleDateFormat("EEE, d MMM yyyy", Locale.getDefault()).format(day);
-            long value = ScreenTimeTracker.getStoredMillis(this, key);
-            report.append(label).append("  —  ");
-            if (value < 0) report.append("No DayFlow snapshot");
-            else {
-                report.append(ScreenTimeTracker.formatDuration(value));
-                if (ScreenTimeTracker.isEstimated(this, key)) report.append(" (foreground-use estimate)");
-                long captured = ScreenTimeTracker.getCapturedAt(this, key);
-                if (captured > 0) report.append("\n    Last value change ").append(clock(captured));
-            }
-            report.append("\n");
-        }
-        report.append("\nAndroid retains raw screen events only for a limited recent period. DayFlow keeps each daily total it has already saved, but cannot recreate older totals that Android no longer provides.");
-
-        TextView view = text(report.toString(), 13, color("#D7DFED"), false);
-        view.setPadding(dp(16), dp(12), dp(16), dp(12));
-        view.setTextIsSelectable(true);
-        ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(color("#0F131C"));
-        scroll.addView(view, new ScrollView.LayoutParams(-1, -2));
-        new AlertDialog.Builder(this).setTitle("Screen time history")
-                .setView(scroll)
-                .setNeutralButton("Refresh", (d, w) -> showScreenTimeTracker())
-                .setPositiveButton("Close", null)
-                .show();
-    }
+    private void showScreenTimeTracker() { switchPage("screenTime"); }
 
     private void requestExportBackup() {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
@@ -3164,12 +3272,12 @@ public class MainActivity extends Activity {
     private void showDiagnostics() {
         String log = getPrefs().getString(DEBUG_LOG_KEY, "No diagnostics recorded yet.");
         if (log.length() > 12000) log = log.substring(log.length() - 12000);
-        TextView view = text(log, 11, color("#C7D0DF"), false);
+        TextView view = text(log, 11, color("#DEE8E0"), false);
         view.setTextIsSelectable(true);
         view.setPadding(dp(16), dp(12), dp(16), dp(12));
 
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(color("#0F131C"));
+        scroll.setBackgroundColor(color("#111A16"));
         scroll.addView(view, new ScrollView.LayoutParams(-1, -1));
 
         new AlertDialog.Builder(this)
@@ -3293,13 +3401,13 @@ public class MainActivity extends Activity {
 
             LinearLayout content = vertical();
             content.setPadding(dp(18), dp(2), dp(18), dp(2));
-            TextView note = text("Correct the recorded times. DayFlow stores the exact date + time.", 11, color("#7F899D"), false);
+            TextView note = text("Correct the recorded times. DayFlow stores the exact date + time.", 11, color("#91A197"), false);
             content.addView(note);
 
-            Button inBtn = actionButton("Office in  •  " + (session.optLong("in", 0) > 0 ? clock(session.optLong("in", 0)) : "Not set"), Color.WHITE, "#202638");
-            Button outBtn = actionButton("Office out  •  " + (session.optLong("out", 0) > 0 ? clock(session.optLong("out", 0)) : "Not set"), Color.WHITE, "#202638");
-            Button ciBtn = actionButton("Commute to office  •  " + timeLabel(day.optLong("commuteInStart", 0)) + " → " + timeLabel(day.optLong("commuteInEnd", 0)), Color.WHITE, "#202638");
-            Button coBtn = actionButton("Commute home  •  " + timeLabel(day.optLong("commuteOutStart", 0)) + " → " + timeLabel(day.optLong("commuteOutEnd", 0)), Color.WHITE, "#202638");
+            Button inBtn = actionButton("Office in  •  " + (session.optLong("in", 0) > 0 ? clock(session.optLong("in", 0)) : "Not set"), Color.WHITE, "#263A31");
+            Button outBtn = actionButton("Office out  •  " + (session.optLong("out", 0) > 0 ? clock(session.optLong("out", 0)) : "Not set"), Color.WHITE, "#263A31");
+            Button ciBtn = actionButton("Commute to office  •  " + timeLabel(day.optLong("commuteInStart", 0)) + " → " + timeLabel(day.optLong("commuteInEnd", 0)), Color.WHITE, "#263A31");
+            Button coBtn = actionButton("Commute home  •  " + timeLabel(day.optLong("commuteOutStart", 0)) + " → " + timeLabel(day.optLong("commuteOutEnd", 0)), Color.WHITE, "#263A31");
             content.addView(inBtn, new LinearLayout.LayoutParams(-1, dp(42)));
             LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(outBtn, ml);
             ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(ciBtn, ml);
