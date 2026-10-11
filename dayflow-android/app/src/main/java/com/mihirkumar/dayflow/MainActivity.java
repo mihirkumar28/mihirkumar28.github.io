@@ -48,6 +48,7 @@ public class MainActivity extends Activity {
     private static final String SYLLABUS_TARGET_KEY = "syllabusTargetDate";
     private static final String SYLLABUS_START_KEY = "syllabusStartDate";
     private static final String ROUTINE_MIGRATION_V2_KEY = "routineDefaultMigrationV2";
+    private static final String ROUTINE_MIGRATION_V3_KEY = "routineDefaultMigrationV3";
     private static final String STARTER_SEEDED_KEY = "starterSyllabusSeeded_v2";
     private static final String INTERVIEW_PLAN_START_KEY = "softwareInterviewPlanStart";
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
@@ -160,6 +161,7 @@ public class MainActivity extends Activity {
 
         selectedDateKey = todayKey();
         migrateUneditedDefaultTemplates();
+        migrateUntouchedWfhMorningPlan();
         load();
         buildUi();
         ensureStarterPlans();
@@ -3260,18 +3262,17 @@ public class MainActivity extends Activity {
             };
         }
         return new String[][]{
-                {"05:00","05:15","Wake up","fixed"},
-                {"05:15","05:45","Morning routine","flexible"},
-                {"05:45","07:45","GS study","important"},
+                {"03:30","03:45","Wake up + routine","fixed"},
+                {"03:45","05:45","GS study","important"},
+                {"05:45","07:45","Maths Optional","important"},
                 {"07:45","08:00","Breakfast / transition","flexible"},
                 {"08:00","09:30","Interview preparation","fixed"},
                 {"09:30","13:00","Work","fixed"},
                 {"13:00","14:00","Lunch","fixed"},
                 {"14:00","18:30","Work","fixed"},
                 {"18:30","19:15","Exercise","important"},
-                {"19:15","21:15","Maths Optional","important"},
-                {"21:15","21:45","Dinner","fixed"},
-                {"21:45","22:15","Wind down","flexible"}
+                {"19:15","19:45","Dinner","fixed"},
+                {"19:45","20:15","Wind down","flexible"}
         };
     }
 
@@ -3319,27 +3320,61 @@ public class MainActivity extends Activity {
         };
     }
 
-    private boolean matchesLegacyTemplate(String key, String raw) {
+    private boolean matchesSavedTemplate(String raw, String[][] expected) {
         try {
             JSONArray saved = new JSONArray(raw);
-            String[][] legacy = legacyDefaultTemplate(key);
-            if (saved.length() != legacy.length) return false;
-            for (int i = 0; i < legacy.length; i++) {
+            if (saved.length() != expected.length) return false;
+            for (int i = 0; i < expected.length; i++) {
                 JSONObject record = saved.optJSONObject(i);
                 if (record == null) return false;
-                String[] expected = legacy[i];
-                if (!expected[0].equals(record.optString("start"))
-                        || !expected[1].equals(record.optString("end"))
-                        || !expected[2].equals(record.optString("title"))) return false;
-                Block wanted = new Block(i, expected[0], expected[1], expected[2], expected[3], "pending");
+                String[] spec = expected[i];
+                if (!spec[0].equals(record.optString("start"))
+                        || !spec[1].equals(record.optString("end"))
+                        || !spec[2].equals(record.optString("title"))) return false;
+                Block wanted = new Block(i, spec[0], spec[1], spec[2], spec[3], "pending");
                 Block actual = blockFromJson(record, "pending");
                 if (!wanted.priority.equals(actual.priority) || !wanted.rigidity.equals(actual.rigidity)) return false;
             }
             return true;
         } catch (Exception e) {
-            debugLog("Routine migration check failed for " + key + ": " + e.getMessage());
+            debugLog("Routine migration comparison failed: " + e.getMessage());
             return false;
         }
+    }
+
+    private boolean matchesLegacyTemplate(String key, String raw) {
+        return matchesSavedTemplate(raw, legacyDefaultTemplate(key));
+    }
+
+    private void migrateUntouchedWfhMorningPlan() {
+        SharedPreferences prefs = getPrefs();
+        if (prefs.getBoolean(ROUTINE_MIGRATION_V3_KEY, false)) return;
+        String raw = prefs.getString(templateKey("wfh"), null);
+        String[][] previousWfh = {
+                {"05:00","05:15","Wake up","fixed"},
+                {"05:15","05:45","Morning routine","flexible"},
+                {"05:45","07:45","GS study","important"},
+                {"07:45","08:00","Breakfast / transition","flexible"},
+                {"08:00","09:30","Interview preparation","fixed"},
+                {"09:30","13:00","Work","fixed"},
+                {"13:00","14:00","Lunch","fixed"},
+                {"14:00","18:30","Work","fixed"},
+                {"18:30","19:15","Exercise","important"},
+                {"19:15","21:15","Maths Optional","important"},
+                {"21:15","21:45","Dinner","fixed"},
+                {"21:45","22:15","Wind down","flexible"}
+        };
+        if (raw != null && matchesSavedTemplate(raw, previousWfh)) {
+            ArrayList<Block> updated = new ArrayList<>();
+            String[][] revised = defaultTemplate("wfh");
+            for (int i = 0; i < revised.length; i++) {
+                updated.add(new Block(System.currentTimeMillis() + i, revised[i][0], revised[i][1],
+                        revised[i][2], revised[i][3], "pending"));
+            }
+            saveTemplate("wfh", updated);
+            debugLog("Updated untouched built-in WFH routine to protect both morning CSE blocks and the 08:00–09:30 interview slot.");
+        }
+        prefs.edit().putBoolean(ROUTINE_MIGRATION_V3_KEY, true).apply();
     }
 
     private void migrateUneditedDefaultTemplates() {
