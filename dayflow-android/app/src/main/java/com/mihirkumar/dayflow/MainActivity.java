@@ -492,6 +492,40 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams detailLp=new LinearLayout.LayoutParams(-1,-2); detailLp.bottomMargin=dp(18); page.addView(detail,detailLp);
     }
 
+    private GradientDrawable surfaceBackground(float radius) {
+        GradientDrawable drawable = bg("#FFFFFF", radius);
+        drawable.setStroke(dp(1), color("#DDE6DE"));
+        return drawable;
+    }
+
+    private void sectionLabel(LinearLayout parent, String label) {
+        TextView labelView = text(label, 14, color("#18372E"), true);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.bottomMargin = dp(8);
+        parent.addView(labelView, lp);
+    }
+
+    private void addManageRow(LinearLayout parent, String title, String detail, Runnable action) {
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(5), dp(10), dp(4), dp(10));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+        parent.addView(row, rp);
+        LinearLayout details = vertical();
+        LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(0, -2, 1);
+        detailsLp.rightMargin = dp(8);
+        row.addView(details, detailsLp);
+        details.addView(text(title, 13, color("#18372E"), true));
+        TextView hint = text(detail, 11, color("#687A70"), false);
+        hint.setLineSpacing(dp(1), 1f);
+        details.addView(hint);
+        row.addView(text("›", 23, color("#286B55"), true));
+        row.setOnClickListener(v -> action.run());
+        View divider = new View(this);
+        divider.setBackgroundColor(color("#DDE6DE"));
+        parent.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+    }
+
     private LinearLayout surfaceCard() {
         LinearLayout card=vertical(); card.setPadding(dp(16),dp(15),dp(16),dp(15)); card.setBackground(bg("#18231E",18));
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);card.setLayoutParams(lp);return card;
@@ -521,12 +555,12 @@ public class MainActivity extends Activity {
     }
 
     private void refreshCurrentWorkspace() {
-        if ("home".equals(activePage)) renderHome();
+        if ("home".equals(activePage)) render();
         else if ("plan".equals(activePage)) renderPlanPage();
         else if ("progress".equals(activePage)) renderProgressPage();
         else if ("office".equals(activePage)) renderOfficePage();
         else if ("more".equals(activePage)) renderMorePage();
-        else if ("syllabus".equals(activePage)) renderSyllabusRows();
+        else if ("syllabus".equals(activePage)) refreshSyllabusRows();
         else if ("screenTime".equals(activePage)) renderScreenTimePage();
         renderBottomNavOnly();
     }
@@ -3842,7 +3876,33 @@ private void requestImportBackup() {
         else if (requestCode == REQUEST_IMPORT_BACKUP) readBackupForRestore(data.getData());
     }
 
-private void writeBackup(Uri uri) {
+private JSONObject buildBackupDocument() throws Exception {
+        JSONObject root = new JSONObject();
+        root.put("app", "DayFlow");
+        root.put("formatVersion", 1);
+        root.put("exportedAt", System.currentTimeMillis());
+        JSONObject values = new JSONObject();
+        for (Map.Entry<String, ?> entry : getPrefs().getAll().entrySet()) {
+            Object value = entry.getValue();
+            JSONObject typed = new JSONObject();
+            if (value instanceof String) { typed.put("type", "string"); typed.put("value", value); }
+            else if (value instanceof Boolean) { typed.put("type", "boolean"); typed.put("value", value); }
+            else if (value instanceof Integer) { typed.put("type", "int"); typed.put("value", value); }
+            else if (value instanceof Long) { typed.put("type", "long"); typed.put("value", value); }
+            else if (value instanceof Float) { typed.put("type", "float"); typed.put("value", value); }
+            else if (value instanceof Set) {
+                JSONArray set = new JSONArray();
+                for (Object item : (Set<?>) value) set.put(String.valueOf(item));
+                typed.put("type", "stringSet");
+                typed.put("value", set);
+            } else continue;
+            values.put(entry.getKey(), typed);
+        }
+        root.put("preferences", values);
+        return root;
+    }
+
+    private void writeBackup(Uri uri) {
         try (java.io.OutputStream output = getContentResolver().openOutputStream(uri)) {
             if (output == null) throw new java.io.IOException("Could not open backup destination");
             output.write(buildBackupDocument().toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -3914,22 +3974,26 @@ private void restoreBackupValues(JSONObject values) {
         }
     }
 
-private void showDiagnostics() {
+    private void showDiagnostics() {
         String log = getPrefs().getString(DEBUG_LOG_KEY, "No diagnostics recorded yet.");
         if (log.length() > 12000) log = log.substring(log.length() - 12000);
-        TextView view = text(log, 11, color("#DEE8E0"), false);
+        LinearLayout content = vertical();
+        content.setPadding(dp(14), dp(6), dp(14), dp(16));
+        TextView explanation = text("Recent app/widget events, saves and timer transitions. Select and copy this text when reporting a problem.", 12, color("#687A70"), false);
+        explanation.setLineSpacing(dp(2), 1f);
+        content.addView(explanation);
+        TextView view = text(log, 11, color("#18372E"), false);
         view.setTextIsSelectable(true);
-        view.setPadding(dp(16), dp(12), dp(16), dp(12));
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(color("#111A16"));
-        scroll.addView(view, new ScrollView.LayoutParams(-1, -1));
-
-        new AlertDialog.Builder(this)
-                .setTitle("DayFlow diagnostics")
-                .setView(scroll)
-                .setPositiveButton("Close", null)
-                .show();
+        view.setPadding(dp(12), dp(12), dp(12), dp(12));
+        view.setBackground(bg("#FFFFFF", 12));
+        LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, -2);
+        vp.topMargin = dp(10);
+        content.addView(view, vp);
+        Button refresh = secondaryButton("Refresh log", () -> showDiagnostics());
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(42));
+        rp.topMargin = dp(10);
+        content.addView(refresh, rp);
+        showFullScreenViewer("TROUBLESHOOTING", "Diagnostics", "Recent local logs, with no automatic upload.", content, null, null);
     }
 
 private void clearDay() {
