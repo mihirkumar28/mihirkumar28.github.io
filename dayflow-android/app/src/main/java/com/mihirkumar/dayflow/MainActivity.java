@@ -2284,10 +2284,11 @@ public class MainActivity extends Activity {
         }
 
         final int selectedActiveIndex = activeIndex;
+        final int selectedMovablePending = movablePending;
         showFullScreenViewer("RECOVERY PLANNER", "Catch up",
                 "Review the rules before DayFlow rearranges today's remaining work.", content,
                 "Rebuild remaining day", () -> {
-                    if (movablePending == 0) {
+                    if (selectedMovablePending == 0) {
                         Toast.makeText(this, "No flexible tasks need reflowing.", Toast.LENGTH_SHORT).show();
                         return;
                     }
