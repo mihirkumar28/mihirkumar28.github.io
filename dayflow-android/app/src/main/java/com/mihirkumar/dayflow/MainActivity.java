@@ -43,6 +43,8 @@ public class MainActivity extends Activity {
     private static final String DEBUG_LOG_KEY = "debugLog";
     private static final String DEBUG_TAG = "DayFlow";
     private static final String SYLLABUS_KEY = "syllabusTopics";
+    private static final String SYLLABUS_TARGET_KEY = "syllabusTargetDate";
+    private static final String SYLLABUS_START_KEY = "syllabusStartDate";
     private static final int REQUEST_EXPORT_BACKUP = 4201;
     private static final int REQUEST_IMPORT_BACKUP = 4202;
     private static final String[] SYLLABUS_SUBJECTS = {
@@ -77,11 +79,13 @@ public class MainActivity extends Activity {
         long id;
         String subject, title;
         boolean done;
-        SyllabusTopic(long id, String subject, String title, boolean done) {
+        long completedAt;
+        SyllabusTopic(long id, String subject, String title, boolean done, long completedAt) {
             this.id = id;
             this.subject = subject;
             this.title = title;
             this.done = done;
+            this.completedAt = completedAt;
         }
     }
 
@@ -1335,7 +1339,8 @@ public class MainActivity extends Activity {
                         item.optLong("id", i + 1L),
                         item.optString("subject", "General Studies"),
                         item.optString("title", ""),
-                        item.optBoolean("done", false)));
+                        item.optBoolean("done", false),
+                        item.optLong("completedAt", 0L)));
             }
         } catch (Exception e) {
             debugLog("Syllabus read failed: " + e.getMessage());
@@ -1352,9 +1357,23 @@ public class MainActivity extends Activity {
     }
 
     private String syllabusSummary(ArrayList<SyllabusTopic> topics) {
-        if (topics.isEmpty()) return "Add your own GS, Maths Optional, CSAT, Essay or Interview topics. Progress is calculated from topics you mark complete.";
+        String target = getPrefs().getString(SYLLABUS_TARGET_KEY, "2028-01-01");
+        Date targetDate = parseDateKey(target);
+        Calendar targetCalendar = Calendar.getInstance();
+        if (targetDate != null) targetCalendar.setTime(targetDate);
+        targetCalendar.set(Calendar.HOUR_OF_DAY, 0);
+        targetCalendar.set(Calendar.MINUTE, 0);
+        targetCalendar.set(Calendar.SECOND, 0);
+        targetCalendar.set(Calendar.MILLISECOND, 0);
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        today.set(Calendar.MILLISECOND, 0);
+        long daysLeft = Math.max(0L, (targetCalendar.getTimeInMillis() - today.getTimeInMillis()) / 86400000L);
+        int done = 0, recentlyDone = 0;
+        long weekAgo = System.currentTimeMillis() - 7L * 86400000L;
         LinkedHashMap<String, int[]> counts = new LinkedHashMap<>();
-        int done = 0;
         for (SyllabusTopic topic : topics) {
             int[] values = counts.get(topic.subject);
             if (values == null) {
@@ -1362,33 +1381,114 @@ public class MainActivity extends Activity {
                 counts.put(topic.subject, values);
             }
             values[1]++;
-            if (topic.done) { values[0]++; done++; }
+            if (topic.done) {
+                values[0]++;
+                done++;
+                if (topic.completedAt >= weekAgo) recentlyDone++;
+            }
         }
+        int remaining = Math.max(0, topics.size() - done);
         StringBuilder summary = new StringBuilder();
         summary.append("Overall: ").append(done).append("/").append(topics.size())
-                .append(" complete (").append(Math.round(done * 100f / topics.size())).append("%)");
+                .append(" complete (").append(topics.isEmpty() ? 0 : Math.round(done * 100f / topics.size())).append("%)")
+                .append("\nTarget: ").append(target).append(" • ").append(daysLeft).append(" days left");
+        if (remaining == 0 && !topics.isEmpty()) {
+            summary.append("\nAll topics in your current list are complete.");
+        } else if (!topics.isEmpty() && daysLeft > 0) {
+            summary.append("\nRequired pace: ").append(String.format(Locale.US, "%.2f", remaining / (double) daysLeft))
+                    .append(" topics/day");
+            if (recentlyDone > 0) {
+                double perDay = recentlyDone / 7.0;
+                long projectedDays = (long) Math.ceil(remaining / perDay);
+                Calendar forecast = Calendar.getInstance();
+                forecast.add(Calendar.DAY_OF_YEAR, (int) Math.min(Integer.MAX_VALUE, projectedDays));
+                summary.append("\n7-day pace: ").append(recentlyDone).append(" topics/week")
+                        .append(" • projected finish ").append(new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(forecast.getTime()));
+            } else {
+                summary.append("\nFinish forecast: not enough recent completion history yet.");
+            }
+        }
         for (Map.Entry<String, int[]> entry : counts.entrySet()) {
             int[] values = entry.getValue();
             summary.append("\n").append(entry.getKey()).append(": ").append(values[0]).append("/")
                     .append(values[1]).append(" (").append(Math.round(values[0] * 100f / values[1])).append("%)");
         }
+        if (topics.isEmpty()) summary.append("\nAdd or import topics. Percentages cover your list only, not syllabus items you have not entered.");
         return summary.toString();
+    }
+
+    private void chooseSyllabusTargetDate() {
+        String current = getPrefs().getString(SYLLABUS_TARGET_KEY, "2028-01-01");
+        Date parsed = parseDateKey(current);
+        Calendar c = Calendar.getInstance();
+        if (parsed != null) c.setTime(parsed);
+        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar chosen = Calendar.getInstance();
+            chosen.set(year, month, day, 0, 0, 0);
+            chosen.set(Calendar.MILLISECOND, 0);
+            String key = keyForDate(chosen.getTime());
+            getPrefs().edit().putString(SYLLABUS_TARGET_KEY, key).apply();
+            debugLog("Syllabus target date set: " + key);
+            showSyllabusTracker();
+        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
+        picker.setTitle("Syllabus target date");
+        picker.show();
+    }
+
+    private void importSyllabusTopics() {
+        LinearLayout form = vertical();
+        form.setPadding(dp(18), dp(4), dp(18), dp(4));
+        Spinner subject = new Spinner(this);
+        subject.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, SYLLABUS_SUBJECTS));
+        form.addView(subject, new LinearLayout.LayoutParams(-1, dp(44)));
+        EditText lines = new EditText(this);
+        lines.setGravity(Gravity.TOP);
+        lines.setMinLines(6);
+        lines.setHint("Paste topics, one per line");
+        lines.setTextColor(Color.WHITE);
+        lines.setHintTextColor(color("#697386"));
+        form.addView(lines, new LinearLayout.LayoutParams(-1, dp(160)));
+        new AlertDialog.Builder(this).setTitle("Import topic list")
+                .setMessage("Each non-empty line becomes one topic under the selected subject.")
+                .setView(form).setPositiveButton("Import", (d, w) -> {
+                    String selectedSubject = subject.getSelectedItem().toString();
+                    ArrayList<SyllabusTopic> all = readSyllabusTopics();
+                    HashSet<String> existing = new HashSet<>();
+                    for (SyllabusTopic topic : all) existing.add((topic.subject + "|" + topic.title).toLowerCase(Locale.US));
+                    int added = 0;
+                    for (String raw : lines.getText().toString().split("\\r?\\n")) {
+                        String name = raw.trim();
+                        if (name.isEmpty() || !existing.add((selectedSubject + "|" + name).toLowerCase(Locale.US))) continue;
+                        all.add(new SyllabusTopic(System.currentTimeMillis() + added, selectedSubject, name, false, 0L));
+                        added++;
+                    }
+                    if (added > 0 && !getPrefs().contains(SYLLABUS_START_KEY)) {
+                        getPrefs().edit().putString(SYLLABUS_START_KEY, todayKey()).apply();
+                    }
+                    persistSyllabusTopics(all);
+                    Toast.makeText(this, added + " topics imported.", Toast.LENGTH_SHORT).show();
+                    showSyllabusTracker();
+                }).setNegativeButton("Cancel", null).show();
     }
 
     private void showSyllabusTracker() {
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
-        String[] rows = new String[topics.size() + 1];
-        rows[0] = "＋ Add syllabus topic";
+        String[] rows = new String[topics.size() + 3];
+        rows[0] = "＋ Add one topic";
+        rows[1] = "Import topic list (one topic per line)";
+        rows[2] = "Set target date";
         for (int i = 0; i < topics.size(); i++) {
             SyllabusTopic topic = topics.get(i);
-            rows[i + 1] = (topic.done ? "✓ " : "○ ") + topic.subject + " • " + topic.title;
+            rows[i + 3] = (topic.done ? "✓ " : "○ ") + topic.subject + " • " + topic.title;
         }
         new AlertDialog.Builder(this)
                 .setTitle("Syllabus tracker")
                 .setMessage(syllabusSummary(topics))
                 .setItems(rows, (dialog, which) -> {
                     if (which == 0) editSyllabusTopic(null);
-                    else showSyllabusTopicActions(topics.get(which - 1));
+                    else if (which == 1) importSyllabusTopics();
+                    else if (which == 2) chooseSyllabusTargetDate();
+                    else showSyllabusTopicActions(topics.get(which - 3));
                 })
                 .setNegativeButton("Close", null)
                 .show();
@@ -1400,6 +1500,7 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle(topic.title).setItems(actions, (dialog, which) -> {
             if (which == 0) {
                 topic.done = !topic.done;
+                topic.completedAt = topic.done ? System.currentTimeMillis() : 0L;
                 saveSyllabusTopics();
             } else if (which == 1) {
                 editSyllabusTopic(topic);
@@ -1457,7 +1558,8 @@ public class MainActivity extends Activity {
                     }
                     ArrayList<SyllabusTopic> all = readSyllabusTopics();
                     if (existing == null) {
-                        all.add(new SyllabusTopic(System.currentTimeMillis(), subject.getSelectedItem().toString(), name, false));
+                        if (!getPrefs().contains(SYLLABUS_START_KEY)) getPrefs().edit().putString(SYLLABUS_START_KEY, todayKey()).apply();
+                        all.add(new SyllabusTopic(System.currentTimeMillis(), subject.getSelectedItem().toString(), name, false, 0L));
                     } else {
                         for (SyllabusTopic item : all) {
                             if (item.id == existing.id) {
@@ -1485,6 +1587,7 @@ public class MainActivity extends Activity {
                 item.put("subject", topic.subject);
                 item.put("title", topic.title);
                 item.put("done", topic.done);
+                item.put("completedAt", topic.completedAt);
                 data.put(item);
             }
             getPrefs().edit().putString(SYLLABUS_KEY, data.toString()).apply();
