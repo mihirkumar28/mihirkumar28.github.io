@@ -2856,22 +2856,54 @@ public class MainActivity extends Activity {
                     .show();
             return;
         }
+
         ScreenTimeTracker.refreshRecentDays(this, 14);
         java.util.TreeSet<String> historyDates = new java.util.TreeSet<>(Collections.reverseOrder());
         for (String prefKey : getPrefs().getAll().keySet()) {
             if (prefKey.startsWith("screenTimeMs_")) {
-                historyDates.add(prefKey.substring("screenTimeMs_".length()));
+                String key = prefKey.substring("screenTimeMs_".length());
+                if (key.matches("\\d{4}-\\d{2}-\\d{2}")) historyDates.add(key);
             }
         }
-        // Include recent dates even when Android has not supplied a usable snapshot yet.
         for (int i = 0; i < 14; i++) {
             Calendar day = Calendar.getInstance();
             day.add(Calendar.DAY_OF_YEAR, -i);
             historyDates.add(keyForDate(day.getTime()));
         }
 
-        StringBuilder report = new StringBuilder("Phone screen-interactive time • saved locally\n");
-        report.append("Showing all stored dates plus the most recent 14 days.\n\n");
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        today.set(Calendar.MILLISECOND, 0);
+        Calendar weekStart = (Calendar) today.clone();
+        weekStart.add(Calendar.DAY_OF_YEAR, -6);
+        Calendar monthStart = (Calendar) today.clone();
+        monthStart.add(Calendar.DAY_OF_YEAR, -29);
+        String weekStartKey = keyForDate(weekStart.getTime());
+        String monthStartKey = keyForDate(monthStart.getTime());
+
+        long weekTotal = 0L, monthTotal = 0L;
+        int weekDays = 0, monthDays = 0;
+        for (String key : historyDates) {
+            long value = ScreenTimeTracker.getStoredMillis(this, key);
+            if (value < 0) continue;
+            if (key.compareTo(weekStartKey) >= 0) {
+                weekTotal += value;
+                weekDays++;
+            }
+            if (key.compareTo(monthStartKey) >= 0) {
+                monthTotal += value;
+                monthDays++;
+            }
+        }
+
+        StringBuilder report = new StringBuilder("PHONE SCREEN-INTERACTIVE TIME • SAVED LOCALLY\n");
+        report.append("Last 7 calendar days: ").append(ScreenTimeTracker.formatDuration(weekTotal))
+                .append(" (").append(weekDays).append(" recorded days)\n");
+        report.append("Last 30 calendar days: ").append(ScreenTimeTracker.formatDuration(monthTotal))
+                .append(" (").append(monthDays).append(" recorded days)\n\n");
+        report.append("DAILY HISTORY • ").append(historyDates.size()).append(" dates\n\n");
         for (String key : historyDates) {
             Date day = parseDateKey(key);
             String label = day == null ? key
@@ -2887,7 +2919,8 @@ public class MainActivity extends Activity {
             }
             report.append("\n");
         }
-        report.append("\nAndroid retains detailed screen events only for a limited recent period. DayFlow keeps each daily total it has saved, but cannot recreate older totals that Android no longer provides.");
+        report.append("\nAndroid retains raw screen events only for a limited recent period. DayFlow keeps each daily total it has already saved, but cannot recreate older totals that Android no longer provides.");
+
         TextView view = text(report.toString(), 13, color("#D7DFED"), false);
         view.setPadding(dp(16), dp(12), dp(16), dp(12));
         view.setTextIsSelectable(true);
