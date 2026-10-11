@@ -3795,9 +3795,13 @@ public class MainActivity extends Activity {
             ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(ciBtn, ml);
             ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(coBtn, ml);
 
-            AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Edit attendance")
-                    .setView(content).setPositiveButton("Done", (d, w) -> { saveOfficeDay(day); render(); })
-                    .show();
+            showFullScreenEditor("OFFICE RECORD", "Edit attendance",
+                    "Correct the exact timestamps. These records are separate from the daily plan.", content, () -> {
+                        saveOfficeDay(day);
+                        render();
+                        renderOfficePage();
+                        return true;
+                    });
 
             inBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "officeIn", session, inBtn));
             outBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "officeOut", session, outBtn));
