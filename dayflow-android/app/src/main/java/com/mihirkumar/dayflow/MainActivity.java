@@ -273,13 +273,51 @@ public class MainActivity extends Activity {
     }
 
     private int color(String hex) {
-        return Color.parseColor(hex);
+        String key = hex == null ? "" : hex.toUpperCase(Locale.US);
+        switch (key) {
+            case "#0D1512": case "#0B0D12": case "#0F131C": case "#111A16":
+                return Color.parseColor("#F4F6F1");
+            case "#131D18": case "#152019": case "#1B2621":
+                return Color.parseColor("#EAF0E9");
+            case "#17231D": case "#1B2922": case "#18231E":
+                return Color.parseColor("#FFFFFF");
+            case "#23352C": case "#283A30": case "#263243": case "#202936":
+                return Color.parseColor("#E6EEE7");
+            case "#23845F": case "#40B58A": case "#27513E": case "#245B45":
+            case "#243F34": case "#2C8061": case "#3F8E69":
+                return Color.parseColor("#286B55");
+            case "#70D6A5": case "#6BD0A6": case "#7DD6B2": case "#6FD6A3":
+            case "#65C5A0": case "#40B58A":
+                return Color.parseColor("#2E8060");
+            case "#203E30": case "#172B22": case "#DCEBE3":
+                return Color.parseColor("#DCEBE2");
+            case "#3A2729": case "#B84B5C":
+                return Color.parseColor("#F8E8E6");
+            case "#D5B56E": return Color.parseColor("#A76821");
+            case "#F2F7F3": case "#F1F6F2": case "#F5FBF7": case "#F5F6F1":
+                return Color.parseColor("#18372E");
+            case "#D6E4DA": case "#D6E1D8": case "#DCE2EE": case "#B7C7BC":
+                return Color.parseColor("#496257");
+            case "#9AABA0": case "#91A197": case "#82948A": case "#A5B5AA":
+            case "#A8B0C2": case "#8A9A90": case "#8E98AA": case "#AEB7C9":
+            case "#B7C7BC": return Color.parseColor("#687A70");
+            case "#FFC5C9": return Color.parseColor("#B44248");
+            case "#D2F1E2": return Color.parseColor("#DDECE2");
+            case "#FFFFFF": return Color.WHITE;
+            default: return Color.parseColor(hex);
+        }
     }
 
     private GradientDrawable bg(String hex, float radius) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(color(hex));
         g.setCornerRadius(dp(radius));
+        String key = hex == null ? "" : hex.toUpperCase(Locale.US);
+        if (!key.equals("#23845F") && !key.equals("#40B58A") && !key.equals("#27513E")
+                && !key.equals("#245B45") && !key.equals("#70D6A5") && !key.equals("#6BD0A6")
+                && !key.equals("#7DD6B2") && !key.equals("#65C5A0") && !key.equals("#B84B5C")) {
+            g.setStroke(dp(1), color("#DDE6DE"));
+        }
         return g;
     }
 
@@ -287,7 +325,7 @@ public class MainActivity extends Activity {
         TextView t = new TextView(this);
         t.setText(value);
         t.setTextSize(sp);
-        t.setTextColor(c);
+        t.setTextColor(c == Color.WHITE ? color("#18372E") : c);
         t.setTypeface(Typeface.DEFAULT, bold ? Typeface.BOLD : Typeface.NORMAL);
         return t;
     }
@@ -420,12 +458,15 @@ public class MainActivity extends Activity {
     }
 
     private void buildBottomNavigation(LinearLayout shell) {
-        bottomNavigation=horizontal();bottomNavigation.setGravity(Gravity.CENTER);bottomNavigation.setPadding(dp(6),dp(7),dp(6),dp(8));bottomNavigation.setBackgroundColor(color("#131D18"));
-        String[][] items={{"⌂","Home","home"},{"▤","Plan","plan"},{"◔","Progress","progress"},{"◷","Office","office"},{"•••","More","more"}};
+        bottomNavigation=horizontal();
+        bottomNavigation.setGravity(Gravity.CENTER);
+        bottomNavigation.setPadding(dp(8),dp(7),dp(8),dp(8));
+        bottomNavigation.setBackgroundColor(Color.WHITE);
+        String[][] items={{"⌂","Today","home"},{"▤","Plan","plan"},{"◔","Study","progress"},{"◷","Office","office"},{"•••","More","more"}};
         for(String[] item:items){
-            LinearLayout tab=vertical();tab.setGravity(Gravity.CENTER);tab.setPadding(dp(2),dp(5),dp(2),dp(4));
-            TextView icon=text(item[0],19,color("#91A197"),true);icon.setGravity(Gravity.CENTER);
-            TextView label=text(item[1],10,color("#91A197"),true);label.setGravity(Gravity.CENTER);
+            LinearLayout tab=vertical();tab.setGravity(Gravity.CENTER);tab.setPadding(dp(3),dp(5),dp(3),dp(4));
+            TextView icon=text(item[0],19,color("#687A70"),true);icon.setGravity(Gravity.CENTER);
+            TextView label=text(item[1],10,color("#687A70"),true);label.setGravity(Gravity.CENTER);
             tab.addView(icon);tab.addView(label);tab.setContentDescription(item[1]);tab.setOnClickListener(v->switchPage(item[2]));
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.leftMargin=dp(2);lp.rightMargin=dp(2);bottomNavigation.addView(tab,lp);navItems.put(item[2],label);
         }
@@ -670,33 +711,51 @@ public class MainActivity extends Activity {
 
     private void renderBottomNavOnly() {
         String tab=activePage.equals("syllabus")||activePage.equals("screenTime")?"progress":activePage;
-        for(Map.Entry<String,TextView> e:navItems.entrySet()){boolean sel=e.getKey().equals(tab);e.getValue().setTextColor(color(sel?"#6BD0A6":"#91A197"));((View)e.getValue().getParent()).setBackground(bg(sel?"#203E30":"#131D18",14));}
+        for(Map.Entry<String,TextView> e:navItems.entrySet()){
+            boolean selected=e.getKey().equals(tab);
+            int foreground=color(selected?"#286B55":"#687A70");
+            e.getValue().setTextColor(foreground);
+            View parent=(View)e.getValue().getParent();
+            parent.setBackground(bg(selected?"#DCEBE2":"#FFFFFF",14));
+            if(parent instanceof LinearLayout){
+                LinearLayout item=(LinearLayout)parent;
+                if(item.getChildCount()>0 && item.getChildAt(0) instanceof TextView)
+                    ((TextView)item.getChildAt(0)).setTextColor(foreground);
+            }
+        }
     }
 
     private void buildHeader() {
         LinearLayout top = horizontal();
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
-        tp.bottomMargin = dp(8);
+        tp.bottomMargin = dp(12);
         root.addView(top, tp);
 
-        TextView appName = text("DayFlow", 25, Color.WHITE, true);
-        top.addView(appName, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout brand = vertical();
+        TextView eyebrow = text("DAYFLOW  /  YOUR DAY", 10, color("#2E8060"), true);
+        eyebrow.setLetterSpacing(0.12f);
+        brand.addView(eyebrow);
+        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        String greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+        TextView title = text(greeting, 26, Color.WHITE, true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.topMargin = dp(3);
+        brand.addView(title, titleLp);
+        brand.addView(text("Make the next block count.", 12, color("#687A70"), false));
+        top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
 
-        Button manage = actionButton("Manage", color("#D6E4DA"), "#1B2621");
-        manage.setTextSize(11);manage.setContentDescription("Open tools and preferences");manage.setOnClickListener(v -> switchPage("more"));
-        LinearLayout.LayoutParams manageLp = new LinearLayout.LayoutParams(dp(66), dp(42));manageLp.rightMargin = dp(5);top.addView(manage, manageLp);
-        Button syllabus = actionButton("Study", color("#D6E4DA"), "#1B2621");
-        syllabus.setTextSize(11);syllabus.setContentDescription("Open syllabus and interview progress");syllabus.setOnClickListener(v -> showSyllabusTracker());
-        LinearLayout.LayoutParams syllabusLp = new LinearLayout.LayoutParams(dp(54), dp(42));syllabusLp.rightMargin = dp(5);top.addView(syllabus, syllabusLp);
-        Button add = actionButton("＋", Color.WHITE, "#23845F");add.setTextSize(21);add.setContentDescription("Add block");add.setOnClickListener(v -> openAddDialog());
-        top.addView(add, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        Button add = actionButton("＋", Color.WHITE, "#23845F");
+        add.setTextSize(22);
+        add.setContentDescription("Add block");
+        add.setOnClickListener(v -> openAddDialog());
+        top.addView(add, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
         LinearLayout nav = horizontal();
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, dp(42));
-        np.bottomMargin = dp(14);
+        np.bottomMargin = dp(13);
         root.addView(nav, np);
 
-        Button prev = actionButton("‹", Color.WHITE, "#1B2621");
+        Button prev = actionButton("‹", color("#496257"), "#EAF0E9");
         prev.setTextSize(24);
         prev.setContentDescription("Previous day");
         prev.setOnClickListener(v -> changeSelectedDate(-1));
@@ -708,7 +767,7 @@ public class MainActivity extends Activity {
         dateView.setOnClickListener(v -> openDatePicker());
         nav.addView(dateView, new LinearLayout.LayoutParams(0, -2, 1));
 
-        Button next = actionButton("›", Color.WHITE, "#1B2621");
+        Button next = actionButton("›", color("#496257"), "#EAF0E9");
         next.setTextSize(24);
         next.setContentDescription("Next day");
         next.setOnClickListener(v -> changeSelectedDate(1));
