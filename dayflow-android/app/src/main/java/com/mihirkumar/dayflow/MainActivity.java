@@ -56,7 +56,7 @@ public class MainActivity extends Activity {
 
     private LinearLayout root, timeline, officeCard;
     private TextView dateView, modeView, completionView, progressPercent;
-    private TextView currentTitle, currentTime, currentCountdown, plannedView, doneView;
+    private TextView currentTitle, currentTime, currentCountdown, plannedView, doneView, studyActualView;
     private TextView officeStatus, officeTimes, commuteView;
     private Button officeAction, commuteAction, focusAction;
     private String mode = "wfh";
@@ -190,6 +190,10 @@ public class MainActivity extends Activity {
         if (h == 0) return m + "m";
         if (m == 0) return h + "h";
         return h + "h " + m + "m";
+    }
+
+    private String fmtMillisForLabel(long ms) {
+        return fmtShort((int) Math.min(Integer.MAX_VALUE, Math.max(0L, ms / 60000L)));
     }
 
     private String fmtMillis(long ms) {
@@ -465,7 +469,7 @@ public class MainActivity extends Activity {
 
     private void buildTodaySummary() {
         LinearLayout summary = horizontal();
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(72));
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(90));
         sp.bottomMargin = dp(14);
         root.addView(summary, sp);
 
@@ -474,6 +478,8 @@ public class MainActivity extends Activity {
         progressPercent = text("0% of the plan", 12, color("#7F899D"), false);
         left.addView(completionView);
         left.addView(progressPercent);
+        studyActualView = text("Study actual 0m / 0m planned", 11, color("#8E98AA"), false);
+        left.addView(studyActualView);
         summary.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
 
         LinearLayout metricBox = horizontal();
@@ -595,21 +601,30 @@ public class MainActivity extends Activity {
             }
         }
 
-        int total = blocks.size(), done = 0, plannedMinutes = 0;
-        long actualFocusMs = 0L;
+        int total = blocks.size(), done = 0, plannedMinutes = 0, plannedStudyMinutes = 0;
+        long actualFocusMs = 0L, actualStudyMs = 0L;
         long metricsNow = System.currentTimeMillis();
         for (Block b : blocks) {
             int d = Math.max(0, mins(b.end) - mins(b.start));
             plannedMinutes += d;
             if ("done".equals(b.status)) done++;
-            actualFocusMs += getActualDuration(b, metricsNow);
+            long actual = getActualDuration(b, metricsNow);
+            actualFocusMs += actual;
+            if (isStudyBlock(b.title)) {
+                plannedStudyMinutes += d;
+                actualStudyMs += actual;
+            }
         }
 
         completionView.setText(done + " / " + total + " complete");
         int percent = total == 0 ? 0 : Math.round(done * 100f / total);
         progressPercent.setText(percent + "% of plan • " + syllabusProgressLabel());
         plannedView.setText(fmtShort(plannedMinutes));
-        doneView.setText(fmtPreciseMillis(actualFocusMs) + " actual");
+        doneView.setText(fmtPreciseMillis(actualFocusMs) + " focus");
+        if (studyActualView != null) {
+            studyActualView.setText("Study actual " + fmtMillisForLabel(actualStudyMs)
+                    + " / " + fmtShort(plannedStudyMinutes) + " planned");
+        }
 
         updateCurrentCard(current, next, nowMins);
         renderOfficeCard();
@@ -812,6 +827,14 @@ public class MainActivity extends Activity {
         }
 
         card.setOnClickListener(v -> showBlockOptions(b));
+    }
+
+    private boolean isStudyBlock(String title) {
+        String value = title == null ? "" : title.toLowerCase(Locale.US);
+        return value.contains("gs") || value.contains("general studies") || value.contains("math")
+                || value.contains("optional") || value.contains("csat") || value.contains("essay")
+                || value.contains("upsc") || value.contains("revision") || value.contains("interview prep")
+                || value.contains("study") || value.contains("syllabus");
     }
 
     private String priorityLabel(String value) {
@@ -1305,42 +1328,112 @@ public class MainActivity extends Activity {
 
     private void editBlockDialog(Block b) {
         LinearLayout form = vertical();
-        form.setPadding(dp(20), 0, dp(20), 0);
-
+        form.setPadding(dp(20), dp(4), dp(20), dp(4));
         EditText title = new EditText(this);
         title.setSingleLine(true);
         title.setText(b.title);
+        title.setHint("Block name");
         title.setTextColor(Color.WHITE);
-        form.addView(title, new LinearLayout.LayoutParams(-1, dp(52)));
+        title.setHintTextColor(color("#697386"));
+        form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
+        final int[] start = {mins(b.start)};
+        final int[] end = {mins(b.end)};
+        Button startButton = chip("Start • " + time12(b.start));
+        Button endButton = chip("End • " + time12(b.end));
+        LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(-1, dp(40));
+        startLp.topMargin = dp(8);
+        form.addView(startButton, startLp);
+        LinearLayout.LayoutParams endLp = new LinearLayout.LayoutParams(-1, dp(40));
+        endLp.topMargin = dp(6);
+        form.addView(endButton, endLp);
+        startButton.setOnClickListener(v -> {
+            TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
+                start[0] = h * 60 + m;
+                startButton.setText("Start • " + time12(toTime(start[0])));
+            }, start[0] / 60, start[0] % 60, true);
+            picker.show();
+        });
+        endButton.setOnClickListener(v -> {
+            TimePickerDialog picker = new TimePickerDialog(this, (tv, h, m) -> {
+                end[0] = h * 60 + m;
+                endButton.setText("End • " + time12(toTime(end[0])));
+            }, end[0] / 60, end[0] % 60, true);
+            picker.show();
+        });
 
-        TextView timing = text("Current: " + time12(b.start) + " – " + time12(b.end), 12, color("#8E98AA"), false);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
-        tp.topMargin = dp(8);
-        form.addView(timing, tp);
+        TextView rigidityLabel = text("RIGIDITY", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams rigidityLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        rigidityLabelLp.topMargin = dp(12);
+        form.addView(rigidityLabel, rigidityLabelLp);
+        LinearLayout rigidities = horizontal();
+        form.addView(rigidities, new LinearLayout.LayoutParams(-1, dp(40)));
+        String[] rigidityNames = {"Fixed time", "Flexible time"};
+        String[] rigidityValues = {"fixed", "flexible"};
+        String[] selectedRigidity = {b.rigidity};
+        for (int i = 0; i < rigidityNames.length; i++) {
+            final int idx = i;
+            Button button = chip(rigidityNames[i]);
+            boolean selected = rigidityValues[i].equals(selectedRigidity[0]);
+            button.setTextColor(selected ? Color.WHITE : color("#AEB7C9"));
+            button.setBackground(bg(selected ? "#413B73" : "#151A27", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+            if (i > 0) lp.leftMargin = dp(6);
+            rigidities.addView(button, lp);
+            button.setOnClickListener(v -> {
+                selectedRigidity[0] = rigidityValues[idx];
+                for (int j = 0; j < rigidities.getChildCount(); j++) {
+                    Button child = (Button) rigidities.getChildAt(j);
+                    child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
 
-        new AlertDialog.Builder(this)
-                .setTitle("Edit block")
-                .setView(form)
-                .setPositiveButton("Change time", (d, w) -> {
-                    TimePickerDialog start = new TimePickerDialog(this, (v, h, m) -> {
-                        int s = h * 60 + m;
-                        TimePickerDialog end = new TimePickerDialog(this, (v2, h2, m2) -> {
-                            int e = h2 * 60 + m2;
-                            if (e <= s) {
-                                Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
-                                return;
-                            }
-                            String name = title.getText().toString().trim();
-                            if (!name.isEmpty()) b.title = name;
-                            b.start = toTime(s);
-                            b.end = toTime(e);
-                            save();
-                        }, mins(b.end) / 60, mins(b.end) % 60, true);
-                        end.setTitle("New end time");
-                        end.show();
-                    }, mins(b.start) / 60, mins(b.start) % 60, true);
-                    start.setTitle("New start time");
-                    start.show();
+        TextView priorityTitle = text("PRIORITY", 10, color("#6F7C91"), true);
+        LinearLayout.LayoutParams priorityTitleLp = new LinearLayout.LayoutParams(-1, -2);
+        priorityTitleLp.topMargin = dp(10);
+        form.addView(priorityTitle, priorityTitleLp);
+        LinearLayout priorities = horizontal();
+        form.addView(priorities, new LinearLayout.LayoutParams(-1, dp(40)));
+        String[] priorityNames = {"Critical", "Important", "Normal", "Optional"};
+        String[] priorityValues = {"critical", "important", "normal", "optional"};
+        String[] selectedPriority = {b.priority};
+        for (int i = 0; i < priorityNames.length; i++) {
+            final int idx = i;
+            Button button = chip(priorityNames[i]);
+            boolean selected = priorityValues[i].equals(selectedPriority[0]);
+            button.setTextColor(selected ? Color.WHITE : color("#AEB7C9"));
+            button.setBackground(bg(selected ? "#413B73" : "#151A27", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+            if (i > 0) lp.leftMargin = dp(4);
+            priorities.addView(button, lp);
+            button.setOnClickListener(v -> {
+                selectedPriority[0] = priorityValues[idx];
+                for (int j = 0; j < priorities.getChildCount(); j++) {
+                    Button child = (Button) priorities.getChildAt(j);
+                    child.setTextColor(j == idx ? Color.WHITE : color("#AEB7C9"));
+                    child.setBackground(bg(j == idx ? "#413B73" : "#151A27", 12));
+                }
+            });
+        }
+        new AlertDialog.Builder(this).setTitle("Edit block").setView(form)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String name = title.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        Toast.makeText(this, "Give this block a name.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (end[0] <= start[0]) {
+                        Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    stopFocusForBlock(b, System.currentTimeMillis());
+                    b.title = name;
+                    b.start = toTime(start[0]);
+                    b.end = toTime(end[0]);
+                    b.rigidity = selectedRigidity[0];
+                    b.priority = selectedPriority[0];
+                    save();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
