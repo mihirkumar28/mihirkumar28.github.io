@@ -642,7 +642,7 @@ public class MainActivity extends Activity {
             LinearLayout details=vertical();details.setPadding(dp(9),0,dp(3),0);details.addView(text(topic.title,13,color("#F2F7F3"),true));details.addView(text(topic.subject+(topic.done?" • Complete":" • Pending"),10,color("#9AABA0"),false));row.addView(details,new LinearLayout.LayoutParams(0,-2,1));
             Button more=secondaryButton("⋮",()->showSyllabusTopicActions(topic));row.addView(more,new LinearLayout.LayoutParams(dp(36),dp(36)));
             toggle.setOnClickListener(v->{topic.done=!topic.done;topic.completedAt=topic.done?System.currentTimeMillis():0L;persistSyllabusTopics(readSyllabusTopicsWith(topic));});
-            details.setOnClickListener(v->{syllabusFilter=topic.subject;syllabusQuery=topic.title;switchPage("syllabus");});
+            details.setOnClickListener(v -> editSyllabusTopic(topic));
         }
         if(shown==0)syllabusList.addView(text("No topics match these filters. Try All or clear the search.",13,color("#9AABA0"),false));
     }
@@ -782,34 +782,39 @@ public class MainActivity extends Activity {
     }
 
     private void buildModeRow() {
+        LinearLayout wrapper = vertical();
+        LinearLayout.LayoutParams wrapperLp = new LinearLayout.LayoutParams(-1, -2);
+        wrapperLp.bottomMargin = dp(14);
+        root.addView(wrapper, wrapperLp);
+        modeView = text("DAY TYPE", 10, color("#687A70"), true);
+        wrapper.addView(modeView);
         LinearLayout row = horizontal();
-        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(44));
-        rp.bottomMargin = dp(14);
-        root.addView(row, rp);
-
-        modeView = text("", 12, color("#A5B5AA"), false);
-        row.addView(modeView, new LinearLayout.LayoutParams(0, -2, 1));
-
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(42));
+        rp.topMargin = dp(6);
+        wrapper.addView(row, rp);
         String[] modes = {"WFH", "Office", "Weekend"};
         for (String item : modes) {
+            String modeKey = item.toLowerCase(Locale.US);
             Button b = chip(item);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(item.equals("Weekend") ? 78 : 68), dp(38));
-            lp.leftMargin = dp(6);
+            b.setTag("mode-chip-" + modeKey);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1);
+            if (row.getChildCount() > 0) lp.leftMargin = dp(6);
             row.addView(b, lp);
-            b.setTag(item.toLowerCase(Locale.US));
-            b.setOnClickListener(v -> chooseMode((String) v.getTag()));
+            b.setContentDescription(item + " day");
+            b.setOnClickListener(v -> chooseMode(modeKey));
         }
     }
 
     private void buildCurrentCard() {
         LinearLayout card = vertical();
-        card.setPadding(dp(18), dp(18), dp(18), dp(18));
-        card.setBackground(bg("#1B2922", 20));
+        card.setPadding(dp(18), dp(18), dp(18), dp(16));
+        card.setBackground(bg("#DCEBE2", 20));
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.bottomMargin = dp(14);
         root.addView(card, cp);
 
-        TextView label = text("RIGHT NOW", 11, color("#7DD6B2"), true);
+        TextView label = text("CURRENT TASK", 10, color("#2E8060"), true);
+        label.setLetterSpacing(0.12f);
         card.addView(label);
 
         currentTitle = text("Loading…", 24, Color.WHITE, true);
@@ -821,28 +826,27 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
         rp.topMargin = dp(8);
         card.addView(row, rp);
-
-        currentTime = text("—", 13, color("#A5B5AA"), false);
-        currentCountdown = text("—", 13, color("#FFFFFF"), true);
+        currentTime = text("—", 13, color("#496257"), false);
+        currentCountdown = text("—", 13, color("#18372E"), true);
         row.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1));
         row.addView(currentCountdown);
 
-        Button markDone = actionButton("Mark done", Color.WHITE, "#40B58A");
-        LinearLayout.LayoutParams doneLp = new LinearLayout.LayoutParams(-1, dp(46));
-        doneLp.topMargin = dp(16);
-        card.addView(markDone, doneLp);
-        markDone.setTag("currentDone");
-        markDone.setOnClickListener(v -> completeCurrent());
-
-        focusAction = actionButton("Start focus", color("#D6E4DA"), "#263A31");
-        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(40));
-        focusLp.topMargin = dp(8);
+        focusAction = actionButton("Start focus", Color.WHITE, "#23845F");
+        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(46));
+        focusLp.topMargin = dp(16);
         card.addView(focusAction, focusLp);
         focusAction.setTag("focusAction");
         focusAction.setOnClickListener(v -> toggleFocusCurrent());
 
-        Button recover = actionButton("Catch up", color("#D2F1E2"), "#27513E");
-        LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(-1, dp(42));
+        Button markDone = actionButton("Mark complete", color("#496257"), "#FFFFFF");
+        LinearLayout.LayoutParams doneLp = new LinearLayout.LayoutParams(-1, dp(42));
+        doneLp.topMargin = dp(8);
+        card.addView(markDone, doneLp);
+        markDone.setTag("currentDone");
+        markDone.setOnClickListener(v -> completeCurrent());
+
+        Button recover = actionButton("Catch up", color("#496257"), "#FFFFFF");
+        LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(-1, dp(40));
         recLp.topMargin = dp(8);
         card.addView(recover, recLp);
         recover.setTag("recoveryButton");
@@ -851,7 +855,9 @@ public class MainActivity extends Activity {
 
     private void buildTodaySummary() {
         LinearLayout summary = horizontal();
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(90));
+        summary.setPadding(dp(14), dp(12), dp(14), dp(12));
+        summary.setBackground(surfaceCard().getBackground());
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(104));
         sp.bottomMargin = dp(14);
         root.addView(summary, sp);
 
@@ -962,7 +968,15 @@ public class MainActivity extends Activity {
         dateView.setText(date);
 
         String modeLabel = mode.equals("office") ? "Office" : mode.equals("weekend") ? "Weekend" : "WFH";
-        modeView.setText("TODAY • " + modeLabel);
+        modeView.setText("DAY TYPE");
+        for (String key : new String[]{"wfh", "office", "weekend"}) {
+            View modeChoice = root.findViewWithTag("mode-chip-" + key);
+            if (modeChoice instanceof Button) {
+                boolean selectedMode = mode.equals(key);
+                ((Button) modeChoice).setTextColor(selectedMode ? Color.WHITE : color("#496257"));
+                modeChoice.setBackground(bg(selectedMode ? "#286B55" : "#FFFFFF", 12));
+            }
+        }
         View headerMode = root.findViewWithTag("modeHeader");
         if (headerMode instanceof TextView) ((TextView) headerMode).setText(modeLabel.toUpperCase(Locale.US));
 
@@ -1170,13 +1184,13 @@ public class MainActivity extends Activity {
 
         String surface, border;
         if ("done".equals(b.status)) {
-            surface = "#111A16"; border = "#40976D";
+            surface = "#EAF0E9"; border = "#2E8060";
         } else if ("skipped".equals(b.status)) {
-            surface = "#171214"; border = "#5C3038";
+            surface = "#F8E8E6"; border = "#B44248";
         } else if (current) {
-            surface = "#254C3C"; border = "#40B58A";
+            surface = "#DCEBE2"; border = "#286B55";
         } else {
-            surface = "#1B2621"; border = "#2D3C34";
+            surface = "#FFFFFF"; border = "#DDE6DE";
         }
 
         GradientDrawable cardBg = bg(surface, 16);
