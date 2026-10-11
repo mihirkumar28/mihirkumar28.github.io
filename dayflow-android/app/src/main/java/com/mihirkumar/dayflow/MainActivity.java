@@ -656,7 +656,7 @@ public class MainActivity extends Activity {
     private void updateCurrentCard(Block current, Block next, int nowMins) {
         View doneButton = root.findViewWithTag("currentDone");
         View recoveryButton = root.findViewWithTag("recoveryButton");
-        View focusButton = root.findViewWithTag("focusAction");
+        Button focusButton = (Button) root.findViewWithTag("focusAction");
         boolean viewingToday = selectedDateKey.equals(todayKey());
         if (!viewingToday) {
             currentTitle.setText(selectedDateKey.compareTo(todayKey()) < 0 ? "Historical day" : "Planned day");
