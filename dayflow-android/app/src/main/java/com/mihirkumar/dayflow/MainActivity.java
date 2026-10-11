@@ -297,8 +297,10 @@ public class MainActivity extends Activity {
             case "#B44248": case "#FFC5C9":
                 return Color.parseColor("#B44248");
             case "#D5B56E": return Color.parseColor("#A76821");
-            case "#F2F7F3": case "#F1F6F2": case "#F5FBF7": case "#F5F6F1":
+            case "#F2F7F3": case "#F1F6F2": case "#F5F6F1":
                 return Color.parseColor("#18372E");
+            case "#F5FBF7":
+                return Color.WHITE;
             case "#D6E4DA": case "#D6E1D8": case "#DCE2EE": case "#DCE7DF":
                 return Color.parseColor("#496257");
             case "#9AABA0": case "#91A197": case "#82948A": case "#A5B5AA":
@@ -326,8 +328,10 @@ public class MainActivity extends Activity {
                 return Color.WHITE;
             case "#23845F": case "#40B58A": case "#27513E": case "#245B45":
             case "#243F34": case "#2C8061": case "#3F8E69": case "#286B55":
-            case "#2E8060": case "#B84B5C": case "#B44248":
+            case "#2E8060":
                 return Color.parseColor("#286B55");
+            case "#B84B5C": case "#B44248":
+                return Color.parseColor("#B44248");
             case "#70D6A5": case "#6BD0A6": case "#7DD6B2": case "#6FD6A3":
             case "#65C5A0": case "#203E30": case "#172B22": case "#DCEBE3":
             case "#D2F1E2": case "#DCEBE2":
