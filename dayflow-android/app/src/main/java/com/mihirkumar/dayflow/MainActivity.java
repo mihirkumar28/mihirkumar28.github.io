@@ -573,34 +573,110 @@ public class MainActivity extends Activity {
     }
 
     private void renderPlanPage() {
-        if(planList==null)return;
-        TextView date=(TextView)pagePlan.findViewWithTag("planDate");
-        if(date!=null){
-            Date d=parseDateKey(selectedDateKey);
-            String dayState=selectedDateKey.equals(todayKey())?"TODAY":selectedDateKey.compareTo(todayKey())<0?"PAST":"PLANNED";
-            date.setText((d==null?selectedDateKey:new SimpleDateFormat("EEE, d MMM",Locale.getDefault()).format(d))+"  •  "+dayState);
+        if (planList == null) return;
+        TextView date = (TextView) pagePlan.findViewWithTag("planDate");
+        if (date != null) {
+            Date d = parseDateKey(selectedDateKey);
+            String dayState = selectedDateKey.equals(todayKey()) ? "TODAY"
+                    : selectedDateKey.compareTo(todayKey()) < 0 ? "PAST" : "PLANNED";
+            date.setText((d == null ? selectedDateKey
+                    : new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(d)) + "  •  " + dayState);
         }
-        for(String key:new String[]{"wfh","office","weekend"}){
-            View choice=pagePlan.findViewWithTag("plan-mode-chip-"+key);
-            if(choice instanceof Button){
-                boolean selected=mode.equals(key);
-                ((Button)choice).setTextColor(selected?Color.WHITE:color("#496257"));
-                choice.setBackground(bg(selected?"#286B55":"#FFFFFF",12));
+        for (String key : new String[]{"wfh", "office", "weekend"}) {
+            View choice = pagePlan.findViewWithTag("plan-mode-chip-" + key);
+            if (choice instanceof Button) {
+                boolean selected = mode.equals(key);
+                ((Button) choice).setTextColor(selected ? Color.WHITE : color("#496257"));
+                choice.setBackground(bg(selected ? "#286B55" : "#FFFFFF", 12));
             }
         }
+
         planList.removeAllViews();
-        ArrayList<Block> ordered=new ArrayList<>(blocks);
-        Collections.sort(ordered,Comparator.comparingInt(b->mins(b.start)));
-        if(ordered.isEmpty()){planList.addView(text("Nothing planned yet. Add a block or load a saved routine.",14,color("#9AABA0"),false));return;}
-        for(Block block:ordered){
-            LinearLayout card=surfaceCard();LinearLayout row=horizontal();row.setGravity(Gravity.TOP);
-            LinearLayout time=vertical();time.addView(text(time12(block.start),12,color("#6BD0A6"),true));time.addView(text(time12(block.end),10,color("#8A9A90"),false));row.addView(time,new LinearLayout.LayoutParams(dp(72),-2));
-            LinearLayout details=vertical();details.addView(text(block.title,15,color("#F1F6F2"),true));details.addView(text(blockBehaviorLabel(block)+"  •  "+fmt(mins(block.end)-mins(block.start)),11,color("#9AABA0"),false));
-            String status="done".equals(block.status)?"Completed":"skipped".equals(block.status)?"Skipped":"Pending";details.addView(text(status,10,"done".equals(block.status)?color("#6BD0A6"):color("#9AABA0"),true));row.addView(details,new LinearLayout.LayoutParams(0,-2,1));
-            row.addView(secondaryButton("•••",()->showBlockOptions(block)),new LinearLayout.LayoutParams(dp(45),dp(38)));card.addView(row);
-            if("pending".equals(block.status)){Button done=primaryButton("Mark complete",()->{stopFocusForBlock(block,System.currentTimeMillis());block.status="done";save();});LinearLayout.LayoutParams dlp=new LinearLayout.LayoutParams(-1,dp(40));dlp.topMargin=dp(10);card.addView(done,dlp);}
-            else if("done".equals(block.status)){Button undo=secondaryButton("Undo completion",()->{block.status="pending";save();});LinearLayout.LayoutParams ulp=new LinearLayout.LayoutParams(-1,dp(38));ulp.topMargin=dp(8);card.addView(undo,ulp);}
-            row.setOnClickListener(v->showBlockOptions(block));planList.addView(card);
+        ArrayList<Block> ordered = new ArrayList<>(blocks);
+        Collections.sort(ordered, Comparator.comparingInt(b -> mins(b.start)));
+        if (ordered.isEmpty()) {
+            LinearLayout empty = surfaceCard();
+            empty.addView(text("A clean slate", 19, color("#18372E"), true));
+            TextView hint = text("Add a block for the next thing you need to do, or apply one of your saved routines.", 12, color("#687A70"), false);
+            hint.setLineSpacing(dp(2), 1f);
+            LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
+            hp.topMargin = dp(5);
+            empty.addView(hint, hp);
+            LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, dp(44));
+            actionsLp.topMargin = dp(12);
+            LinearLayout actions = horizontal();
+            actions.addView(primaryButton("＋ Add first block", () -> openAddDialog()),
+                    new LinearLayout.LayoutParams(0, -1, 1));
+            Button apply = secondaryButton("Apply routine", () -> showTemplatePicker());
+            LinearLayout.LayoutParams applyLp = new LinearLayout.LayoutParams(0, -1, 1);
+            applyLp.leftMargin = dp(8);
+            actions.addView(apply, applyLp);
+            empty.addView(actions, actionsLp);
+            planList.addView(empty);
+            return;
+        }
+
+        for (Block block : ordered) {
+            LinearLayout card = surfaceCard();
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+
+            LinearLayout time = vertical();
+            time.addView(text(time12(block.start), 12, color("#286B55"), true));
+            time.addView(text(time12(block.end), 10, color("#687A70"), false));
+            row.addView(time, new LinearLayout.LayoutParams(dp(66), -2));
+
+            LinearLayout details = vertical();
+            LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(0, -2, 1);
+            detailLp.leftMargin = dp(8);
+            detailLp.rightMargin = dp(6);
+            row.addView(details, detailLp);
+            TextView title = text(block.title, 14, color("#18372E"), true);
+            title.setMaxLines(3);
+            details.addView(title);
+            TextView meta = text(blockBehaviorLabel(block) + "  •  " + fmt(mins(block.end) - mins(block.start)), 10, color("#687A70"), false);
+            LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
+            metaLp.topMargin = dp(2);
+            details.addView(meta, metaLp);
+
+            boolean isDone = "done".equals(block.status);
+            boolean isSkipped = "skipped".equals(block.status);
+            TextView state = text(isDone ? "COMPLETED" : isSkipped ? "SKIPPED" : "PENDING",
+                    9, isDone ? color("#2E8060") : isSkipped ? color("#B44248") : color("#687A70"), true);
+            LinearLayout.LayoutParams stateLp = new LinearLayout.LayoutParams(-1, -2);
+            stateLp.topMargin = dp(4);
+            details.addView(state, stateLp);
+            details.setOnClickListener(v -> editBlockDialog(block));
+            title.setOnClickListener(v -> editBlockDialog(block));
+
+            Button stateAction;
+            if (isDone) {
+                stateAction = secondaryButton("↶", () -> { block.status = "pending"; save(); });
+                stateAction.setContentDescription("Undo completion");
+            } else if (isSkipped) {
+                stateAction = secondaryButton("↶", () -> { block.status = "pending"; save(); });
+                stateAction.setContentDescription("Restore skipped block");
+            } else {
+                stateAction = primaryButton("✓", () -> {
+                    stopFocusForBlock(block, System.currentTimeMillis());
+                    block.status = "done";
+                    save();
+                });
+                stateAction.setContentDescription("Mark complete");
+            }
+            LinearLayout.LayoutParams stateActionLp = new LinearLayout.LayoutParams(dp(38), dp(38));
+            stateActionLp.leftMargin = dp(3);
+            row.addView(stateAction, stateActionLp);
+
+            Button more = secondaryButton("•••", () -> showBlockOptions(block));
+            more.setContentDescription("More actions for " + block.title);
+            LinearLayout.LayoutParams moreLp = new LinearLayout.LayoutParams(dp(36), dp(38));
+            moreLp.leftMargin = dp(5);
+            row.addView(more, moreLp);
+
+            row.setOnClickListener(v -> editBlockDialog(block));
+            card.addView(row);
+            planList.addView(card);
         }
     }
 
