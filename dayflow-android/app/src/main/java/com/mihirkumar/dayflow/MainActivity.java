@@ -2474,12 +2474,25 @@ public class MainActivity extends Activity {
             return;
         }
         ScreenTimeTracker.refreshRecentDays(this, 14);
-        StringBuilder report = new StringBuilder("Phone screen-interactive time • saved locally\n\n");
+        java.util.TreeSet<String> historyDates = new java.util.TreeSet<>(Collections.reverseOrder());
+        for (String prefKey : getPrefs().getAll().keySet()) {
+            if (prefKey.startsWith("screenTimeMs_")) {
+                historyDates.add(prefKey.substring("screenTimeMs_".length()));
+            }
+        }
+        // Include recent dates even when Android has not supplied a usable snapshot yet.
         for (int i = 0; i < 14; i++) {
             Calendar day = Calendar.getInstance();
             day.add(Calendar.DAY_OF_YEAR, -i);
-            String key = keyForDate(day.getTime());
-            String label = new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(day.getTime());
+            historyDates.add(keyForDate(day.getTime()));
+        }
+
+        StringBuilder report = new StringBuilder("Phone screen-interactive time • saved locally\n");
+        report.append("Showing all stored dates plus the most recent 14 days.\n\n");
+        for (String key : historyDates) {
+            Date day = parseDateKey(key);
+            String label = day == null ? key
+                    : new SimpleDateFormat("EEE, d MMM yyyy", Locale.getDefault()).format(day);
             long value = ScreenTimeTracker.getStoredMillis(this, key);
             report.append(label).append("  —  ");
             if (value < 0) report.append("No DayFlow snapshot");
@@ -2487,11 +2500,11 @@ public class MainActivity extends Activity {
                 report.append(ScreenTimeTracker.formatDuration(value));
                 if (ScreenTimeTracker.isEstimated(this, key)) report.append(" (foreground-use estimate)");
                 long captured = ScreenTimeTracker.getCapturedAt(this, key);
-                if (captured > 0) report.append("\n    Updated ").append(clock(captured));
+                if (captured > 0) report.append("\n    Last value change ").append(clock(captured));
             }
             report.append("\n");
         }
-        report.append("\nAndroid keeps detailed screen events only for a limited recent period. Once DayFlow saves a daily total, it remains in local history.");
+        report.append("\nAndroid retains detailed screen events only for a limited recent period. DayFlow keeps each daily total it has saved, but cannot recreate older totals that Android no longer provides.");
         TextView view = text(report.toString(), 13, color("#D7DFED"), false);
         view.setPadding(dp(16), dp(12), dp(16), dp(12));
         view.setTextIsSelectable(true);
