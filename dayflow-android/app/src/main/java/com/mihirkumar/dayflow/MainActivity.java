@@ -78,13 +78,14 @@ public class MainActivity extends Activity {
     private LinearLayout pagePlan, pageProgress, pageOffice, pageMore, pageSyllabus, pageScreenTime;
     private LinearLayout planList, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
     private LinearLayout bottomNavigation;
-    private TextView syllabusSummaryView, screenTimeSummaryView;
-    private LinearLayout syllabusBreakdown;
+    private TextView syllabusSummaryView, screenTimeSummaryView, syllabusCoverageSummary;
+    private LinearLayout syllabusBreakdown, syllabusDetailContent;
     private EditText syllabusSearch;
     private LinearLayout roadmapTabRow, monthlyGoalsSection, monthlyGoalList, milestonesSection, milestoneList, syllabusTopicsSection;
-    private TextView goalMonthLabel;
+    private TextView goalMonthLabel, careerGoalSummary;
     private Button syllabusProgressToggle;
     private boolean syllabusProgressExpanded = false;
+    private boolean syllabusDetailsExpanded = false;
     private String roadmapTab = "goals";
     private String selectedGoalMonth;
     private String activePage = "home";
@@ -608,7 +609,7 @@ public class MainActivity extends Activity {
             v.setPadding(dp(8),dp(4),dp(8),dp(6) + bottomInset);
             return insets;
         });
-        String[][] items={{"⌂","Today","home"},{"▤","Plan","plan"},{"◔","Study","progress"},{"◷","Office","office"},{"•••","More","more"}};
+        String[][] items={{"⌂","Today","home"},{"▤","Plan","plan"},{"◔","Roadmap","syllabus"},{"◷","Office","office"},{"•••","More","more"}};
         for(String[] item:items){
             LinearLayout tab=vertical();tab.setGravity(Gravity.CENTER);tab.setPadding(dp(3),dp(5),dp(3),dp(4));
             TextView icon=text(item[0],19,color("#687A70"),true);icon.setGravity(Gravity.CENTER);
@@ -794,49 +795,57 @@ public class MainActivity extends Activity {
     }
 
     private void buildProgressPage() {
-        pageHeading(pageProgress, "Your progress", "Study & readiness",
-                "See topic completion, monthly goals, deadlines and actual focus time. You can edit your plan at any point.");
-        progressContent=vertical();pageProgress.addView(progressContent);renderProgressPage();
+        pageHeading(pageProgress, "YOUR HABITS", "Execution",
+                "Actual focus time and phone use. Your roadmap sets the goals; this page records how the day went.");
+        progressContent = vertical();
+        pageProgress.addView(progressContent);
+        renderProgressPage();
     }
+
     private void renderProgressPage() {
-        if(progressContent==null)return;progressContent.removeAllViews();ArrayList<SyllabusTopic> topics=readSyllabusTopics();
-        int cseTotal=0,cseDone=0,intTotal=0,intDone=0;
-        for(SyllabusTopic t:topics){boolean sw="Software Interview Prep".equals(t.subject);if(sw){intTotal++;if(t.done)intDone++;}else{cseTotal++;if(t.done)cseDone++;}}
-        LinearLayout cse=surfaceCard();cse.addView(text("UPSC CSE",11,color("#6BD0A6"),true));cse.addView(text(cseDone+" / "+cseTotal+" topics complete",22,color("#F2F7F3"),true));
-        cse.addView(text(cseTotal==0?"Load the syllabus starter to begin tracking.":Math.round(cseDone*100f/Math.max(1,cseTotal))+"% of your current topic list",12,color("#9AABA0"),false));
-        ProgressBar cseBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);cseBar.setMax(Math.max(1,cseTotal));cseBar.setProgress(cseDone);cseBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));cse.addView(cseBar);
-        Button openCse=primaryButton("Open CSE syllabus topics",()->{syllabusFilter="All";syllabusQuery="";if(syllabusSearch!=null)syllabusSearch.setText("");roadmapTab="topics";showSyllabusTracker();});LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(-1,dp(42));openLp.topMargin=dp(10);cse.addView(openCse,openLp);progressContent.addView(cse);
-        LinearLayout career=surfaceCard();career.addView(text("SOFTWARE INTERVIEW PREP",11,color("#D5B56E"),true));career.addView(text(intDone+" / "+intTotal+" topics complete",22,color("#F2F7F3"),true));
-        RoadmapMilestone tier34=roadmapMilestoneForKey("tier34");
-        RoadmapMilestone tier12=roadmapMilestoneForKey("tier12");
-        String tier34Line=(tier34==null?"Tier 3/4 readiness":tier34.title)+": "+displayRoadmapDate(tier34==null?getPrefs().getString(INTERVIEW_TIER34_KEY,"2027-04-05"):tier34.date);
-        String tier12Line=(tier12==null?"Tier 1/2 strong-hire readiness":tier12.title)+": "+displayRoadmapDate(tier12==null?getPrefs().getString(INTERVIEW_TARGET_KEY,"2027-07-11"):tier12.date);
-        String careerTarget=getPrefs().getString(CAREER_TARGET_KEY,"₹2.5–2.75L monthly take-home");
-        String careerNotes=getPrefs().getString(CAREER_TARGET_NOTES_KEY,"After taxes and deductions; bonus and ESOPs excluded. About 6 years of experience; assess IC and EM roles on fit.");
-        career.addView(text(tier34Line+"\n"+tier12Line+"\nInterview-prep commitment: 12–13 hours; track actual sessions with Focus.\nCareer outcome: "+careerTarget+".\n"+careerNotes,12,color("#9AABA0"),false));
-        ProgressBar intBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);intBar.setMax(Math.max(1,intTotal));intBar.setProgress(intDone);intBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#D5B56E")));career.addView(intBar);
-        LinearLayout careerActions=vertical();
-        LinearLayout roadmapRow=horizontal();
-        Button openCareer=secondaryButton("Monthly goals",()->{selectedGoalMonth=monthKeyFromDate(todayKey());roadmapTab="goals";showSyllabusTracker();});
-        roadmapRow.addView(openCareer,new LinearLayout.LayoutParams(0,dp(42),1f));
-        Button openMilestones=primaryButton("Milestones",()->{roadmapTab="milestones";showSyllabusTracker();});
-        LinearLayout.LayoutParams milestonesLp=new LinearLayout.LayoutParams(0,dp(42),1f);milestonesLp.leftMargin=dp(7);roadmapRow.addView(openMilestones,milestonesLp);
-        careerActions.addView(roadmapRow,new LinearLayout.LayoutParams(-1,dp(42)));
-        Button openInterviewTopics=secondaryButton("View & edit interview topics",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";if(syllabusSearch!=null)syllabusSearch.setText("");roadmapTab="topics";showSyllabusTracker();});
-        LinearLayout.LayoutParams interviewLp=new LinearLayout.LayoutParams(-1,dp(42));interviewLp.topMargin=dp(7);careerActions.addView(openInterviewTopics,interviewLp);
-        LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,-2);careerLp.topMargin=dp(10);career.addView(careerActions,careerLp);
-        Button editCareer=secondaryButton("Edit career goal",()->editCareerGoal());
-        LinearLayout.LayoutParams editCareerLp=new LinearLayout.LayoutParams(-1,dp(42));editCareerLp.topMargin=dp(7);career.addView(editCareer,editCareerLp);
-        progressContent.addView(career);
-        LinearLayout focus=surfaceCard();long actual=0;int planned=0;long now=System.currentTimeMillis();
-        for(Block b:blocks){long d=getActualDuration(b,now);actual+=d;if(isStudyBlock(b.title))planned+=Math.max(0,mins(b.end)-mins(b.start));}
-        focus.addView(text("EXECUTION",11,color("#6BD0A6"),true));focus.addView(text(fmtPreciseMillis(actual)+" tracked focus",22,color("#F2F7F3"),true));
-        focus.addView(text("Study time planned today: "+fmtShort(planned)+" • actual focus is measured only when you start Focus.",12,color("#9AABA0"),false));focus.addView(secondaryButton("View today's plan",()->switchPage("plan")));progressContent.addView(focus);
-        LinearLayout screen=surfaceCard();screen.addView(text("PHONE SCREEN TIME",11,color("#D5B56E"),true));long t=ScreenTimeTracker.getStoredMillis(this,todayKey());
-        screen.addView(text(t<0?"Today's total not captured yet":ScreenTimeTracker.formatDuration(t)+" today",22,color("#F2F7F3"),true));
-        long week=0;int days=0;for(int i=0;i<7;i++){Calendar c=Calendar.getInstance();c.add(Calendar.DAY_OF_YEAR,-i);long ms=ScreenTimeTracker.getStoredMillis(this,keyForDate(c.getTime()));if(ms>=0){week+=ms;days++;}}
-        screen.addView(text(days==0?"Grant Usage access to begin a saved history.":"7-day average: "+ScreenTimeTracker.formatDuration(week/days)+" across "+days+" recorded days.",12,color("#9AABA0"),false));
-        Button viewTime=secondaryButton("Screen-time history",()->showScreenTimeTracker());LinearLayout.LayoutParams stp=new LinearLayout.LayoutParams(-1,dp(42));stp.topMargin=dp(10);screen.addView(viewTime,stp);progressContent.addView(screen);
+        if (progressContent == null) return;
+        progressContent.removeAllViews();
+
+        long actual = 0L;
+        int plannedStudy = 0;
+        long now = System.currentTimeMillis();
+        for (Block block : blocks) {
+            actual += getActualDuration(block, now);
+            if (isStudyBlock(block.title)) plannedStudy += Math.max(0, mins(block.end) - mins(block.start));
+        }
+
+        LinearLayout focus = surfaceCard();
+        focus.addView(text("FOCUS TODAY", 10, color("#6BD0A6"), true));
+        focus.addView(text(fmtPreciseMillis(actual), 25, color("#F2F7F3"), true));
+        focus.addView(text("Study time planned: " + fmtShort(plannedStudy)
+                + "\nActual focus counts only when you start Focus.", 12, color("#9AABA0"), false));
+        Button todayPlan = secondaryButton("View today's plan", () -> switchPage("plan"));
+        LinearLayout.LayoutParams planLp = new LinearLayout.LayoutParams(-1, dp(40));
+        planLp.topMargin = dp(10);
+        focus.addView(todayPlan, planLp);
+        progressContent.addView(focus);
+
+        LinearLayout screen = surfaceCard();
+        screen.addView(text("PHONE SCREEN TIME", 10, color("#D5B56E"), true));
+        long todayMs = ScreenTimeTracker.getStoredMillis(this, todayKey());
+        screen.addView(text(todayMs < 0 ? "Not captured yet" : ScreenTimeTracker.formatDuration(todayMs),
+                23, color("#F2F7F3"), true));
+        long weekMs = 0L;
+        int days = 0;
+        for (int i = 0; i < 7; i++) {
+            Calendar day = Calendar.getInstance();
+            day.add(Calendar.DAY_OF_YEAR, -i);
+            long stored = ScreenTimeTracker.getStoredMillis(this, keyForDate(day.getTime()));
+            if (stored >= 0) { weekMs += stored; days++; }
+        }
+        screen.addView(text(days == 0 ? "Grant Usage access to begin a saved history."
+                : "7-day average: " + ScreenTimeTracker.formatDuration(weekMs / days)
+                    + " across " + days + " recorded days.", 12, color("#9AABA0"), false));
+        Button history = secondaryButton("View screen-time history", () -> showScreenTimeTracker());
+        LinearLayout.LayoutParams historyLp = new LinearLayout.LayoutParams(-1, dp(40));
+        historyLp.topMargin = dp(10);
+        screen.addView(history, historyLp);
+        progressContent.addView(screen);
     }
 
     private void editCareerGoal() {
@@ -1011,7 +1020,7 @@ public class MainActivity extends Activity {
     }
 
     private void buildMorePage() {
-        pageHeading(pageMore,"Tools & preferences","More","Configuration and occasional actions stay out of your daily execution flow.");
+        pageHeading(pageMore,"Tools & preferences","More","Routines, data management and less-frequent settings.");
         moreContent=vertical();pageMore.addView(moreContent);renderMorePage();
     }
     private void addMoreRow(String title,String subtitle,String symbol,Runnable action) {
@@ -1022,8 +1031,7 @@ public class MainActivity extends Activity {
     }
     private void renderMorePage() {
         if(moreContent==null)return;moreContent.removeAllViews();
-        addMoreRow("Goals, milestones & syllabus","Monthly goals, deadlines and topic progress","↗",()->showSyllabusTracker());
-        addMoreRow("Screen-time history","Daily totals retained on this device","↗",()->showScreenTimeTracker());
+        addMoreRow("Focus & screen time","Actual focus sessions and phone-use history","↗",()->switchPage("progress"));
         addMoreRow("Edit WFH routine","Change the reusable work-from-home template","↗",()->openTemplateEditor("wfh"));
         addMoreRow("Edit office routine","Change the reusable office-day template","↗",()->openTemplateEditor("office"));
         addMoreRow("Edit weekend routine","Change the reusable weekend template","↗",()->openTemplateEditor("weekend"));
@@ -1037,39 +1045,24 @@ public class MainActivity extends Activity {
 
     private void buildSyllabusPage() {
         if (selectedGoalMonth == null) selectedGoalMonth = monthKeyFromDate(todayKey());
-        pageHeading(pageSyllabus, "Your roadmap", "Goals, milestones & syllabus",
-                "Monthly goals first. Checkpoints and individual syllabus topics have their own clear sections.");
+        pageHeading(pageSyllabus, "YOUR PLAN", "Roadmap",
+                "This month, what is coming next, and the full syllabus when you need it.");
 
         syllabusSummaryView = text("", 12, color("#D6E4DA"), false);
-        syllabusSummaryView.setLineSpacing(dp(3), 1f);
-        syllabusSummaryView.setPadding(dp(14), dp(12), dp(14), dp(12));
-        syllabusSummaryView.setBackground(bg("#18231E", 16));
+        syllabusSummaryView.setLineSpacing(dp(2), 1f);
+        syllabusSummaryView.setPadding(dp(12), dp(10), dp(12), dp(10));
+        syllabusSummaryView.setBackground(bg("#18231E", 13));
         LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
-        summaryLp.bottomMargin = dp(12);
+        summaryLp.bottomMargin = dp(14);
         pageSyllabus.addView(syllabusSummaryView, summaryLp);
-
-        roadmapTabRow = horizontal();
-        String[][] tabs = {{"goals", "Monthly goals"}, {"milestones", "Milestones"}, {"topics", "Syllabus topics"}};
-        for (String[] tab : tabs) {
-            Button b = secondaryButton(tab[1], () -> {
-                roadmapTab = tab[0];
-                refreshRoadmapTabContent();
-            });
-            b.setTag("roadmap-tab-" + tab[0]);
-            b.setTextSize(11);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
-            if (roadmapTabRow.getChildCount() > 0) lp.leftMargin = dp(5);
-            roadmapTabRow.addView(b, lp);
-        }
-        LinearLayout.LayoutParams tabLp = new LinearLayout.LayoutParams(-1, dp(42));
-        tabLp.bottomMargin = dp(14);
-        pageSyllabus.addView(roadmapTabRow, tabLp);
 
         monthlyGoalsSection = vertical();
         milestonesSection = vertical();
         syllabusTopicsSection = vertical();
         pageSyllabus.addView(monthlyGoalsSection, new LinearLayout.LayoutParams(-1, -2));
+        addSectionDivider(pageSyllabus);
         pageSyllabus.addView(milestonesSection, new LinearLayout.LayoutParams(-1, -2));
+        addSectionDivider(pageSyllabus);
         pageSyllabus.addView(syllabusTopicsSection, new LinearLayout.LayoutParams(-1, -2));
 
         buildMonthlyGoalsSection();
@@ -1078,111 +1071,123 @@ public class MainActivity extends Activity {
         refreshRoadmapTabContent();
     }
 
+    private void addSectionDivider(LinearLayout parent) {
+        View divider = new View(this);
+        divider.setBackgroundColor(color("#26372D"));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(1));
+        lp.topMargin = dp(10);
+        lp.bottomMargin = dp(16);
+        parent.addView(divider, lp);
+    }
+
     private void buildMonthlyGoalsSection() {
-        TextView intro = text("An editable starter sequence for your CSE and interview goals. Adjust the month, focus and success criteria to match your sources and actual progress.",
-                12, color("#9AABA0"), false);
-        intro.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
-        introLp.bottomMargin = dp(12);
-        monthlyGoalsSection.addView(intro, introLp);
+        LinearLayout heading = horizontal();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text("THIS MONTH", 15, color("#F2F7F3"), true);
+        heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
+        Button addGoal = secondaryButton("+ Goal", () -> editMonthlyGoal(null));
+        addGoal.setMinHeight(dp(36));
+        heading.addView(addGoal, new LinearLayout.LayoutParams(dp(88), dp(36)));
+        monthlyGoalsSection.addView(heading);
 
         LinearLayout monthNav = horizontal();
         monthNav.setGravity(Gravity.CENTER_VERTICAL);
+        monthNav.setPadding(0, dp(8), 0, dp(8));
         monthNav.addView(secondaryButton("‹", () -> changeSelectedGoalMonth(-1)),
-                new LinearLayout.LayoutParams(dp(44), dp(42)));
-        goalMonthLabel = text(monthLabelForKey(selectedGoalMonth) + "  ▾", 16, color("#F2F7F3"), true);
+                new LinearLayout.LayoutParams(dp(42), dp(38)));
+        goalMonthLabel = text(monthLabelForKey(selectedGoalMonth), 14, color("#D6E4DA"), true);
         goalMonthLabel.setGravity(Gravity.CENTER);
-        goalMonthLabel.setBackground(bg("#18231E", 12));
-        goalMonthLabel.setContentDescription("Choose month");
+        goalMonthLabel.setMaxLines(1);
+        goalMonthLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        goalMonthLabel.setContentDescription("Choose goal month");
         goalMonthLabel.setOnClickListener(v -> chooseGoalMonth());
         goalMonthLabel.setTooltipText("Tap to choose a month");
-        LinearLayout.LayoutParams monthLabelLp = new LinearLayout.LayoutParams(0, dp(42), 1f);
-        monthLabelLp.leftMargin = dp(7);
-        monthLabelLp.rightMargin = dp(7);
-        monthNav.addView(goalMonthLabel, monthLabelLp);
+        LinearLayout.LayoutParams monthLp = new LinearLayout.LayoutParams(0, dp(38), 1f);
+        monthLp.leftMargin = dp(6);
+        monthLp.rightMargin = dp(6);
+        monthNav.addView(goalMonthLabel, monthLp);
         monthNav.addView(secondaryButton("›", () -> changeSelectedGoalMonth(1)),
-                new LinearLayout.LayoutParams(dp(44), dp(42)));
-        LinearLayout.LayoutParams monthNavLp = new LinearLayout.LayoutParams(-1, dp(42));
-        monthNavLp.bottomMargin = dp(10);
-        monthlyGoalsSection.addView(monthNav, monthNavLp);
-
-        Button addGoal = primaryButton("＋  Add a monthly goal", () -> editMonthlyGoal(null));
-        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(44));
-        addLp.bottomMargin = dp(10);
-        monthlyGoalsSection.addView(addGoal, addLp);
+                new LinearLayout.LayoutParams(dp(42), dp(38)));
+        monthlyGoalsSection.addView(monthNav);
 
         monthlyGoalList = vertical();
         monthlyGoalsSection.addView(monthlyGoalList, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private void buildMilestonesSection() {
-        TextView intro = text("Deadlines and checkpoints are separate from syllabus topics. Edit any milestone to change its name, date, track or success criteria.",
-                12, color("#9AABA0"), false);
-        intro.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
-        introLp.bottomMargin = dp(12);
-        milestonesSection.addView(intro, introLp);
-
-        Button addMilestone = primaryButton("＋  Add a milestone", () -> editRoadmapMilestone(null));
-        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(44));
-        addLp.bottomMargin = dp(10);
-        milestonesSection.addView(addMilestone, addLp);
-
+        LinearLayout heading = horizontal();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text("UPCOMING MILESTONES", 15, color("#F2F7F3"), true);
+        heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
+        Button addMilestone = secondaryButton("+ Add", () -> editRoadmapMilestone(null));
+        addMilestone.setMinHeight(dp(36));
+        heading.addView(addMilestone, new LinearLayout.LayoutParams(dp(88), dp(36)));
+        milestonesSection.addView(heading);
         milestoneList = vertical();
-        milestonesSection.addView(milestoneList, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams listLp = new LinearLayout.LayoutParams(-1, -2);
+        listLp.topMargin = dp(5);
+        milestonesSection.addView(milestoneList, listLp);
+
+        careerGoalSummary = text("", 11, color("#9AABA0"), false);
+        careerGoalSummary.setPadding(dp(2), dp(9), dp(2), dp(5));
+        careerGoalSummary.setContentDescription("Edit career goal");
+        careerGoalSummary.setOnClickListener(v -> editCareerGoal());
+        milestonesSection.addView(careerGoalSummary);
     }
 
     private void buildSyllabusTopicsSection() {
-        TextView intro = text("Use this as a checklist: mark topics complete only after study and review. Tap a topic or its Edit button to change the name or subject.",
-                12, color("#9AABA0"), false);
-        intro.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
-        introLp.bottomMargin = dp(10);
-        syllabusTopicsSection.addView(intro, introLp);
-
-        syllabusProgressToggle = secondaryButton("Show subject progress", () -> {
-            syllabusProgressExpanded = !syllabusProgressExpanded;
-            if (syllabusBreakdown != null) {
-                syllabusBreakdown.setVisibility(syllabusProgressExpanded ? View.VISIBLE : View.GONE);
+        LinearLayout heading = horizontal();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text("SYLLABUS COVERAGE", 15, color("#F2F7F3"), true);
+        heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
+        Button open = secondaryButton("Open checklist", () -> {
+            syllabusDetailsExpanded = !syllabusDetailsExpanded;
+            if (syllabusDetailContent != null) {
+                syllabusDetailContent.setVisibility(syllabusDetailsExpanded ? View.VISIBLE : View.GONE);
             }
-            syllabusProgressToggle.setText(syllabusProgressExpanded ? "Hide subject progress" : "Show subject progress");
+            if (syllabusProgressToggle != null) {
+                syllabusProgressToggle.setText(syllabusDetailsExpanded ? "Close checklist" : "Open checklist");
+            }
+            if (syllabusDetailsExpanded) refreshSyllabusRows();
         });
-        LinearLayout.LayoutParams progressToggleLp = new LinearLayout.LayoutParams(-1, dp(42));
-        progressToggleLp.topMargin = dp(8);
-        progressToggleLp.bottomMargin = dp(8);
-        syllabusTopicsSection.addView(syllabusProgressToggle, progressToggleLp);
+        open.setMinHeight(dp(36));
+        syllabusProgressToggle = open;
+        heading.addView(open, new LinearLayout.LayoutParams(dp(122), dp(36)));
+        syllabusTopicsSection.addView(heading);
 
-        syllabusBreakdown = vertical();
-        syllabusBreakdown.setVisibility(View.GONE);
-        LinearLayout.LayoutParams breakdownLp = new LinearLayout.LayoutParams(-1, -2);
-        syllabusTopicsSection.addView(syllabusBreakdown, breakdownLp);
+        syllabusCoverageSummary = text("", 12, color("#9AABA0"), false);
+        syllabusCoverageSummary.setPadding(dp(2), dp(7), dp(2), dp(9));
+        syllabusCoverageSummary.setLineSpacing(dp(2), 1f);
+        syllabusTopicsSection.addView(syllabusCoverageSummary);
+
+        syllabusDetailContent = vertical();
+        syllabusDetailContent.setVisibility(syllabusDetailsExpanded ? View.VISIBLE : View.GONE);
+        LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
+        detailLp.topMargin = dp(4);
+        syllabusTopicsSection.addView(syllabusDetailContent, detailLp);
+
         LinearLayout topicActions = horizontal();
-        topicActions.addView(primaryButton("＋ Add topic", () -> editSyllabusTopic(null)),
-                new LinearLayout.LayoutParams(0, dp(42), 1f));
+        topicActions.addView(primaryButton("+ Topic", () -> editSyllabusTopic(null)),
+                new LinearLayout.LayoutParams(0, dp(40), 1f));
         Button imp = secondaryButton("Import list", () -> importSyllabusTopics());
-        LinearLayout.LayoutParams impLp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        LinearLayout.LayoutParams impLp = new LinearLayout.LayoutParams(0, dp(40), 1f);
         impLp.leftMargin = dp(7);
         topicActions.addView(imp, impLp);
-        LinearLayout.LayoutParams topicActionsLp = new LinearLayout.LayoutParams(-1, dp(42));
-        topicActionsLp.bottomMargin = dp(7);
-        syllabusTopicsSection.addView(topicActions, topicActionsLp);
-
-        Button starter = secondaryButton("Load missing starter topics", () -> loadStarterSyllabus(true));
-        LinearLayout.LayoutParams starterLp = new LinearLayout.LayoutParams(-1, dp(40));
-        starterLp.bottomMargin = dp(10);
-        syllabusTopicsSection.addView(starter, starterLp);
+        LinearLayout.LayoutParams topicActionsLp = new LinearLayout.LayoutParams(-1, dp(40));
+        topicActionsLp.bottomMargin = dp(8);
+        syllabusDetailContent.addView(topicActions, topicActionsLp);
 
         syllabusSearch = new EditText(this);
         syllabusSearch.setSingleLine(true);
         syllabusSearch.setTextColor(color("#F2F7F3"));
         syllabusSearch.setHintTextColor(color("#82948A"));
-        syllabusSearch.setHint("Search topics or subjects");
+        syllabusSearch.setHint("Search syllabus topics");
         syllabusSearch.setText(syllabusQuery);
         syllabusSearch.setPadding(dp(12), 0, dp(12), 0);
-        syllabusSearch.setBackground(bg("#18231E", 12));
-        LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(-1, dp(44));
+        syllabusSearch.setBackground(bg("#18231E", 11));
+        LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(-1, dp(42));
         searchLp.bottomMargin = dp(8);
-        syllabusTopicsSection.addView(syllabusSearch, searchLp);
+        syllabusDetailContent.addView(syllabusSearch, searchLp);
         syllabusSearch.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int count, int after) {}
             public void onTextChanged(CharSequence s, int st, int before, int count) {
@@ -1202,9 +1207,9 @@ public class MainActivity extends Activity {
             Button filter = chip(subject);
             boolean selected = subject.equals(syllabusFilter);
             filter.setTextColor(color(selected ? "#F2F7F3" : "#B7C7BC"));
-            filter.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
-            LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-2, dp(34));
-            fp.rightMargin = dp(6);
+            filter.setBackground(bg(selected ? "#245B45" : "#1B2621", 10));
+            LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-2, dp(32));
+            fp.rightMargin = dp(5);
             filters.addView(filter, fp);
             filter.setOnClickListener(v -> {
                 syllabusFilter = subject;
@@ -1213,13 +1218,12 @@ public class MainActivity extends Activity {
             });
         }
         fs.addView(filters);
-        LinearLayout.LayoutParams filterLp = new LinearLayout.LayoutParams(-1, dp(38));
-        filterLp.bottomMargin = dp(8);
-        syllabusTopicsSection.addView(fs, filterLp);
+        LinearLayout.LayoutParams filterLp = new LinearLayout.LayoutParams(-1, dp(36));
+        filterLp.bottomMargin = dp(6);
+        syllabusDetailContent.addView(fs, filterLp);
 
         syllabusList = vertical();
-        syllabusTopicsSection.addView(syllabusList, new LinearLayout.LayoutParams(-1, -2));
-
+        syllabusDetailContent.addView(syllabusList, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private void refreshSyllabusFilterStyles(LinearLayout filters, ArrayList<String> subjects) {
@@ -1235,26 +1239,19 @@ public class MainActivity extends Activity {
 
     private void refreshRoadmapTabContent() {
         if (monthlyGoalsSection == null || milestonesSection == null || syllabusTopicsSection == null) return;
-        monthlyGoalsSection.setVisibility("goals".equals(roadmapTab) ? View.VISIBLE : View.GONE);
-        milestonesSection.setVisibility("milestones".equals(roadmapTab) ? View.VISIBLE : View.GONE);
-        syllabusTopicsSection.setVisibility("topics".equals(roadmapTab) ? View.VISIBLE : View.GONE);
-        String[] tabKeys = {"goals", "milestones", "topics"};
-        for (String key : tabKeys) {
-            View v = roadmapTabRow == null ? null : roadmapTabRow.findViewWithTag("roadmap-tab-" + key);
-            if (v instanceof Button) {
-                boolean active = key.equals(roadmapTab);
-                ((Button) v).setTextColor(color(active ? "#F2F7F3" : "#B7C7BC"));
-                v.setBackground(bg(active ? "#286B55" : "#18231E", 12));
-            }
-        }
+        // All roadmap essentials live on one scrollable page. Only the long
+        // topic checklist is collapsed, because it is reference material rather
+        // than the user's next action.
+        monthlyGoalsSection.setVisibility(View.VISIBLE);
+        milestonesSection.setVisibility(View.VISIBLE);
+        syllabusTopicsSection.setVisibility(View.VISIBLE);
         refreshRoadmapSummary();
-        if ("goals".equals(roadmapTab)) renderMonthlyGoals();
-        else if ("milestones".equals(roadmapTab)) renderMilestones();
-        else refreshSyllabusRows();
+        renderMonthlyGoals();
+        renderMilestones();
+        refreshSyllabusRows();
     }
 
     private void refreshRoadmapSummary() {
-        if (syllabusSummaryView == null) return;
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
         int cseTotal = 0, cseDone = 0, interviewTotal = 0, interviewDone = 0;
         for (SyllabusTopic topic : topics) {
@@ -1266,35 +1263,40 @@ public class MainActivity extends Activity {
                 if (topic.done) cseDone++;
             }
         }
-        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
-        String monthKey = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
-        int monthGoalCount = 0, monthGoalDone = 0;
-        for (MonthlyGoal goal : goals) {
-            if (monthKey.equals(goal.month)) {
-                monthGoalCount++;
-                if (goal.done) monthGoalDone++;
-            }
+
+        if (syllabusCoverageSummary != null) {
+            syllabusCoverageSummary.setText("UPSC CSE  " + cseDone + "/" + cseTotal
+                    + " topics  ·  Interview prep  " + interviewDone + "/" + interviewTotal);
         }
+
         ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
         Collections.sort(milestones, Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
         RoadmapMilestone next = null;
         for (RoadmapMilestone milestone : milestones) {
-            if (!milestone.done) { next = milestone; break; }
+            if (!milestone.done) {
+                next = milestone;
+                break;
+            }
         }
-        String nextLine = next == null
-                ? "Next milestone · All listed milestones complete"
-                : (next.date.compareTo(todayKey()) < 0 ? "Overdue milestone · " : "Next milestone · ")
-                    + next.title + " · " + displayRoadmapDate(next.date);
-        syllabusSummaryView.setText(monthLabelForKey(monthKey) + " goals · " + monthGoalDone + "/" + monthGoalCount + " complete"
-                + "\nUPSC CSE · " + cseDone + "/" + cseTotal + " topics complete"
-                + "\nSoftware interviews · " + interviewDone + "/" + interviewTotal + " topics complete"
-                + "\n" + nextLine);
+        if (syllabusSummaryView != null) {
+            if (next == null) {
+                syllabusSummaryView.setText("All listed milestones are complete.");
+            } else {
+                boolean overdue = next.date != null && next.date.compareTo(todayKey()) < 0;
+                syllabusSummaryView.setText((overdue ? "OVERDUE  ·  " : "NEXT  ·  ")
+                        + next.title + "  ·  " + displayRoadmapDate(next.date));
+            }
+        }
+
+        if (careerGoalSummary != null) {
+            String target = getPrefs().getString(CAREER_TARGET_KEY, "₹2.5–2.75L/month after taxes and deductions");
+            careerGoalSummary.setText("Career target  ·  " + target + "    Edit");
+        }
     }
 
     private void refreshSyllabusRows() {
         if (syllabusList == null) return;
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
-        refreshRoadmapSummary();
         renderSyllabusBreakdown(topics);
         syllabusList.removeAllViews();
         String query = syllabusQuery.trim().toLowerCase(Locale.US);
@@ -1305,38 +1307,51 @@ public class MainActivity extends Activity {
                     && !topic.title.toLowerCase(Locale.US).contains(query)
                     && !topic.subject.toLowerCase(Locale.US).contains(query)) continue;
             shown++;
+
             LinearLayout row = horizontal();
-            row.setGravity(Gravity.TOP);
-            row.setPadding(dp(11), dp(10), dp(7), dp(10));
-            row.setBackground(bg(topic.done ? "#172B22" : "#18231E", 14));
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
-            rowLp.bottomMargin = dp(7);
-            syllabusList.addView(row, rowLp);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(2), dp(9), dp(2), dp(9));
+            row.setBackgroundColor(Color.TRANSPARENT);
 
             Button toggle = actionButton(topic.done ? "✓" : "○",
                     color(topic.done ? "#102017" : "#A8BAAE"),
                     topic.done ? "#70D6A5" : "#283A30");
-            toggle.setContentDescription(topic.done ? "Mark pending" : "Mark complete");
-            row.addView(toggle, new LinearLayout.LayoutParams(dp(38), dp(38)));
+            toggle.setContentDescription(topic.done ? "Mark topic pending" : "Mark topic complete");
+            row.addView(toggle, new LinearLayout.LayoutParams(dp(34), dp(34)));
+
             LinearLayout details = vertical();
-            details.setPadding(dp(9), 0, dp(3), 0);
+            details.setPadding(dp(10), 0, dp(2), 0);
             details.addView(text(topic.title, 13, color("#F2F7F3"), true));
-            details.addView(text(topic.subject + (topic.done ? " · Complete" : " · Not complete"), 10,
-                    color("#9AABA0"), false));
-            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
-            Button more = secondaryButton("Edit", () -> editSyllabusTopic(topic));
-            row.addView(more, new LinearLayout.LayoutParams(dp(52), dp(36)));
+            details.addView(text(topic.subject + (topic.done ? "  ·  Complete" : ""),
+                    10, color("#9AABA0"), false));
+            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
+            row.setContentDescription(topic.title + ". Tap to edit; long press for more actions.");
+            row.setOnClickListener(v -> editSyllabusTopic(topic));
+            row.setOnLongClickListener(v -> {
+                showSyllabusTopicActions(topic);
+                return true;
+            });
             toggle.setOnClickListener(v -> {
                 topic.done = !topic.done;
                 topic.completedAt = topic.done ? System.currentTimeMillis() : 0L;
                 persistSyllabusTopics(readSyllabusTopicsWith(topic));
             });
-            details.setOnClickListener(v -> editSyllabusTopic(topic));
+            syllabusList.addView(row, new LinearLayout.LayoutParams(-1, -2));
+
+            if (shown < topics.size()) {
+                View divider = new View(this);
+                divider.setBackgroundColor(color("#26372D"));
+                syllabusList.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+            }
         }
         if (shown == 0) {
-            syllabusList.addView(text("No topics match these filters. Try All, clear the search, or add a topic.",
-                    13, color("#9AABA0"), false));
+            LinearLayout empty = vertical();
+            empty.setPadding(dp(8), dp(16), dp(8), dp(16));
+            empty.addView(text("No topics match.", 14, color("#F2F7F3"), true));
+            empty.addView(text("Clear the search or choose another subject.", 12, color("#9AABA0"), false));
+            syllabusList.addView(empty);
         }
+        refreshRoadmapSummary();
     }
 
     private String syllabusOverview(ArrayList<SyllabusTopic> topics) {
@@ -1400,74 +1415,71 @@ public class MainActivity extends Activity {
 
     private void renderMonthlyGoals() {
         if (monthlyGoalList == null) return;
-        if (goalMonthLabel != null) goalMonthLabel.setText(monthLabelForKey(selectedGoalMonth) + "  ▾");
         monthlyGoalList.removeAllViews();
         ArrayList<MonthlyGoal> goals = readMonthlyGoals();
         ArrayList<MonthlyGoal> monthGoals = new ArrayList<>();
-        for (MonthlyGoal goal : goals) if (selectedGoalMonth.equals(goal.month)) monthGoals.add(goal);
+        for (MonthlyGoal goal : goals) {
+            if (selectedGoalMonth.equals(goal.month)) monthGoals.add(goal);
+        }
         Collections.sort(monthGoals, Comparator.comparingInt(g -> monthlyGoalTrackOrder(g.track)));
         int done = 0;
         for (MonthlyGoal goal : monthGoals) if (goal.done) done++;
-        LinearLayout summary = vertical();
-        summary.setPadding(dp(13), dp(10), dp(13), dp(10));
-        summary.setBackground(bg("#18231E", 13));
-        LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
-        summaryLp.bottomMargin = dp(9);
-        monthlyGoalList.addView(summary, summaryLp);
-        summary.addView(text(done + " of " + monthGoals.size() + " goals complete", 13, color("#F2F7F3"), true));
-        summary.addView(text("Three tracks stay separate: GS, Maths Optional and software interviews.", 11,
-                color("#9AABA0"), false));
+        if (goalMonthLabel != null) {
+            goalMonthLabel.setText(monthLabelForKey(selectedGoalMonth) + "  ·  " + done + "/" + monthGoals.size());
+        }
+
         if (monthGoals.isEmpty()) {
-            LinearLayout empty = vertical();
-            empty.setPadding(dp(14), dp(14), dp(14), dp(14));
-            empty.setBackground(bg("#18231E", 13));
-            empty.addView(text("No goals planned for this month yet.", 14, color("#F2F7F3"), true));
-            empty.addView(text("Add a goal below and choose its track, target and month.", 12, color("#9AABA0"), false));
+            TextView empty = text("No goals for this month. Add one with + Goal.",
+                    13, color("#9AABA0"), false);
+            empty.setPadding(dp(4), dp(12), dp(4), dp(12));
             monthlyGoalList.addView(empty);
             return;
         }
-        for (MonthlyGoal goal : monthGoals) {
-            LinearLayout card = vertical();
-            card.setPadding(dp(13), dp(12), dp(13), dp(12));
-            card.setBackground(bg(goal.done ? "#172B22" : "#18231E", 15));
-            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
-            cardLp.bottomMargin = dp(8);
-            monthlyGoalList.addView(card, cardLp);
 
-            TextView track = text(goal.track.toUpperCase(Locale.US), 10,
-                    "Software Interview Prep".equals(goal.track) ? color("#D5B56E") : color("#65C5A0"), true);
-            card.addView(track);
-            TextView title = text(goal.title, 15, color("#F2F7F3"), true);
-            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-            titleLp.topMargin = dp(5);
-            card.addView(title, titleLp);
+        for (int i = 0; i < monthGoals.size(); i++) {
+            MonthlyGoal goal = monthGoals.get(i);
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(2), dp(10), dp(2), dp(10));
+            row.setBackgroundColor(Color.TRANSPARENT);
+
+            Button mark = actionButton(goal.done ? "✓" : "○",
+                    color(goal.done ? "#102017" : "#A8BAAE"),
+                    goal.done ? "#70D6A5" : "#283A30");
+            mark.setContentDescription(goal.done ? "Reopen goal" : "Mark goal complete");
+            row.addView(mark, new LinearLayout.LayoutParams(dp(34), dp(34)));
+
+            LinearLayout details = vertical();
+            details.setPadding(dp(10), 0, dp(2), 0);
+            int trackColor = "Software Interview Prep".equals(goal.track)
+                    ? color("#D5B56E") : color("#65C5A0");
+            details.addView(text(goal.track.toUpperCase(Locale.US), 9, trackColor, true));
+            TextView title = text(goal.title, 14, color(goal.done ? "#A4B4AA" : "#F2F7F3"), true);
+            title.setLineSpacing(dp(1), 1f);
+            details.addView(title);
             if (goal.target != null && !goal.target.trim().isEmpty()) {
-                TextView target = text(goal.target, 12, color("#B7C7BC"), false);
-                target.setLineSpacing(dp(2), 1f);
+                TextView target = text(goal.target, 11, color("#9AABA0"), false);
+                target.setMaxLines(2);
+                target.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams targetLp = new LinearLayout.LayoutParams(-1, -2);
-                targetLp.topMargin = dp(5);
-                card.addView(target, targetLp);
+                targetLp.topMargin = dp(3);
+                details.addView(target, targetLp);
             }
-            TextView status = text(goal.done ? "✓  COMPLETE" : "○  IN PROGRESS", 10,
-                    goal.done ? color("#70D6A5") : color("#9AABA0"), true);
-            LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
-            statusLp.topMargin = dp(8);
-            card.addView(status, statusLp);
+            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
+            row.setContentDescription(goal.track + ": " + goal.title + ". Tap to edit; long press to delete.");
+            row.setOnClickListener(v -> editMonthlyGoal(goal));
+            row.setOnLongClickListener(v -> {
+                confirmDeleteMonthlyGoal(goal);
+                return true;
+            });
+            mark.setOnClickListener(v -> toggleMonthlyGoal(goal));
+            monthlyGoalList.addView(row, new LinearLayout.LayoutParams(-1, -2));
 
-            LinearLayout actions = horizontal();
-            LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, dp(40));
-            actionsLp.topMargin = dp(8);
-            card.addView(actions, actionsLp);
-            Button mark = secondaryButton(goal.done ? "Reopen" : "Mark done", () -> toggleMonthlyGoal(goal));
-            actions.addView(mark, new LinearLayout.LayoutParams(0, -1, 1f));
-            Button edit = primaryButton("Edit", () -> editMonthlyGoal(goal));
-            LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(0, -1, 1f);
-            editLp.leftMargin = dp(6);
-            actions.addView(edit, editLp);
-            Button delete = secondaryButton("Delete", () -> confirmDeleteMonthlyGoal(goal));
-            LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(0, -1, 0.85f);
-            deleteLp.leftMargin = dp(6);
-            actions.addView(delete, deleteLp);
+            if (i < monthGoals.size() - 1) {
+                View divider = new View(this);
+                divider.setBackgroundColor(color("#26372D"));
+                monthlyGoalList.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+            }
         }
     }
 
@@ -1637,65 +1649,60 @@ public class MainActivity extends Activity {
         if (milestoneList == null) return;
         milestoneList.removeAllViews();
         ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
-        Collections.sort(milestones, Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
+        Collections.sort(milestones, (a, b) -> {
+            if (a.done != b.done) return a.done ? 1 : -1;
+            return (a.date == null ? "9999-12-31" : a.date)
+                    .compareTo(b.date == null ? "9999-12-31" : b.date);
+        });
         if (milestones.isEmpty()) {
-            milestoneList.addView(text("No milestones yet. Add one to give a goal a clear deadline.",
-                    13, color("#9AABA0"), false));
+            TextView empty = text("No milestones yet. Add one when you have a meaningful checkpoint.",
+                    13, color("#9AABA0"), false);
+            empty.setPadding(dp(3), dp(12), dp(3), dp(12));
+            milestoneList.addView(empty);
             return;
         }
-        for (RoadmapMilestone milestone : milestones) {
-            LinearLayout card = vertical();
-            card.setPadding(dp(13), dp(12), dp(13), dp(12));
-            card.setBackground(bg(milestone.done ? "#172B22" : "#18231E", 15));
-            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
-            cardLp.bottomMargin = dp(8);
-            milestoneList.addView(card, cardLp);
 
-            LinearLayout header = horizontal();
-            header.setGravity(Gravity.CENTER_VERTICAL);
-            TextView track = text(milestone.track.toUpperCase(Locale.US), 10,
-                    "Software interviews".equals(milestone.track) ? color("#D5B56E") : color("#65C5A0"), true);
-            header.addView(track, new LinearLayout.LayoutParams(0, -2, 1f));
-            TextView date = text(displayRoadmapDate(milestone.date), 11, color("#D6E4DA"), true);
-            date.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-            header.addView(date);
-            card.addView(header);
+        for (int i = 0; i < milestones.size(); i++) {
+            RoadmapMilestone milestone = milestones.get(i);
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(2), dp(10), dp(2), dp(10));
+            row.setBackgroundColor(Color.TRANSPARENT);
 
-            TextView title = text(milestone.title, 15, color("#F2F7F3"), true);
-            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-            titleLp.topMargin = dp(6);
-            card.addView(title, titleLp);
-            if (milestone.detail != null && !milestone.detail.trim().isEmpty()) {
-                TextView detail = text(milestone.detail, 12, color("#B7C7BC"), false);
-                detail.setLineSpacing(dp(2), 1f);
-                LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
-                detailLp.topMargin = dp(5);
-                card.addView(detail, detailLp);
-            }
+            Button mark = actionButton(milestone.done ? "✓" : "○",
+                    color(milestone.done ? "#102017" : "#A8BAAE"),
+                    milestone.done ? "#70D6A5" : "#283A30");
+            mark.setContentDescription(milestone.done ? "Reopen milestone" : "Mark milestone complete");
+            row.addView(mark, new LinearLayout.LayoutParams(dp(34), dp(34)));
+
+            LinearLayout details = vertical();
+            details.setPadding(dp(10), 0, dp(2), 0);
+            TextView title = text(milestone.title, 14,
+                    color(milestone.done ? "#A4B4AA" : "#F2F7F3"), true);
+            details.addView(title);
             boolean overdue = !milestone.done && milestone.date != null && milestone.date.compareTo(todayKey()) < 0;
-            String statusLabel = milestone.done ? "✓  COMPLETE" : overdue ? "⚠  OVERDUE" : "○  UPCOMING";
-            int statusColor = milestone.done ? color("#70D6A5") : overdue ? color("#D5B56E") : color("#9AABA0");
-            TextView status = text(statusLabel, 10, statusColor, true);
-            LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
-            statusLp.topMargin = dp(8);
-            card.addView(status, statusLp);
+            String dateLine = milestone.track + "  ·  " + displayRoadmapDate(milestone.date)
+                    + (overdue ? "  ·  Overdue" : "");
+            details.addView(text(dateLine, 10, color(overdue ? "#D5B56E" : "#9AABA0"), false));
+            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
+            row.setContentDescription(milestone.title + ", due " + displayRoadmapDate(milestone.date)
+                    + ". Tap to edit; long press to delete if it is a custom milestone.");
+            row.setOnClickListener(v -> editRoadmapMilestone(milestone));
+            row.setOnLongClickListener(v -> {
+                if (milestone.key == null || milestone.key.isEmpty()) {
+                    confirmDeleteRoadmapMilestone(milestone);
+                } else {
+                    Toast.makeText(this, "Core checkpoints can be edited but not deleted.", Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            });
+            mark.setOnClickListener(v -> toggleRoadmapMilestone(milestone));
+            milestoneList.addView(row, new LinearLayout.LayoutParams(-1, -2));
 
-            LinearLayout actions = horizontal();
-            LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, dp(40));
-            actionsLp.topMargin = dp(8);
-            card.addView(actions, actionsLp);
-            actions.addView(secondaryButton(milestone.done ? "Reopen" : "Mark complete",
-                    () -> toggleRoadmapMilestone(milestone)),
-                    new LinearLayout.LayoutParams(0, -1, 1f));
-            Button edit = primaryButton("Edit", () -> editRoadmapMilestone(milestone));
-            LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(0, -1, 1f);
-            editLp.leftMargin = dp(7);
-            actions.addView(edit, editLp);
-            if (milestone.key == null || milestone.key.isEmpty()) {
-                Button delete = secondaryButton("Delete", () -> confirmDeleteRoadmapMilestone(milestone));
-                LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(0, -1, 0.85f);
-                deleteLp.leftMargin = dp(7);
-                actions.addView(delete, deleteLp);
+            if (i < milestones.size() - 1) {
+                View divider = new View(this);
+                divider.setBackgroundColor(color("#26372D"));
+                milestoneList.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
             }
         }
     }
@@ -1871,7 +1878,7 @@ public class MainActivity extends Activity {
             getPrefs().edit().putString(MONTHLY_GOALS_KEY, data.toString()).apply();
             debugLog("Monthly roadmap goals saved: " + goals.size());
             refreshRoadmapSummary();
-            if ("goals".equals(roadmapTab)) renderMonthlyGoals();
+            renderMonthlyGoals();
         } catch (Exception e) {
             debugLog("Monthly goals save failed: " + e.getMessage());
             Toast.makeText(this, "Could not save monthly goals.", Toast.LENGTH_SHORT).show();
@@ -1921,7 +1928,7 @@ public class MainActivity extends Activity {
             editor.putString(ROADMAP_MILESTONES_KEY, data.toString()).apply();
             debugLog("Roadmap milestones saved: " + milestones.size());
             refreshRoadmapSummary();
-            if ("milestones".equals(roadmapTab)) renderMilestones();
+            renderMilestones();
         } catch (Exception e) {
             debugLog("Roadmap milestone save failed: " + e.getMessage());
             Toast.makeText(this, "Could not save milestone changes.", Toast.LENGTH_SHORT).show();
@@ -2175,7 +2182,7 @@ public class MainActivity extends Activity {
     private String dayOffsetKey(int offset){Calendar c=Calendar.getInstance();c.add(Calendar.DAY_OF_YEAR,-offset);return keyForDate(c.getTime());}
 
     private void renderBottomNavOnly() {
-        String tab=activePage.equals("syllabus")||activePage.equals("screenTime")?"progress":activePage;
+        String tab=activePage.equals("progress")||activePage.equals("screenTime")?"more":activePage;
         for(Map.Entry<String,TextView> e:navItems.entrySet()){
             boolean selected=e.getKey().equals(tab);
             int foreground=color(selected?"#286B55":"#687A70");
@@ -4095,7 +4102,12 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showSyllabusTracker() { switchPage("syllabus"); }
+    private void showSyllabusTracker() {
+        syllabusDetailsExpanded = true;
+        if (syllabusDetailContent != null) syllabusDetailContent.setVisibility(View.VISIBLE);
+        if (syllabusProgressToggle != null) syllabusProgressToggle.setText("Close checklist");
+        switchPage("syllabus");
+    }
 
     private void showSyllabusTopicActions(SyllabusTopic topic) {
         LinearLayout content = vertical();
