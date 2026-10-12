@@ -1975,85 +1975,91 @@ public class MainActivity extends Activity {
     private ArrayList<MonthlyGoal> seedDefaultMonthlyGoals() {
         String[][][] plan = {
             {
-                {"General Studies", "Build the GS baseline", "Confirm your source list, begin current affairs, and complete the first planned Prelims topics."},
-                {"Maths Optional", "Start Paper I: Linear Algebra and Calculus", "Study concepts, solve worked examples, and keep an error log for completed units."},
-                {"Software Interview Prep", "Establish the interview-prep rhythm", "Protect the 12–13 hours in your saved prep plan; set a Java/DSA baseline and track questions reviewed."}
+                {"General Studies", "Start current affairs and the GS baseline", "Confirm primary sources. Begin Prelims current events and History of India / National Movement. Keep a weekly recall and MCQ error log."},
+                {"Maths Optional", "Paper I foundations: Linear Algebra + Calculus", "Map Paper I; cover vector spaces, bases, matrix systems, limits, continuity and differentiability. Record difficult proofs and problems."},
+                {"Software Interview Prep", "Establish a Java / DSA / design baseline", "Use the saved 12–13-hour preparation commitment. Benchmark timed coding and one system-design explanation; record gaps."}
             },
             {
-                {"General Studies", "Polity and modern-history foundations", "Cover selected Constitution/governance and modern-history units; test recall each week."},
-                {"Maths Optional", "Linear Algebra and Calculus first pass", "Complete mapped topics, worked examples, and selected previous-year questions."},
-                {"Software Interview Prep", "Java fundamentals and core DSA", "Review OOP, collections and complexity; practise timed arrays, strings and hashing problems."}
+                {"General Studies", "Modern India, freedom struggle and culture", "Cover modern Indian history, the freedom struggle and Indian culture. Test recall weekly and link events to causes, outcomes and contributors."},
+                {"Maths Optional", "Continue Linear Algebra and Calculus", "Cover linear transformations, rank/eigenvalues, derivatives, extrema and integration basics. Solve selected problems without looking at worked solutions."},
+                {"Software Interview Prep", "Java fundamentals + arrays, strings and hashing", "Review OOP, collections, complexity and core Java. Practise timed array/string/hash problems and write down why each miss happened."}
             },
             {
-                {"General Studies", "Geography and Indian-culture foundations", "Cover mapped geography and culture topics, use maps where useful, and revise earlier notes."},
-                {"Maths Optional", "Analytic Geometry and Ordinary Differential Equations", "Work through standard problems and write complete solutions, not just final answers."},
-                {"Software Interview Prep", "Core data structures", "Practise linked lists, stacks/queues, trees and heaps under time limits; review mistakes."}
+                {"General Studies", "Geography and Indian society foundations", "Cover physical/world geography, Indian geography, resources, industries and core society themes. Use maps and short active-recall summaries."},
+                {"Maths Optional", "Analytic Geometry + Ordinary Differential Equations", "Work through lines, planes and standard surfaces, then first- and higher-order ODE methods. Maintain a worked-problem and error log."},
+                {"Software Interview Prep", "Core data structures and timed coding", "Practise linked lists, stacks, queues, trees and heaps. Complete timed questions, then re-solve the missed ones unaided."}
             },
             {
-                {"General Studies", "Constitution, governance and economy basics", "Finish mapped first-pass notes and test what you can recall without looking."},
-                {"Maths Optional", "Dynamics, Statics and Vector Analysis", "Build a topic checklist, solve worked problems and attempt selected PYQs."},
-                {"Software Interview Prep", "SQL and backend/API foundations", "Review transactions, indexes, REST, pagination and idempotency; explain trade-offs aloud."}
+                {"General Studies", "Constitution, Parliament and governance", "Cover constitutional evolution/features, federalism, Parliament, Executive, Judiciary and separation of powers. Build concise comparison notes."},
+                {"Maths Optional", "Paper I: Dynamics, Statics and Vector Analysis", "Cover motion, work/energy, equilibrium, potential energy, grad/div/curl and the major integral theorems; solve standard problems."},
+                {"Software Interview Prep", "SQL, transactions and backend/API fundamentals", "Practise SQL, indexes, transactions/isolation, REST, pagination and idempotency. Explain one API design and its failure cases."}
             },
             {
-                {"General Studies", "Environment, science and social issues", "Map these areas to your syllabus list and complete short recall tests."},
-                {"Maths Optional", "Paper II: Algebra and Real Analysis", "Strengthen definitions, theorem understanding and problem-solving with a written error log."},
-                {"Software Interview Prep", "System-design foundations", "Practise requirements, estimates, data modelling, caching and queues; complete a mock."}
+                {"General Studies", "Economy, budgeting, agriculture and inclusion", "Cover growth, development, inclusive growth, budgeting, agriculture, MSP/PDS, food security and infrastructure. Review with mixed MCQs."},
+                {"Maths Optional", "Paper II: Algebra and Real Analysis", "Cover groups/rings and core real-analysis concepts, sequences, series, continuity and convergence. Write definitions and key proof outlines from memory."},
+                {"Software Interview Prep", "System-design foundations", "Practise requirements, capacity estimates, data modelling, caching, queues and trade-offs. Keep a short written design for review."}
             },
             {
-                {"General Studies", "Prepare for the 1 April CSE checkpoint", "Audit GS coverage, test weak subjects, and decide April priorities from evidence."},
-                {"Maths Optional", "Audit Paper I and map Paper II gaps", "Create a two-paper coverage map and practise PYQs from completed units."},
-                {"Software Interview Prep", "Timed mock cycle for Tier 3/4 readiness", "Run coding, design and behavioural mocks; identify gaps before the readiness checkpoint."}
+                {"General Studies", "Science, environment, security and April checkpoint prep", "Cover core environment/biodiversity, science-tech, disaster management and internal security. Audit topic coverage and identify the highest-priority gaps for 1 April."},
+                {"Maths Optional", "Audit Paper I; begin Complex Analysis + Linear Programming", "Check every Paper I unit against the syllabus list, solve selected PYQs, and begin analytic functions, contour integration and LP methods."},
+                {"Software Interview Prep", "Prepare for the Tier 3/4 readiness checkpoint", "Run timed coding and a system-design mock; review resume/project examples and behavioural stories. Turn every weak area into a drill."}
             },
             {
-                {"General Studies", "Reset the CSE plan after the checkpoint", "Use the 1 April review to update monthly targets and start disciplined active recall."},
-                {"Maths Optional", "Repair the weakest Paper I/II units", "Prioritise gaps using PYQ performance and repeat timed questions you previously missed."},
-                {"Software Interview Prep", "Review Tier 3/4 readiness", "Use mock results to decide whether to apply now or spend another cycle on weak areas."}
+                {"General Studies", "Use the 1 April checkpoint to reset CSE priorities", "Compare actual GS coverage and test performance with the plan. Close the largest gaps first and edit upcoming monthly goals based on evidence."},
+                {"Maths Optional", "Paper II: Complex Analysis + Linear Programming", "Build a first-pass checklist for analytic functions, Cauchy results, singularities, residues, simplex and duality; practise exam-style questions."},
+                {"Software Interview Prep", "Tier 3/4 readiness review", "Use mock results—not the date alone—to decide whether to apply or spend another cycle on coding, design and interview communication."}
             },
             {
-                {"General Studies", "Close remaining core GS first-pass gaps", "Prioritise uncovered GS topics and begin regular answer-writing practice."},
-                {"Maths Optional", "Paper II: Complex Analysis and Linear Programming", "Complete core concepts, standard problems and selected previous-year questions."},
-                {"Software Interview Prep", "Distributed-systems and reliability basics", "Explain consistency, replication, partitioning, retries, timeouts and failure trade-offs."}
+                {"General Studies", "Governance, social justice and international relations", "Cover welfare, health/education, accountability, civil services, India’s neighbourhood, foreign policy and international institutions. Practise recall and short answers."},
+                {"Maths Optional", "Paper II: PDE and Numerical Analysis", "Cover standard PDE methods, canonical forms, interpolation, numerical integration and ODE methods; solve representative problems."},
+                {"Software Interview Prep", "Distributed systems and reliability", "Explain consistency, replication, partitioning/sharding, retries, timeouts, circuit breakers and backpressure with concrete design trade-offs."}
             },
             {
-                {"General Studies", "Revise older subjects while closing coverage", "Combine current affairs with mixed MCQs and a written review of incorrect answers."},
-                {"Maths Optional", "Paper II: PDE and Numerical Analysis", "Work through standard methods with solved examples and timed practice."},
-                {"Software Interview Prep", "Practise system design end to end", "Complete an end-to-end design regularly and document assumptions, failure modes and cost."}
+                {"General Studies", "Ethics, CSAT and remaining GS gaps", "Work through ethics, values, attitude, emotional intelligence, probity and case studies; practise CSAT comprehension, reasoning, numeracy and data interpretation."},
+                {"Maths Optional", "Computer Programming, Mechanics and Fluid Dynamics", "Cover number systems/Boolean logic, algorithms/flowcharts, Lagrangian/Hamiltonian mechanics, continuity and standard fluid-flow concepts."},
+                {"Software Interview Prep", "System design end to end", "Complete end-to-end designs: requirements, data model, capacity, APIs, storage, caching, failure handling, observability and cost."}
             },
             {
-                {"General Studies", "Consolidate GS using mixed tests", "Run regular mixed quizzes, review every error, and update concise revision notes."},
-                {"Maths Optional", "Paper I sectional tests and error repair", "Attempt timed sections and repeat failed questions until the method is clear."},
-                {"Software Interview Prep", "Tier 1/2 strong-hire readiness review", "Use coding, system-design and leadership mocks to identify the highest-value remaining gaps."}
+                {"General Studies", "World history, society, Essay and answer-writing", "Close remaining GS-I society/world-history gaps; practise structured Mains answers and outlines for essays across the saved topic areas."},
+                {"Maths Optional", "Mixed Paper I/II PYQs and gap closure", "Map unresolved topics in both papers, attempt timed previous-year questions and use the error log to select the next revision targets."},
+                {"Software Interview Prep", "Tier 1/2 readiness checkpoint", "Review coding, system design, leadership examples and project deep-dives with timed mocks. Record the gaps that still block strong-hire readiness."}
             },
             {
-                {"General Studies", "Finish residual CSE topics and strengthen recall", "Keep the syllabus list complete and revisit missed MCQs and weak themes."},
-                {"Maths Optional", "Paper II sectional tests and weakness repair", "Practise mixed Paper II problems and track recurring errors."},
-                {"Software Interview Prep", "Leadership stories, résumé and project deep-dives", "Prepare measurable impact examples and be ready to defend important design decisions."}
+                {"General Studies", "Mixed GS tests and current-affairs consolidation", "Run mixed Prelims practice, review every error and connect current events to polity, economy, society, environment and international relations."},
+                {"Maths Optional", "Paper I sectional tests", "Attempt timed Paper I sections, review marking/solution quality and re-solve missed questions until the method is clear."},
+                {"Software Interview Prep", "Leadership stories, resume and project deep-dives", "Prepare evidence-based examples of ownership, delivery, prioritisation, conflict, mentoring and measurable impact."}
             },
             {
-                {"General Studies", "Start a second pass of high-yield GS", "Use active recall, concise notes, answer-writing practice and current-affairs consolidation."},
-                {"Maths Optional", "Second pass: Linear Algebra, Calculus and ODE", "Work through PYQs, build a formula/result sheet, and revisit weak derivations."},
-                {"Software Interview Prep", "Turn mock feedback into targeted drills", "Practise weak interview areas and tune the target-company shortlist from evidence."}
+                {"General Studies", "Close first-pass GS gaps", "Use the syllabus tracker to identify every unchecked GS item. Finish high-priority uncovered topics and schedule short tests for weaker subjects."},
+                {"Maths Optional", "Paper II sectional tests", "Attempt timed Paper II sections across Algebra, Analysis, Complex Analysis, LP, PDE, Numerical Analysis and applied topics; repair recurring errors."},
+                {"Software Interview Prep", "Targeted interview drills and company shortlist", "Use mock feedback to choose drills and refresh the Tier 1/2 company shortlist; protect CSE study priorities."}
             },
             {
-                {"General Studies", "Structured revision and a test cycle", "Combine weekly mixed practice with a written analysis of errors and gaps."},
-                {"Maths Optional", "Second pass of core Paper II areas", "Use timed practice to repair recurring mistakes and reinforce key results."},
-                {"Software Interview Prep", "Maintain job-search readiness", "Keep coding skills warm, practise system design, and refresh your career narrative."}
+                {"General Studies", "Consolidate GS-I and GS-II", "Revise history, culture, geography, society, Constitution, governance and international relations through recall, PYQs and structured Mains answers."},
+                {"Maths Optional", "Second pass: Linear Algebra, Calculus and ODE", "Revisit key results and methods, solve PYQs under time limits and update a concise formula/result sheet."},
+                {"Software Interview Prep", "Keep coding and design interview-ready", "Maintain timed DSA practice, one-page design notes and behavioural review; track the real interview feedback loop."}
             },
             {
-                {"General Studies", "Previous-year questions and answer writing", "Consolidate recurring themes and organise examples and evidence for answers."},
-                {"Maths Optional", "Mixed Paper I/II previous-year questions", "Attempt timed sections, revise formulas and correct previously missed questions."},
-                {"Software Interview Prep", "Maintain a deliberate interview rhythm", "Use mock interviews and targeted revision without displacing CSE priorities."}
+                {"General Studies", "Consolidate GS-III, GS-IV and CSAT", "Revise economy, agriculture, science-tech, environment, security and ethics; practise case studies and mixed CSAT sets."},
+                {"Maths Optional", "Second pass: Paper II core areas", "Revisit Algebra, Real/Complex Analysis, LP, PDE and Numerical Analysis, prioritising weak results and problem types."},
+                {"Software Interview Prep", "Close career narrative and leadership gaps", "Make resume/project stories measurable and coherent; practise explaining PM/EM/IC experience and role fit."}
             },
             {
-                {"General Studies", "Audit syllabus completeness before the target", "Compare actual coverage with the 1 January target and list any carry-over topics explicitly."},
-                {"Maths Optional", "Close first-pass gaps and review weak units", "Audit both papers and schedule unresolved high-value topics honestly."},
-                {"Software Interview Prep", "Review target roles and career progress", "Update the résumé and choose next interview opportunities based on feedback."}
+                {"General Studies", "Previous-year questions and answer writing", "Use PYQs to find recurring themes, practise timed answers and essays, and keep a list of factual/analytical gaps."},
+                {"Maths Optional", "Mixed Paper I/II previous-year questions", "Attempt mixed timed sections from both papers, track accuracy/time, revise formulas and repeat previously missed problems."},
+                {"Software Interview Prep", "Mock interviews and focused repairs", "Run realistic coding, design and behavioural mocks; spend the next study cycle on the top three observed weaknesses."}
             },
             {
-                {"General Studies", "Review the CSE target and next revision phase", "Use actual coverage and test results to plan the next 8–12 weeks of revision."},
-                {"Maths Optional", "Set Maths Optional revision priorities", "Audit confidence, PYQ performance and unresolved proofs or problem types."},
-                {"Software Interview Prep", "Refresh career goals after the milestone review", "Reassess target tiers, interview readiness and the next application cycle."}
+                {"General Studies", "Finish any outstanding first-pass GS topics", "Audit every GS/CSAT topic and either mark it complete or name it explicitly as carry-over. Keep current affairs and weekly recall active."},
+                {"Maths Optional", "Finish outstanding Maths Optional coverage", "Audit both papers against the topic tracker; close remaining high-priority topics and document any carry-over honestly."},
+                {"Software Interview Prep", "Review target roles and interview outcomes", "Update the resume, target-company list and practice priorities using mock/interview evidence rather than assuming readiness."}
+            },
+            {
+                {"General Studies", "By 1 January: verify CSE syllabus coverage", "Use the tracker to confirm first-pass coverage by the saved 1 January 2028 target. Start the next revision/test cycle and list any carry-over plainly."},
+                {"Maths Optional", "By 1 January: verify both papers", "Confirm every Maths Optional topic is covered or explicitly carried forward; set the next revision priorities from PYQs and the error log."},
+                {"Software Interview Prep", "Review milestones and set the next career cycle", "Compare actual readiness with the Tier 3/4 and Tier 1/2 checkpoints; update target roles and the next interview plan."}
             }
+        };
         };
         ArrayList<MonthlyGoal> goals = new ArrayList<>();
         Calendar month = Calendar.getInstance();
