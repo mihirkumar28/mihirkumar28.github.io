@@ -2055,7 +2055,6 @@ public class MainActivity extends Activity {
                 {"Software Interview Prep", "Review career milestones and set the next cycle", "Compare actual readiness with Tier 3/4 and Tier 1/2 checkpoints; update target roles and the next interview plan from mock and interview evidence."}
             }
         };
-        };
         ArrayList<MonthlyGoal> goals = new ArrayList<>();
         Calendar month = Calendar.getInstance();
         month.set(Calendar.DAY_OF_MONTH, 1);
