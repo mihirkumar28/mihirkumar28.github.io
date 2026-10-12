@@ -1140,6 +1140,22 @@ public class MainActivity extends Activity {
         introLp.bottomMargin = dp(10);
         syllabusTopicsSection.addView(intro, introLp);
 
+        syllabusProgressToggle = secondaryButton("Show subject progress", () -> {
+            syllabusProgressExpanded = !syllabusProgressExpanded;
+            if (syllabusBreakdown != null) {
+                syllabusBreakdown.setVisibility(syllabusProgressExpanded ? View.VISIBLE : View.GONE);
+            }
+            syllabusProgressToggle.setText(syllabusProgressExpanded ? "Hide subject progress" : "Show subject progress");
+        });
+        LinearLayout.LayoutParams progressToggleLp = new LinearLayout.LayoutParams(-1, dp(42));
+        progressToggleLp.topMargin = dp(8);
+        progressToggleLp.bottomMargin = dp(8);
+        syllabusTopicsSection.addView(syllabusProgressToggle, progressToggleLp);
+
+        syllabusBreakdown = vertical();
+        syllabusBreakdown.setVisibility(View.GONE);
+        LinearLayout.LayoutParams breakdownLp = new LinearLayout.LayoutParams(-1, -2);
+        syllabusTopicsSection.addView(syllabusBreakdown, breakdownLp);
         LinearLayout topicActions = horizontal();
         topicActions.addView(primaryButton("＋ Add topic", () -> editSyllabusTopic(null)),
                 new LinearLayout.LayoutParams(0, dp(42), 1f));
@@ -1204,22 +1220,6 @@ public class MainActivity extends Activity {
         syllabusList = vertical();
         syllabusTopicsSection.addView(syllabusList, new LinearLayout.LayoutParams(-1, -2));
 
-        syllabusProgressToggle = secondaryButton("Show subject progress", () -> {
-            syllabusProgressExpanded = !syllabusProgressExpanded;
-            if (syllabusBreakdown != null) {
-                syllabusBreakdown.setVisibility(syllabusProgressExpanded ? View.VISIBLE : View.GONE);
-            }
-            syllabusProgressToggle.setText(syllabusProgressExpanded ? "Hide subject progress" : "Show subject progress");
-        });
-        LinearLayout.LayoutParams progressToggleLp = new LinearLayout.LayoutParams(-1, dp(42));
-        progressToggleLp.topMargin = dp(8);
-        progressToggleLp.bottomMargin = dp(8);
-        syllabusTopicsSection.addView(syllabusProgressToggle, progressToggleLp);
-
-        syllabusBreakdown = vertical();
-        syllabusBreakdown.setVisibility(View.GONE);
-        LinearLayout.LayoutParams breakdownLp = new LinearLayout.LayoutParams(-1, -2);
-        syllabusTopicsSection.addView(syllabusBreakdown, breakdownLp);
     }
 
     private void refreshSyllabusFilterStyles(LinearLayout filters, ArrayList<String> subjects) {
