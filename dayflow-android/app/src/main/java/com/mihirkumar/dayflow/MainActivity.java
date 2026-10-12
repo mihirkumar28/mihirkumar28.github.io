@@ -53,6 +53,14 @@ public class MainActivity extends Activity {
     private static final String STARTER_SEEDED_KEY = "starterSyllabusSeeded_v2";
     private static final String INTERVIEW_PLAN_START_KEY = "softwareInterviewPlanStart";
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
+    private static final String MONTHLY_GOALS_KEY = "monthlyGoals";
+    private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
+    private static final String CSE_CHECKPOINT_KEY = "cseCheckpointDate";
+    private static final String INTERVIEW_TIER34_KEY = "softwareTier34Target";
+    private static final String[] MONTHLY_GOAL_TRACKS = {
+            "General Studies", "Maths Optional", "Software Interview Prep", "CSE Revision & Tests", "Other"
+    };
+    private static final String[] MILESTONE_TRACKS = {"UPSC CSE", "Software interviews", "Personal / other"};
     private static final int REQUEST_EXPORT_BACKUP = 4201;
     private static final int REQUEST_IMPORT_BACKUP = 4202;
     private static final String[] SYLLABUS_SUBJECTS = {
@@ -71,6 +79,10 @@ public class MainActivity extends Activity {
     private TextView syllabusSummaryView, screenTimeSummaryView;
     private LinearLayout syllabusBreakdown;
     private EditText syllabusSearch;
+    private LinearLayout roadmapTabRow, monthlyGoalsSection, monthlyGoalList, milestonesSection, milestoneList, syllabusTopicsSection;
+    private TextView goalMonthLabel;
+    private String roadmapTab = "goals";
+    private String selectedGoalMonth;
     private String activePage = "home";
     private String syllabusFilter = "All";
     private String syllabusQuery = "";
@@ -136,6 +148,35 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static class MonthlyGoal {
+        long id;
+        String month, track, title, target;
+        boolean done;
+        MonthlyGoal(long id, String month, String track, String title, String target, boolean done) {
+            this.id = id;
+            this.month = month;
+            this.track = track;
+            this.title = title;
+            this.target = target;
+            this.done = done;
+        }
+    }
+
+    private static class RoadmapMilestone {
+        long id;
+        String key, track, title, date, detail;
+        boolean done;
+        RoadmapMilestone(long id, String key, String track, String title, String date, String detail, boolean done) {
+            this.id = id;
+            this.key = key == null ? "" : key;
+            this.track = track;
+            this.title = title;
+            this.date = date;
+            this.detail = detail;
+            this.done = done;
+        }
+    }
+
     private long lastRenderedMinute = -1;
     private final Runnable liveRefresh = new Runnable() {
         @Override public void run() {
@@ -166,6 +207,8 @@ public class MainActivity extends Activity {
         load();
         buildUi();
         ensureStarterPlans();
+        ensureRoadmapData();
+        refreshRoadmapTabContent();
         render();
         ensureScreenTimeWorker();
         if (ScreenTimeTracker.hasUsageAccess(this)) ScreenTimeTracker.refreshRecentDays(this, 7);
@@ -581,7 +624,7 @@ public class MainActivity extends Activity {
         else if ("progress".equals(activePage)) renderProgressPage();
         else if ("office".equals(activePage)) renderOfficePage();
         else if ("more".equals(activePage)) renderMorePage();
-        else if ("syllabus".equals(activePage)) refreshSyllabusRows();
+        else if ("syllabus".equals(activePage)) refreshRoadmapTabContent();
         else if ("screenTime".equals(activePage)) renderScreenTimePage();
         renderBottomNavOnly();
     }
@@ -604,7 +647,7 @@ public class MainActivity extends Activity {
         else if("progress".equals(page))renderProgressPage();
         else if("office".equals(page))renderOfficePage();
         else if("more".equals(page))renderMorePage();
-        else if("syllabus".equals(page))refreshSyllabusRows();
+        else if("syllabus".equals(page))refreshRoadmapTabContent();
         else if("screenTime".equals(page))renderScreenTimePage();
     }
 
@@ -897,7 +940,7 @@ public class MainActivity extends Activity {
     }
     private void renderMorePage() {
         if(moreContent==null)return;moreContent.removeAllViews();
-        addMoreRow("Syllabus & interview roadmap","Topic completion, targets and pace","↗",()->showSyllabusTracker());
+        addMoreRow("Goals, milestones & syllabus","Monthly goals, deadlines and topic progress","↗",()->showSyllabusTracker());
         addMoreRow("Screen-time history","Daily totals retained on this device","↗",()->showScreenTimeTracker());
         addMoreRow("Edit WFH routine","Change the reusable work-from-home template","↗",()->openTemplateEditor("wfh"));
         addMoreRow("Edit office routine","Change the reusable office-day template","↗",()->openTemplateEditor("office"));
@@ -1357,7 +1400,10 @@ public class MainActivity extends Activity {
         else if ("progress".equals(activePage)) renderProgressPage();
         else if ("office".equals(activePage)) renderOfficePage();
         else if ("more".equals(activePage)) renderMorePage();
-        else if ("syllabus".equals(activePage)) refreshSyllabusRows();
+        else if ("syllabus".equals(activePage)) {
+            refreshRoadmapSummary();
+            if ("topics".equals(roadmapTab)) refreshSyllabusRows();
+        }
     }
 
     private void updateLiveBits() {
@@ -2956,9 +3002,6 @@ public class MainActivity extends Activity {
             {"Interview", "Interview: Current affairs and balanced judgement"},
             {"Interview", "Interview: Public-service motivation and ethical dilemmas"},
             {"Interview", "Interview: Mock interview and feedback review"},
-            {"Software Interview Prep", "Roadmap milestone: after 6 months, target Tier 3/4 interview readiness"},
-            {"Software Interview Prep", "Interview-prep time commitment: use the 12–13 hours in the saved prep plan; log actual sessions with Focus"},
-            {"Software Interview Prep", "Roadmap milestone: after 9 months, target strong-hire readiness for Tier 1/2"},
             {"Software Interview Prep", "Java: OOP, inheritance, composition, polymorphism and SOLID"},
             {"Software Interview Prep", "Java: collections, generics, equals/hashCode and immutability"},
             {"Software Interview Prep", "Java: JVM memory, garbage collection, class loading and performance"},
