@@ -79,14 +79,12 @@ public class MainActivity extends Activity {
     private LinearLayout planList, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
     private LinearLayout bottomNavigation;
     private TextView syllabusSummaryView, screenTimeSummaryView, syllabusCoverageSummary;
-    private LinearLayout syllabusBreakdown, syllabusDetailContent;
+    private LinearLayout syllabusDetailContent;
     private EditText syllabusSearch;
-    private LinearLayout roadmapTabRow, monthlyGoalsSection, monthlyGoalList, milestonesSection, milestoneList, syllabusTopicsSection;
+    private LinearLayout monthlyGoalsSection, monthlyGoalList, milestonesSection, milestoneList, syllabusTopicsSection;
     private TextView goalMonthLabel, careerGoalSummary;
     private Button syllabusProgressToggle;
-    private boolean syllabusProgressExpanded = false;
     private boolean syllabusDetailsExpanded = false;
-    private String roadmapTab = "goals";
     private String selectedGoalMonth;
     private String activePage = "home";
     private String syllabusFilter = "All";
@@ -1297,7 +1295,6 @@ public class MainActivity extends Activity {
     private void refreshSyllabusRows() {
         if (syllabusList == null) return;
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
-        renderSyllabusBreakdown(topics);
         syllabusList.removeAllViews();
         String query = syllabusQuery.trim().toLowerCase(Locale.US);
         int shown = 0;
@@ -1365,52 +1362,6 @@ public class MainActivity extends Activity {
         return "UPSC CSE  " + cseDone + "/" + cseTotal
                 + " complete\nSoftware interviews  " + interviewDone + "/" + interviewTotal
                 + " complete\nCombined  " + done + "/" + topics.size() + " topics complete";
-    }
-
-    private void renderSyllabusBreakdown(ArrayList<SyllabusTopic> topics) {
-        if (syllabusBreakdown == null) return;
-        syllabusBreakdown.removeAllViews();
-        for (String subject : SYLLABUS_SUBJECTS) {
-            int total = 0, done = 0;
-            for (SyllabusTopic topic : topics) {
-                if (subject.equals(topic.subject)) {
-                    total++;
-                    if (topic.done) done++;
-                }
-            }
-            LinearLayout card = vertical();
-            card.setPadding(dp(12), dp(9), dp(12), dp(9));
-            card.setBackground(bg("#18231E", 13));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-            lp.bottomMargin = dp(6);
-            syllabusBreakdown.addView(card, lp);
-            LinearLayout row = horizontal();
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            TextView label = text(subject, 12, color("#F2F7F3"), true);
-            label.setMaxLines(2);
-            row.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
-            row.addView(text(done + "/" + total, 12, color("#B7C7BC"), true));
-            card.addView(row);
-            ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-            bar.setMax(Math.max(1, total));
-            bar.setProgress(done);
-            bar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));
-            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(4));
-            bp.topMargin = dp(7);
-            card.addView(bar, bp);
-            card.setOnClickListener(v -> {
-                syllabusFilter = subject;
-                syllabusQuery = "";
-                if (syllabusSearch != null) syllabusSearch.setText("");
-                refreshSyllabusRows();
-            });
-        }
-        if (syllabusBreakdown != null) {
-            syllabusBreakdown.setVisibility(syllabusProgressExpanded ? View.VISIBLE : View.GONE);
-        }
-        if (syllabusProgressToggle != null) {
-            syllabusProgressToggle.setText(syllabusProgressExpanded ? "Hide subject progress" : "Show subject progress");
-        }
     }
 
     private void renderMonthlyGoals() {
@@ -1615,7 +1566,6 @@ public class MainActivity extends Activity {
                     if (!replaced) all.add(updated);
                     selectedGoalMonth = draftMonth[0];
                     persistMonthlyGoals(all);
-                    roadmapTab = "goals";
                     refreshRoadmapTabContent();
                     return true;
                 });
@@ -1808,7 +1758,6 @@ public class MainActivity extends Activity {
                     }
                     if (!replaced) all.add(updated);
                     persistRoadmapMilestones(all);
-                    roadmapTab = "milestones";
                     refreshRoadmapTabContent();
                     return true;
                 });
@@ -2517,10 +2466,7 @@ public class MainActivity extends Activity {
         else if ("progress".equals(activePage)) renderProgressPage();
         else if ("office".equals(activePage)) renderOfficePage();
         else if ("more".equals(activePage)) renderMorePage();
-        else if ("syllabus".equals(activePage)) {
-            refreshRoadmapSummary();
-            if ("topics".equals(roadmapTab)) refreshSyllabusRows();
-        }
+        else if ("syllabus".equals(activePage)) refreshRoadmapTabContent();
     }
 
     private void updateLiveBits() {
