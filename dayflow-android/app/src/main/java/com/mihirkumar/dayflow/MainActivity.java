@@ -816,7 +816,7 @@ public class MainActivity extends Activity {
         Button openCareer=secondaryButton("Monthly goals",()->{selectedGoalMonth=monthKeyFromDate(todayKey());roadmapTab="goals";showSyllabusTracker();});
         careerActions.addView(openCareer,new LinearLayout.LayoutParams(0,dp(42),1f));
         Button openInterviewTopics=primaryButton("Interview topics",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";roadmapTab="topics";showSyllabusTracker();});
-        LinearLayout interviewLp=new LinearLayout.LayoutParams(0,dp(42),1f);interviewLp.leftMargin=dp(7);careerActions.addView(openInterviewTopics,interviewLp);
+        LinearLayout.LayoutParams interviewLp=new LinearLayout.LayoutParams(0,dp(42),1f);interviewLp.leftMargin=dp(7);careerActions.addView(openInterviewTopics,interviewLp);
         LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,dp(42));careerLp.topMargin=dp(10);career.addView(careerActions,careerLp);
         Button editCareer=secondaryButton("Edit career goal",()->editCareerGoal());
         LinearLayout.LayoutParams editCareerLp=new LinearLayout.LayoutParams(-1,dp(42));editCareerLp.topMargin=dp(7);career.addView(editCareer,editCareerLp);
