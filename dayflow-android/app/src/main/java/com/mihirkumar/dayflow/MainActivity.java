@@ -1485,7 +1485,8 @@ public class MainActivity extends Activity {
         help.setLineSpacing(dp(2), 1f);
         form.addView(help);
 
-        Button month = secondaryButton(monthLabelForKey(draftMonth[0]), () -> {
+        final Button[] monthButtonRef = new Button[1];
+        monthButtonRef[0] = secondaryButton(monthLabelForKey(draftMonth[0]), () -> {
             Date parsed = parseDateKey(draftMonth[0] + "-01");
             Calendar initial = Calendar.getInstance();
             if (parsed != null) initial.setTime(parsed);
@@ -1493,11 +1494,12 @@ public class MainActivity extends Activity {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(year, monthOfYear, 1, 0, 0, 0);
                 draftMonth[0] = new SimpleDateFormat("yyyy-MM", Locale.US).format(chosen.getTime());
-                month.setText(monthLabelForKey(draftMonth[0]));
+                monthButtonRef[0].setText(monthLabelForKey(draftMonth[0]));
             }, initial.get(Calendar.YEAR), initial.get(Calendar.MONTH), initial.get(Calendar.DAY_OF_MONTH));
             picker.setTitle("Goal month");
             picker.show();
         });
+        Button month = monthButtonRef[0];
         LinearLayout.LayoutParams monthLp = new LinearLayout.LayoutParams(-1, dp(44));
         monthLp.topMargin = dp(12);
         form.addView(month, monthLp);
@@ -1704,7 +1706,8 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams dateLabelLp = new LinearLayout.LayoutParams(-1, -2);
         dateLabelLp.topMargin = dp(10);
         form.addView(dateLabel, dateLabelLp);
-        Button dateButton = secondaryButton(displayRoadmapDate(draftDate[0]), () -> {
+        final Button[] dateButtonRef = new Button[1];
+        dateButtonRef[0] = secondaryButton(displayRoadmapDate(draftDate[0]), () -> {
             Date parsed = parseDateKey(draftDate[0]);
             Calendar initial = Calendar.getInstance();
             if (parsed != null) initial.setTime(parsed);
@@ -1712,11 +1715,12 @@ public class MainActivity extends Activity {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(year, month, day, 0, 0, 0);
                 draftDate[0] = keyForDate(chosen.getTime());
-                dateButton.setText(displayRoadmapDate(draftDate[0]));
+                dateButtonRef[0].setText(displayRoadmapDate(draftDate[0]));
             }, initial.get(Calendar.YEAR), initial.get(Calendar.MONTH), initial.get(Calendar.DAY_OF_MONTH));
             picker.setTitle("Milestone deadline");
             picker.show();
         });
+        Button dateButton = dateButtonRef[0];
         form.addView(dateButton, new LinearLayout.LayoutParams(-1, dp(44)));
 
         TextView detailLabel = text("SUCCESS CRITERIA", 10, color("#687A70"), true);
