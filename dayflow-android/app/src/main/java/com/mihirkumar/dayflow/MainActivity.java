@@ -900,6 +900,7 @@ public class MainActivity extends Activity {
                             .putString(CAREER_TARGET_KEY, value)
                             .putString(CAREER_TARGET_NOTES_KEY, notes.getText().toString().trim())
                             .apply();
+                    refreshRoadmapSummary();
                     renderProgressPage();
                     return true;
                 });
@@ -2466,7 +2467,7 @@ public class MainActivity extends Activity {
         else if ("progress".equals(activePage)) renderProgressPage();
         else if ("office".equals(activePage)) renderOfficePage();
         else if ("more".equals(activePage)) renderMorePage();
-        else if ("syllabus".equals(activePage)) refreshRoadmapTabContent();
+        else if ("syllabus".equals(activePage)) refreshRoadmapSummary();
     }
 
     private void updateLiveBits() {
@@ -4187,6 +4188,7 @@ public class MainActivity extends Activity {
             debugLog("Syllabus save failed: " + e.getMessage());
             Toast.makeText(this, "Could not save syllabus changes.", Toast.LENGTH_SHORT).show();
         }
+        if (syllabusList != null) refreshSyllabusRows();
         render();
     }
 
