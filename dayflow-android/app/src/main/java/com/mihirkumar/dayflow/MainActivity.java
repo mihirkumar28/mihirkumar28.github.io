@@ -57,6 +57,8 @@ public class MainActivity extends Activity {
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
     private static final String CSE_CHECKPOINT_KEY = "cseCheckpointDate";
     private static final String INTERVIEW_TIER34_KEY = "softwareTier34Target";
+    private static final String CAREER_TARGET_KEY = "careerTargetMonthlyTakeHome";
+    private static final String CAREER_TARGET_NOTES_KEY = "careerTargetNotes";
     private static final String[] MONTHLY_GOAL_TRACKS = {
             "General Studies", "Maths Optional", "Software Interview Prep", "CSE Revision & Tests", "Other"
     };
@@ -800,11 +802,25 @@ public class MainActivity extends Activity {
         LinearLayout cse=surfaceCard();cse.addView(text("UPSC CSE",11,color("#6BD0A6"),true));cse.addView(text(cseDone+" / "+cseTotal+" topics complete",22,color("#F2F7F3"),true));
         cse.addView(text(cseTotal==0?"Load the syllabus starter to begin tracking.":Math.round(cseDone*100f/Math.max(1,cseTotal))+"% of your current topic list",12,color("#9AABA0"),false));
         ProgressBar cseBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);cseBar.setMax(Math.max(1,cseTotal));cseBar.setProgress(cseDone);cseBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));cse.addView(cseBar);
-        Button openCse=primaryButton("Open CSE syllabus",()->{syllabusFilter="All";showSyllabusTracker();});LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(-1,dp(42));openLp.topMargin=dp(10);cse.addView(openCse,openLp);progressContent.addView(cse);
+        Button openCse=primaryButton("Open CSE syllabus topics",()->{syllabusFilter="All";syllabusQuery="";roadmapTab="topics";showSyllabusTracker();});LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(-1,dp(42));openLp.topMargin=dp(10);cse.addView(openCse,openLp);progressContent.addView(cse);
         LinearLayout career=surfaceCard();career.addView(text("SOFTWARE INTERVIEW PREP",11,color("#D5B56E"),true));career.addView(text(intDone+" / "+intTotal+" topics complete",22,color("#F2F7F3"),true));
-        career.addView(text("Month 6 • Tier 3/4 readiness\nMonth 9 • Tier 1/2 strong-hire target\nInterview-prep commitment: 12–13 hours (track actual sessions with Focus).\nCareer outcome: ₹2.5–2.75L monthly take-home after taxes/deductions; bonus and ESOPs excluded.\nExperience context: about 6 years; evaluate IC and EM paths on fit rather than assuming title alone.",12,color("#9AABA0"),false));
+        RoadmapMilestone tier34=roadmapMilestoneForKey("tier34");
+        RoadmapMilestone tier12=roadmapMilestoneForKey("tier12");
+        String tier34Line=(tier34==null?"Tier 3/4 readiness":tier34.title)+": "+displayRoadmapDate(tier34==null?getPrefs().getString(INTERVIEW_TIER34_KEY,"2027-04-05"):tier34.date);
+        String tier12Line=(tier12==null?"Tier 1/2 strong-hire readiness":tier12.title)+": "+displayRoadmapDate(tier12==null?getPrefs().getString(INTERVIEW_TARGET_KEY,"2027-07-11"):tier12.date);
+        String careerTarget=getPrefs().getString(CAREER_TARGET_KEY,"₹2.5–2.75L monthly take-home");
+        String careerNotes=getPrefs().getString(CAREER_TARGET_NOTES_KEY,"After taxes and deductions; bonus and ESOPs excluded. About 6 years of experience; assess IC and EM roles on fit.");
+        career.addView(text(tier34Line+"\n"+tier12Line+"\nInterview-prep commitment: 12–13 hours; track actual sessions with Focus.\nCareer outcome: "+careerTarget+".\n"+careerNotes,12,color("#9AABA0"),false));
         ProgressBar intBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);intBar.setMax(Math.max(1,intTotal));intBar.setProgress(intDone);intBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#D5B56E")));career.addView(intBar);
-        Button openCareer=secondaryButton("Open interview roadmap",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";showSyllabusTracker();});LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,dp(42));careerLp.topMargin=dp(10);career.addView(openCareer,careerLp);progressContent.addView(career);
+        LinearLayout careerActions=horizontal();
+        Button openCareer=secondaryButton("Monthly goals",()->{selectedGoalMonth=monthKeyFromDate(todayKey());roadmapTab="goals";showSyllabusTracker();});
+        careerActions.addView(openCareer,new LinearLayout.LayoutParams(0,dp(42),1f));
+        Button openInterviewTopics=primaryButton("Interview topics",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";roadmapTab="topics";showSyllabusTracker();});
+        LinearLayout interviewLp=new LinearLayout.LayoutParams(0,dp(42),1f);interviewLp.leftMargin=dp(7);careerActions.addView(openInterviewTopics,interviewLp);
+        LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,dp(42));careerLp.topMargin=dp(10);career.addView(careerActions,careerLp);
+        Button editCareer=secondaryButton("Edit career goal",()->editCareerGoal());
+        LinearLayout.LayoutParams editCareerLp=new LinearLayout.LayoutParams(-1,dp(42));editCareerLp.topMargin=dp(7);career.addView(editCareer,editCareerLp);
+        progressContent.addView(career);
         LinearLayout focus=surfaceCard();long actual=0;int planned=0;long now=System.currentTimeMillis();
         for(Block b:blocks){long d=getActualDuration(b,now);actual+=d;if(isStudyBlock(b.title))planned+=Math.max(0,mins(b.end)-mins(b.start));}
         focus.addView(text("EXECUTION",11,color("#6BD0A6"),true));focus.addView(text(fmtPreciseMillis(actual)+" tracked focus",22,color("#F2F7F3"),true));
@@ -997,7 +1013,7 @@ public class MainActivity extends Activity {
     }
 
     private void buildMonthlyGoalsSection() {
-        TextView intro = text("An editable month-by-month plan based on your saved checkpoints: the 1 April 2027 CSE review and 1 January 2028 CSE target. Treat the topic sequence as a starting point and adjust it to your sources and actual progress.",
+        TextView intro = text("An editable starter sequence for your CSE and interview goals. Adjust the month, focus and success criteria to match your sources and actual progress.",
                 12, color("#9AABA0"), false);
         intro.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
