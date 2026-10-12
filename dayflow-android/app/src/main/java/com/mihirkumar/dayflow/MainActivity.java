@@ -792,7 +792,8 @@ public class MainActivity extends Activity {
     }
 
     private void buildProgressPage() {
-        pageHeading(pageProgress,"Long game","Progress","One honest view of preparation, real work completed, and phone use. Forecasts use your saved history—not invented completion.");
+        pageHeading(pageProgress, "Your progress", "Study & readiness",
+                "See topic completion, monthly goals, deadlines and actual focus time. You can edit your plan at any point.");
         progressContent=vertical();pageProgress.addView(progressContent);renderProgressPage();
     }
     private void renderProgressPage() {
@@ -812,12 +813,16 @@ public class MainActivity extends Activity {
         String careerNotes=getPrefs().getString(CAREER_TARGET_NOTES_KEY,"After taxes and deductions; bonus and ESOPs excluded. About 6 years of experience; assess IC and EM roles on fit.");
         career.addView(text(tier34Line+"\n"+tier12Line+"\nInterview-prep commitment: 12–13 hours; track actual sessions with Focus.\nCareer outcome: "+careerTarget+".\n"+careerNotes,12,color("#9AABA0"),false));
         ProgressBar intBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);intBar.setMax(Math.max(1,intTotal));intBar.setProgress(intDone);intBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#D5B56E")));career.addView(intBar);
-        LinearLayout careerActions=horizontal();
+        LinearLayout careerActions=vertical();
+        LinearLayout roadmapRow=horizontal();
         Button openCareer=secondaryButton("Monthly goals",()->{selectedGoalMonth=monthKeyFromDate(todayKey());roadmapTab="goals";showSyllabusTracker();});
-        careerActions.addView(openCareer,new LinearLayout.LayoutParams(0,dp(42),1f));
-        Button openInterviewTopics=primaryButton("Interview topics",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";if(syllabusSearch!=null)syllabusSearch.setText("");roadmapTab="topics";showSyllabusTracker();});
-        LinearLayout.LayoutParams interviewLp=new LinearLayout.LayoutParams(0,dp(42),1f);interviewLp.leftMargin=dp(7);careerActions.addView(openInterviewTopics,interviewLp);
-        LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,dp(42));careerLp.topMargin=dp(10);career.addView(careerActions,careerLp);
+        roadmapRow.addView(openCareer,new LinearLayout.LayoutParams(0,dp(42),1f));
+        Button openMilestones=primaryButton("Milestones",()->{roadmapTab="milestones";showSyllabusTracker();});
+        LinearLayout.LayoutParams milestonesLp=new LinearLayout.LayoutParams(0,dp(42),1f);milestonesLp.leftMargin=dp(7);roadmapRow.addView(openMilestones,milestonesLp);
+        careerActions.addView(roadmapRow,new LinearLayout.LayoutParams(-1,dp(42)));
+        Button openInterviewTopics=secondaryButton("View & edit interview topics",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";if(syllabusSearch!=null)syllabusSearch.setText("");roadmapTab="topics";showSyllabusTracker();});
+        LinearLayout.LayoutParams interviewLp=new LinearLayout.LayoutParams(-1,dp(42));interviewLp.topMargin=dp(7);careerActions.addView(openInterviewTopics,interviewLp);
+        LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,-2);careerLp.topMargin=dp(10);career.addView(careerActions,careerLp);
         Button editCareer=secondaryButton("Edit career goal",()->editCareerGoal());
         LinearLayout.LayoutParams editCareerLp=new LinearLayout.LayoutParams(-1,dp(42));editCareerLp.topMargin=dp(7);career.addView(editCareer,editCareerLp);
         progressContent.addView(career);
