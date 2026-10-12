@@ -83,6 +83,8 @@ public class MainActivity extends Activity {
     private EditText syllabusSearch;
     private LinearLayout roadmapTabRow, monthlyGoalsSection, monthlyGoalList, milestonesSection, milestoneList, syllabusTopicsSection;
     private TextView goalMonthLabel;
+    private Button syllabusProgressToggle;
+    private boolean syllabusProgressExpanded = false;
     private String roadmapTab = "goals";
     private String selectedGoalMonth;
     private String activePage = "home";
@@ -1131,21 +1133,12 @@ public class MainActivity extends Activity {
     }
 
     private void buildSyllabusTopicsSection() {
-        TextView intro = text("Tick a topic only when you have completed the study and review you intended. Tap its name to edit it.",
+        TextView intro = text("Use this as a checklist: mark topics complete only after study and review. Tap a topic or its Edit button to change the name or subject.",
                 12, color("#9AABA0"), false);
         intro.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
         introLp.bottomMargin = dp(10);
         syllabusTopicsSection.addView(intro, introLp);
-
-        TextView progressLabel = text("SUBJECT PROGRESS", 10, color("#65C5A0"), true);
-        LinearLayout.LayoutParams progressLabelLp = new LinearLayout.LayoutParams(-1, -2);
-        progressLabelLp.bottomMargin = dp(7);
-        syllabusTopicsSection.addView(progressLabel, progressLabelLp);
-        syllabusBreakdown = vertical();
-        LinearLayout.LayoutParams breakdownLp = new LinearLayout.LayoutParams(-1, -2);
-        breakdownLp.bottomMargin = dp(12);
-        syllabusTopicsSection.addView(syllabusBreakdown, breakdownLp);
 
         LinearLayout topicActions = horizontal();
         topicActions.addView(primaryButton("＋ Add topic", () -> editSyllabusTopic(null)),
@@ -1210,6 +1203,23 @@ public class MainActivity extends Activity {
 
         syllabusList = vertical();
         syllabusTopicsSection.addView(syllabusList, new LinearLayout.LayoutParams(-1, -2));
+
+        syllabusProgressToggle = secondaryButton("Show subject progress", () -> {
+            syllabusProgressExpanded = !syllabusProgressExpanded;
+            if (syllabusBreakdown != null) {
+                syllabusBreakdown.setVisibility(syllabusProgressExpanded ? View.VISIBLE : View.GONE);
+            }
+            syllabusProgressToggle.setText(syllabusProgressExpanded ? "Hide subject progress" : "Show subject progress");
+        });
+        LinearLayout.LayoutParams progressToggleLp = new LinearLayout.LayoutParams(-1, dp(42));
+        progressToggleLp.topMargin = dp(8);
+        progressToggleLp.bottomMargin = dp(8);
+        syllabusTopicsSection.addView(syllabusProgressToggle, progressToggleLp);
+
+        syllabusBreakdown = vertical();
+        syllabusBreakdown.setVisibility(View.GONE);
+        LinearLayout.LayoutParams breakdownLp = new LinearLayout.LayoutParams(-1, -2);
+        syllabusTopicsSection.addView(syllabusBreakdown, breakdownLp);
     }
 
     private void refreshSyllabusFilterStyles(LinearLayout filters, ArrayList<String> subjects) {
@@ -1379,6 +1389,12 @@ public class MainActivity extends Activity {
                 if (syllabusSearch != null) syllabusSearch.setText("");
                 refreshSyllabusRows();
             });
+        }
+        if (syllabusBreakdown != null) {
+            syllabusBreakdown.setVisibility(syllabusProgressExpanded ? View.VISIBLE : View.GONE);
+        }
+        if (syllabusProgressToggle != null) {
+            syllabusProgressToggle.setText(syllabusProgressExpanded ? "Hide subject progress" : "Show subject progress");
         }
     }
 
