@@ -802,7 +802,7 @@ public class MainActivity extends Activity {
         LinearLayout cse=surfaceCard();cse.addView(text("UPSC CSE",11,color("#6BD0A6"),true));cse.addView(text(cseDone+" / "+cseTotal+" topics complete",22,color("#F2F7F3"),true));
         cse.addView(text(cseTotal==0?"Load the syllabus starter to begin tracking.":Math.round(cseDone*100f/Math.max(1,cseTotal))+"% of your current topic list",12,color("#9AABA0"),false));
         ProgressBar cseBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);cseBar.setMax(Math.max(1,cseTotal));cseBar.setProgress(cseDone);cseBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));cse.addView(cseBar);
-        Button openCse=primaryButton("Open CSE syllabus topics",()->{syllabusFilter="All";syllabusQuery="";roadmapTab="topics";showSyllabusTracker();});LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(-1,dp(42));openLp.topMargin=dp(10);cse.addView(openCse,openLp);progressContent.addView(cse);
+        Button openCse=primaryButton("Open CSE syllabus topics",()->{syllabusFilter="All";syllabusQuery="";if(syllabusSearch!=null)syllabusSearch.setText("");roadmapTab="topics";showSyllabusTracker();});LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(-1,dp(42));openLp.topMargin=dp(10);cse.addView(openCse,openLp);progressContent.addView(cse);
         LinearLayout career=surfaceCard();career.addView(text("SOFTWARE INTERVIEW PREP",11,color("#D5B56E"),true));career.addView(text(intDone+" / "+intTotal+" topics complete",22,color("#F2F7F3"),true));
         RoadmapMilestone tier34=roadmapMilestoneForKey("tier34");
         RoadmapMilestone tier12=roadmapMilestoneForKey("tier12");
@@ -815,7 +815,7 @@ public class MainActivity extends Activity {
         LinearLayout careerActions=horizontal();
         Button openCareer=secondaryButton("Monthly goals",()->{selectedGoalMonth=monthKeyFromDate(todayKey());roadmapTab="goals";showSyllabusTracker();});
         careerActions.addView(openCareer,new LinearLayout.LayoutParams(0,dp(42),1f));
-        Button openInterviewTopics=primaryButton("Interview topics",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";roadmapTab="topics";showSyllabusTracker();});
+        Button openInterviewTopics=primaryButton("Interview topics",()->{syllabusFilter="Software Interview Prep";syllabusQuery="";if(syllabusSearch!=null)syllabusSearch.setText("");roadmapTab="topics";showSyllabusTracker();});
         LinearLayout.LayoutParams interviewLp=new LinearLayout.LayoutParams(0,dp(42),1f);interviewLp.leftMargin=dp(7);careerActions.addView(openInterviewTopics,interviewLp);
         LinearLayout.LayoutParams careerLp=new LinearLayout.LayoutParams(-1,dp(42));careerLp.topMargin=dp(10);career.addView(careerActions,careerLp);
         Button editCareer=secondaryButton("Edit career goal",()->editCareerGoal());
@@ -1083,11 +1083,12 @@ public class MainActivity extends Activity {
         monthNav.setGravity(Gravity.CENTER_VERTICAL);
         monthNav.addView(secondaryButton("‹", () -> changeSelectedGoalMonth(-1)),
                 new LinearLayout.LayoutParams(dp(44), dp(42)));
-        goalMonthLabel = text(monthLabelForKey(selectedGoalMonth), 16, color("#F2F7F3"), true);
+        goalMonthLabel = text(monthLabelForKey(selectedGoalMonth) + "  ▾", 16, color("#F2F7F3"), true);
         goalMonthLabel.setGravity(Gravity.CENTER);
         goalMonthLabel.setBackground(bg("#18231E", 12));
         goalMonthLabel.setContentDescription("Choose month");
         goalMonthLabel.setOnClickListener(v -> chooseGoalMonth());
+        goalMonthLabel.setTooltipText("Tap to choose a month");
         LinearLayout.LayoutParams monthLabelLp = new LinearLayout.LayoutParams(0, dp(42), 1f);
         monthLabelLp.leftMargin = dp(7);
         monthLabelLp.rightMargin = dp(7);
@@ -1250,6 +1251,15 @@ public class MainActivity extends Activity {
                 if (topic.done) cseDone++;
             }
         }
+        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+        String monthKey = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
+        int monthGoalCount = 0, monthGoalDone = 0;
+        for (MonthlyGoal goal : goals) {
+            if (monthKey.equals(goal.month)) {
+                monthGoalCount++;
+                if (goal.done) monthGoalDone++;
+            }
+        }
         ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
         Collections.sort(milestones, Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
         RoadmapMilestone next = null;
@@ -1257,11 +1267,12 @@ public class MainActivity extends Activity {
             if (!milestone.done) { next = milestone; break; }
         }
         String nextLine = next == null
-                ? "Next milestone: all listed milestones are marked complete"
-                : (next.date.compareTo(todayKey()) < 0 ? "Overdue milestone: " : "Next milestone: ")
+                ? "Next milestone · All listed milestones complete"
+                : (next.date.compareTo(todayKey()) < 0 ? "Overdue milestone · " : "Next milestone · ")
                     + next.title + " · " + displayRoadmapDate(next.date);
-        syllabusSummaryView.setText("UPSC CSE  ·  " + cseDone + "/" + cseTotal + " topics complete"
-                + "\nSoftware interviews  ·  " + interviewDone + "/" + interviewTotal + " topics complete"
+        syllabusSummaryView.setText(monthLabelForKey(monthKey) + " goals · " + monthGoalDone + "/" + monthGoalCount + " complete"
+                + "\nUPSC CSE · " + cseDone + "/" + cseTotal + " topics complete"
+                + "\nSoftware interviews · " + interviewDone + "/" + interviewTotal + " topics complete"
                 + "\n" + nextLine);
     }
 
@@ -1368,7 +1379,7 @@ public class MainActivity extends Activity {
 
     private void renderMonthlyGoals() {
         if (monthlyGoalList == null) return;
-        if (goalMonthLabel != null) goalMonthLabel.setText(monthLabelForKey(selectedGoalMonth));
+        if (goalMonthLabel != null) goalMonthLabel.setText(monthLabelForKey(selectedGoalMonth) + "  ▾");
         monthlyGoalList.removeAllViews();
         ArrayList<MonthlyGoal> goals = readMonthlyGoals();
         ArrayList<MonthlyGoal> monthGoals = new ArrayList<>();
@@ -1640,8 +1651,10 @@ public class MainActivity extends Activity {
                 detailLp.topMargin = dp(5);
                 card.addView(detail, detailLp);
             }
-            TextView status = text(milestone.done ? "✓  COMPLETE" : "○  UPCOMING",
-                    10, milestone.done ? color("#70D6A5") : color("#9AABA0"), true);
+            boolean overdue = !milestone.done && milestone.date != null && milestone.date.compareTo(todayKey()) < 0;
+            String statusLabel = milestone.done ? "✓  COMPLETE" : overdue ? "⚠  OVERDUE" : "○  UPCOMING";
+            int statusColor = milestone.done ? color("#70D6A5") : overdue ? color("#D5B56E") : color("#9AABA0");
+            TextView status = text(statusLabel, 10, statusColor, true);
             LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
             statusLp.topMargin = dp(8);
             card.addView(status, statusLp);
