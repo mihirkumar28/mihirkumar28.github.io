@@ -5322,6 +5322,8 @@ private void restoreBackupValues(JSONObject values) {
             editor.apply();
             selectedDateKey = todayKey();
             load();
+            ensureRoadmapData();
+            refreshRoadmapTabContent();
             render();
             ensureScreenTimeWorker();
             DayFlowWidgetProvider.refreshAll(this);
