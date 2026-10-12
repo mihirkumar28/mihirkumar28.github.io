@@ -832,6 +832,65 @@ public class MainActivity extends Activity {
         Button viewTime=secondaryButton("Screen-time history",()->showScreenTimeTracker());LinearLayout.LayoutParams stp=new LinearLayout.LayoutParams(-1,dp(42));stp.topMargin=dp(10);screen.addView(viewTime,stp);progressContent.addView(screen);
     }
 
+    private void editCareerGoal() {
+        LinearLayout form = vertical();
+        form.setPadding(dp(20), dp(4), dp(20), dp(10));
+        TextView helper = text("These are career planning assumptions, not app-enforced targets. Edit them as your priorities change.",
+                12, color("#687A70"), false);
+        helper.setLineSpacing(dp(2), 1f);
+        form.addView(helper);
+
+        TextView targetLabel = text("MONTHLY TAKE-HOME TARGET", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams targetLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        targetLabelLp.topMargin = dp(12);
+        form.addView(targetLabel, targetLabelLp);
+        EditText target = new EditText(this);
+        target.setSingleLine(true);
+        target.setHint("e.g. ₹2.5–2.75L/month");
+        target.setTextColor(color("#18372E"));
+        target.setHintTextColor(color("#82948A"));
+        target.setPadding(dp(12), dp(5), dp(12), dp(5));
+        target.setBackground(bg("#FFFFFF", 12));
+        target.setText(getPrefs().getString(CAREER_TARGET_KEY, "₹2.5–2.75L/month after taxes and deductions"));
+        form.addView(target, new LinearLayout.LayoutParams(-1, dp(50)));
+
+        TextView notesLabel = text("ROLE / CAREER CONTEXT", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams notesLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        notesLabelLp.topMargin = dp(12);
+        form.addView(notesLabel, notesLabelLp);
+        EditText notes = new EditText(this);
+        notes.setGravity(Gravity.TOP | Gravity.START);
+        notes.setMinLines(3);
+        notes.setTextColor(color("#18372E"));
+        notes.setHintTextColor(color("#82948A"));
+        notes.setPadding(dp(12), dp(10), dp(12), dp(10));
+        notes.setBackground(bg("#FFFFFF", 12));
+        notes.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        notes.setText(getPrefs().getString(CAREER_TARGET_NOTES_KEY,
+                "Exclude bonus and ESOPs. About 6 years of experience; assess IC and EM roles on fit."));
+        LinearLayout.LayoutParams notesLp = new LinearLayout.LayoutParams(-1, dp(118));
+        notesLp.topMargin = dp(4);
+        form.addView(notes, notesLp);
+
+        showFullScreenEditor("CAREER GOAL", "Edit career goal",
+                "Your goal stays saved locally and can be updated at any time.", form, () -> {
+                    String value = target.getText().toString().trim();
+                    if (value.isEmpty()) {
+                        target.setError("Enter your target or remove the target from this field");
+                        target.requestFocus();
+                        return false;
+                    }
+                    getPrefs().edit()
+                            .putString(CAREER_TARGET_KEY, value)
+                            .putString(CAREER_TARGET_NOTES_KEY, notes.getText().toString().trim())
+                            .apply();
+                    renderProgressPage();
+                    return true;
+                });
+    }
+
     private void buildOfficePage() {
         pageHeading(pageOffice,"Time ledger","Office & commute","One-tap attendance, commute sessions and weekly totals. Presence is separate from timetable completion.");
         officePageContent=vertical();pageOffice.addView(officePageContent);renderOfficePage();
@@ -1592,10 +1651,16 @@ public class MainActivity extends Activity {
             actions.addView(secondaryButton(milestone.done ? "Reopen" : "Mark complete",
                     () -> toggleRoadmapMilestone(milestone)),
                     new LinearLayout.LayoutParams(0, -1, 1f));
-            Button edit = primaryButton("Edit milestone", () -> editRoadmapMilestone(milestone));
+            Button edit = primaryButton("Edit", () -> editRoadmapMilestone(milestone));
             LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(0, -1, 1f);
             editLp.leftMargin = dp(7);
             actions.addView(edit, editLp);
+            if (milestone.key == null || milestone.key.isEmpty()) {
+                Button delete = secondaryButton("Delete", () -> confirmDeleteRoadmapMilestone(milestone));
+                LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(0, -1, 0.85f);
+                deleteLp.leftMargin = dp(7);
+                actions.addView(delete, deleteLp);
+            }
         }
     }
 
@@ -3662,101 +3727,23 @@ public class MainActivity extends Activity {
     }
 
     private String syllabusSummary(ArrayList<SyllabusTopic> topics) {
-        String target = getPrefs().getString(SYLLABUS_TARGET_KEY, "2028-01-01");
-        String interviewStart = getPrefs().getString(INTERVIEW_PLAN_START_KEY, todayKey());
-        String interviewTarget = getPrefs().getString(INTERVIEW_TARGET_KEY, "2027-07-11");
-        Calendar interviewSixMonth = Calendar.getInstance();
-        Date interviewStartDate = parseDateKey(interviewStart);
-        if (interviewStartDate != null) interviewSixMonth.setTime(interviewStartDate);
-        interviewSixMonth.add(Calendar.MONTH, 6);
-        String sixMonthDate = keyForDate(interviewSixMonth.getTime());
-        Date targetDate = parseDateKey(target);
-        Calendar targetCalendar = Calendar.getInstance();
-        if (targetDate != null) targetCalendar.setTime(targetDate);
-        targetCalendar.set(Calendar.HOUR_OF_DAY, 0);
-        targetCalendar.set(Calendar.MINUTE, 0);
-        targetCalendar.set(Calendar.SECOND, 0);
-        targetCalendar.set(Calendar.MILLISECOND, 0);
-        Calendar today = Calendar.getInstance();
-        today.set(Calendar.HOUR_OF_DAY, 0);
-        today.set(Calendar.MINUTE, 0);
-        today.set(Calendar.SECOND, 0);
-        today.set(Calendar.MILLISECOND, 0);
-        long daysLeft = Math.max(0L, (targetCalendar.getTimeInMillis() - today.getTimeInMillis()) / 86400000L);
-        int done = 0, recentlyDone = 0, cseDone = 0, cseTotal = 0, interviewDone = 0, interviewTotal = 0;
-        long weekAgo = System.currentTimeMillis() - 7L * 86400000L;
-        LinkedHashMap<String, int[]> counts = new LinkedHashMap<>();
-        for (SyllabusTopic topic : topics) {
-            int[] values = counts.get(topic.subject);
-            if (values == null) {
-                values = new int[2];
-                counts.put(topic.subject, values);
-            }
-            values[1]++;
-            boolean softwareInterview = "Software Interview Prep".equals(topic.subject);
-            if (softwareInterview) interviewTotal++; else cseTotal++;
-            if (topic.done) {
-                values[0]++;
-                done++;
-                if (softwareInterview) interviewDone++; else cseDone++;
-                if (topic.completedAt >= weekAgo && !softwareInterview) recentlyDone++;
-            }
-        }
-        int cseRemaining = Math.max(0, cseTotal - cseDone);
-        int interviewRemaining = Math.max(0, interviewTotal - interviewDone);
-        Calendar aprilCheckpoint = Calendar.getInstance();
-        Date aprilDate = parseDateKey("2027-04-01");
-        if (aprilDate != null) aprilCheckpoint.setTime(aprilDate);
-        aprilCheckpoint.set(Calendar.HOUR_OF_DAY, 0);
-        aprilCheckpoint.set(Calendar.MINUTE, 0);
-        aprilCheckpoint.set(Calendar.SECOND, 0);
-        aprilCheckpoint.set(Calendar.MILLISECOND, 0);
-        long daysToApril = Math.max(0L, (aprilCheckpoint.getTimeInMillis() - today.getTimeInMillis()) / 86400000L);
-        StringBuilder summary = new StringBuilder();
-        summary.append("Overall: ").append(done).append("/").append(topics.size())
-                .append(" complete (").append(topics.isEmpty() ? 0 : Math.round(done * 100f / topics.size())).append("%)");
-        summary.append("\n\nCSE checkpoint: 1 Apr 2027 • ").append(daysToApril).append(" days left");
-        if (cseTotal > 0 && daysToApril > 0) {
-            summary.append("\nPace needed by April checkpoint: ")
-                    .append(String.format(Locale.US, "%.2f", cseRemaining / (double) daysToApril))
-                    .append(" topics/day from your current CSE list");
-        }
-        summary.append("\nCSE syllabus target: ").append(target).append(" • ").append(daysLeft).append(" days left");
-        if (cseTotal > 0 && daysLeft > 0) {
-            summary.append("\nCSE pace needed: ").append(String.format(Locale.US, "%.2f", cseRemaining / (double) daysLeft))
-                    .append(" topics/day (software interview topics excluded)");
-            if (recentlyDone > 0) {
-                double perDay = recentlyDone / 7.0;
-                long projectedDays = (long) Math.ceil(cseRemaining / perDay);
-                Calendar forecast = Calendar.getInstance();
-                forecast.add(Calendar.DAY_OF_YEAR, (int) Math.min(Integer.MAX_VALUE, projectedDays));
-                summary.append("\nRecent CSE pace: ").append(recentlyDone).append(" topics/week")
-                        .append(" • projected finish ").append(new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(forecast.getTime()));
-            } else {
-                summary.append("\nCSE finish forecast: not enough completion history yet.");
-            }
-        }
-        summary.append("\n\nSoftware interview prep: ").append(interviewDone).append("/").append(interviewTotal)
-                .append(" complete")
-                .append("\n6-month Tier 3/4 readiness checkpoint: ").append(sixMonthDate)
-                .append("\n9-month Tier 1/2 strong-hire target: ").append(interviewTarget);
-        if (interviewTotal > 0) {
-            summary.append("\nInterview topics remaining: ").append(interviewRemaining);
-        }
-        summary.append("\n\nRoutine anchors from your saved plan:")
-                .append("\n• Workweek: 3 WFH days and 2 office days.")
-                .append("\n• WFH target: 2h GS + 2h Maths Optional; protect 08:00–09:30 for interview preparation.")
-                .append("\n• Default WFH routine places Maths Optional after work so it does not overlap the protected interview slot; adjust it if your work hours differ.")
-                .append("\n• Office: Maths Optional only after work, not in the morning.")
-                .append("\n• Weekends: 6 hours CSE — 3 hours GS + 3 hours Maths Optional.")
-                .append("\n• Interview prep: 12–13 hours planned; Tier 3/4 readiness around month 6, Tier 1/2 strong-hire target around month 9.");
-        for (Map.Entry<String, int[]> entry : counts.entrySet()) {
-            int[] values = entry.getValue();
-            summary.append("\n").append(entry.getKey()).append(": ").append(values[0]).append("/")
-                    .append(values[1]).append(" (").append(Math.round(values[0] * 100f / values[1])).append("%)");
-        }
-        if (topics.isEmpty()) summary.append("\nAdd or import topics. Percentages cover your list only, not syllabus items you have not entered.");
-        return summary.toString();
+        RoadmapMilestone cseCheckpoint = roadmapMilestoneForKey("cse-checkpoint");
+        RoadmapMilestone cseTarget = roadmapMilestoneForKey("cse-target");
+        RoadmapMilestone tier34 = roadmapMilestoneForKey("tier34");
+        RoadmapMilestone tier12 = roadmapMilestoneForKey("tier12");
+        return syllabusOverview(topics)
+                + "\n\nCSE checkpoint: " + (cseCheckpoint == null
+                    ? displayRoadmapDate(getPrefs().getString(CSE_CHECKPOINT_KEY, "2027-04-01"))
+                    : displayRoadmapDate(cseCheckpoint.date))
+                + "\nCSE target: " + (cseTarget == null
+                    ? displayRoadmapDate(getPrefs().getString(SYLLABUS_TARGET_KEY, "2028-01-01"))
+                    : displayRoadmapDate(cseTarget.date))
+                + "\nTier 3/4 readiness: " + (tier34 == null
+                    ? displayRoadmapDate(getPrefs().getString(INTERVIEW_TIER34_KEY, "2027-04-05"))
+                    : displayRoadmapDate(tier34.date))
+                + "\nTier 1/2 readiness: " + (tier12 == null
+                    ? displayRoadmapDate(getPrefs().getString(INTERVIEW_TARGET_KEY, "2027-07-11"))
+                    : displayRoadmapDate(tier12.date));
     }
 
     private void chooseSyllabusTargetDate() {
@@ -3769,8 +3756,19 @@ public class MainActivity extends Activity {
             chosen.set(year, month, day, 0, 0, 0);
             chosen.set(Calendar.MILLISECOND, 0);
             String key = keyForDate(chosen.getTime());
-            getPrefs().edit().putString(SYLLABUS_TARGET_KEY, key).apply();
+            ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
+            boolean found = false;
+            for (RoadmapMilestone milestone : milestones) {
+                if ("cse-target".equals(milestone.key)) {
+                    milestone.date = key;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) persistRoadmapMilestones(milestones);
+            else getPrefs().edit().putString(SYLLABUS_TARGET_KEY, key).apply();
             debugLog("Syllabus target date set: " + key);
+            refreshRoadmapSummary();
             showSyllabusTracker();
         }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
         picker.setTitle("Syllabus target date");
