@@ -954,79 +954,1070 @@ public class MainActivity extends Activity {
     }
 
     private void buildSyllabusPage() {
-        pageHeading(pageSyllabus,"Learning ledger","Syllabus & interview prep","Track completed topics. UPSC CSE and software interviews keep separate progress and deadlines.");
-        LinearLayout actions=horizontal();actions.addView(secondaryButton("‹ Progress",()->switchPage("progress")),new LinearLayout.LayoutParams(dp(105),dp(40)));
-        Button target=secondaryButton("Target date",()->chooseSyllabusTargetDate());LinearLayout.LayoutParams targetLp=new LinearLayout.LayoutParams(0,dp(40),1);targetLp.leftMargin=dp(7);actions.addView(target,targetLp);pageSyllabus.addView(actions);
-        syllabusSummaryView=text("",14,color("#D6E4DA"),true);syllabusSummaryView.setPadding(dp(14),dp(12),dp(14),dp(12));syllabusSummaryView.setBackground(bg("#18231E",16));
-        LinearLayout.LayoutParams sumLp=new LinearLayout.LayoutParams(-1,-2);sumLp.topMargin=dp(12);sumLp.bottomMargin=dp(8);pageSyllabus.addView(syllabusSummaryView,sumLp);
-        HorizontalScrollView overviewScroll=new HorizontalScrollView(this);overviewScroll.setHorizontalScrollBarEnabled(false);
-        syllabusBreakdown=horizontal();overviewScroll.addView(syllabusBreakdown);
-        LinearLayout.LayoutParams breakdownLp=new LinearLayout.LayoutParams(-1,-2);breakdownLp.bottomMargin=dp(12);pageSyllabus.addView(overviewScroll,breakdownLp);
-        LinearLayout topicActions=horizontal();
-        topicActions.addView(primaryButton("＋ Add topic",()->editSyllabusTopic(null)),new LinearLayout.LayoutParams(0,dp(42),1));
-        Button imp=secondaryButton("Import list",()->importSyllabusTopics());LinearLayout.LayoutParams impLp=new LinearLayout.LayoutParams(0,dp(42),1);impLp.leftMargin=dp(6);topicActions.addView(imp,impLp);
-        Button starter=secondaryButton("Load syllabus",()->loadStarterSyllabus(true));LinearLayout.LayoutParams seedLp=new LinearLayout.LayoutParams(0,dp(42),1);seedLp.leftMargin=dp(6);topicActions.addView(starter,seedLp);pageSyllabus.addView(topicActions);
-        syllabusSearch=new EditText(this);syllabusSearch.setSingleLine(true);syllabusSearch.setTextColor(color("#F2F7F3"));syllabusSearch.setHintTextColor(color("#82948A"));syllabusSearch.setHint("Search topics, papers or subjects");syllabusSearch.setText(syllabusQuery);syllabusSearch.setPadding(dp(12),0,dp(12),0);syllabusSearch.setBackground(bg("#18231E",12));
-        LinearLayout.LayoutParams searchLp=new LinearLayout.LayoutParams(-1,dp(44));searchLp.topMargin=dp(10);searchLp.bottomMargin=dp(8);pageSyllabus.addView(syllabusSearch,searchLp);
-        syllabusSearch.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){} public void onTextChanged(CharSequence s,int st,int before,int count){syllabusQuery=s.toString();refreshSyllabusRows();} public void afterTextChanged(Editable e){}});
-        HorizontalScrollView fs=new HorizontalScrollView(this);fs.setHorizontalScrollBarEnabled(false);LinearLayout filters=horizontal();ArrayList<String> subjects=new ArrayList<>();subjects.add("All");subjects.addAll(Arrays.asList(SYLLABUS_SUBJECTS));
-        for(String subject:subjects){Button filter=chip(subject);boolean selected=subject.equals(syllabusFilter);filter.setTextColor(color(selected?"#F2F7F3":"#B7C7BC"));filter.setBackground(bg(selected?"#245B45":"#1B2621",12));LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-2,dp(34));fp.rightMargin=dp(6);filters.addView(filter,fp);filter.setOnClickListener(v->{syllabusFilter=subject;refreshSyllabusRows();});}
-        fs.addView(filters);LinearLayout.LayoutParams filterLp=new LinearLayout.LayoutParams(-1,dp(38));filterLp.bottomMargin=dp(8);pageSyllabus.addView(fs,filterLp);
-        syllabusList=vertical();pageSyllabus.addView(syllabusList);refreshSyllabusRows();
+        if (selectedGoalMonth == null) selectedGoalMonth = monthKeyFromDate(todayKey());
+        pageHeading(pageSyllabus, "Your roadmap", "Goals, milestones & syllabus",
+                "Monthly goals first. Checkpoints and individual syllabus topics have their own clear sections.");
+
+        syllabusSummaryView = text("", 12, color("#D6E4DA"), false);
+        syllabusSummaryView.setLineSpacing(dp(3), 1f);
+        syllabusSummaryView.setPadding(dp(14), dp(12), dp(14), dp(12));
+        syllabusSummaryView.setBackground(bg("#18231E", 16));
+        LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
+        summaryLp.bottomMargin = dp(12);
+        pageSyllabus.addView(syllabusSummaryView, summaryLp);
+
+        roadmapTabRow = horizontal();
+        String[][] tabs = {{"goals", "Monthly goals"}, {"milestones", "Milestones"}, {"topics", "Syllabus topics"}};
+        for (String[] tab : tabs) {
+            Button b = secondaryButton(tab[1], () -> {
+                roadmapTab = tab[0];
+                refreshRoadmapTabContent();
+            });
+            b.setTag("roadmap-tab-" + tab[0]);
+            b.setTextSize(11);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+            if (roadmapTabRow.getChildCount() > 0) lp.leftMargin = dp(5);
+            roadmapTabRow.addView(b, lp);
+        }
+        LinearLayout.LayoutParams tabLp = new LinearLayout.LayoutParams(-1, dp(42));
+        tabLp.bottomMargin = dp(14);
+        pageSyllabus.addView(roadmapTabRow, tabLp);
+
+        monthlyGoalsSection = vertical();
+        milestonesSection = vertical();
+        syllabusTopicsSection = vertical();
+        pageSyllabus.addView(monthlyGoalsSection, new LinearLayout.LayoutParams(-1, -2));
+        pageSyllabus.addView(milestonesSection, new LinearLayout.LayoutParams(-1, -2));
+        pageSyllabus.addView(syllabusTopicsSection, new LinearLayout.LayoutParams(-1, -2));
+
+        buildMonthlyGoalsSection();
+        buildMilestonesSection();
+        buildSyllabusTopicsSection();
+        refreshRoadmapTabContent();
     }
+
+    private void buildMonthlyGoalsSection() {
+        TextView intro = text("An editable month-by-month plan based on your saved checkpoints: the 1 April 2027 CSE review and 1 January 2028 CSE target. Treat the topic sequence as a starting point and adjust it to your sources and actual progress.",
+                12, color("#9AABA0"), false);
+        intro.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
+        introLp.bottomMargin = dp(12);
+        monthlyGoalsSection.addView(intro, introLp);
+
+        LinearLayout monthNav = horizontal();
+        monthNav.setGravity(Gravity.CENTER_VERTICAL);
+        monthNav.addView(secondaryButton("‹", () -> changeSelectedGoalMonth(-1)),
+                new LinearLayout.LayoutParams(dp(44), dp(42)));
+        goalMonthLabel = text(monthLabelForKey(selectedGoalMonth), 16, color("#F2F7F3"), true);
+        goalMonthLabel.setGravity(Gravity.CENTER);
+        goalMonthLabel.setBackground(bg("#18231E", 12));
+        goalMonthLabel.setContentDescription("Choose month");
+        goalMonthLabel.setOnClickListener(v -> chooseGoalMonth());
+        LinearLayout.LayoutParams monthLabelLp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        monthLabelLp.leftMargin = dp(7);
+        monthLabelLp.rightMargin = dp(7);
+        monthNav.addView(goalMonthLabel, monthLabelLp);
+        monthNav.addView(secondaryButton("›", () -> changeSelectedGoalMonth(1)),
+                new LinearLayout.LayoutParams(dp(44), dp(42)));
+        LinearLayout.LayoutParams monthNavLp = new LinearLayout.LayoutParams(-1, dp(42));
+        monthNavLp.bottomMargin = dp(10);
+        monthlyGoalsSection.addView(monthNav, monthNavLp);
+
+        Button addGoal = primaryButton("＋  Add a monthly goal", () -> editMonthlyGoal(null));
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(44));
+        addLp.bottomMargin = dp(10);
+        monthlyGoalsSection.addView(addGoal, addLp);
+
+        monthlyGoalList = vertical();
+        monthlyGoalsSection.addView(monthlyGoalList, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private void buildMilestonesSection() {
+        TextView intro = text("Deadlines and checkpoints are separate from syllabus topics. Edit any milestone to change its name, date, track or success criteria.",
+                12, color("#9AABA0"), false);
+        intro.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
+        introLp.bottomMargin = dp(12);
+        milestonesSection.addView(intro, introLp);
+
+        Button addMilestone = primaryButton("＋  Add a milestone", () -> editRoadmapMilestone(null));
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(44));
+        addLp.bottomMargin = dp(10);
+        milestonesSection.addView(addMilestone, addLp);
+
+        milestoneList = vertical();
+        milestonesSection.addView(milestoneList, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private void buildSyllabusTopicsSection() {
+        TextView intro = text("Tick a topic only when you have completed the study and review you intended. Tap its name to edit it.",
+                12, color("#9AABA0"), false);
+        intro.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
+        introLp.bottomMargin = dp(10);
+        syllabusTopicsSection.addView(intro, introLp);
+
+        TextView progressLabel = text("SUBJECT PROGRESS", 10, color("#65C5A0"), true);
+        LinearLayout.LayoutParams progressLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        progressLabelLp.bottomMargin = dp(7);
+        syllabusTopicsSection.addView(progressLabel, progressLabelLp);
+        syllabusBreakdown = vertical();
+        LinearLayout.LayoutParams breakdownLp = new LinearLayout.LayoutParams(-1, -2);
+        breakdownLp.bottomMargin = dp(12);
+        syllabusTopicsSection.addView(syllabusBreakdown, breakdownLp);
+
+        LinearLayout topicActions = horizontal();
+        topicActions.addView(primaryButton("＋ Add topic", () -> editSyllabusTopic(null)),
+                new LinearLayout.LayoutParams(0, dp(42), 1f));
+        Button imp = secondaryButton("Import list", () -> importSyllabusTopics());
+        LinearLayout.LayoutParams impLp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        impLp.leftMargin = dp(7);
+        topicActions.addView(imp, impLp);
+        LinearLayout.LayoutParams topicActionsLp = new LinearLayout.LayoutParams(-1, dp(42));
+        topicActionsLp.bottomMargin = dp(7);
+        syllabusTopicsSection.addView(topicActions, topicActionsLp);
+
+        Button starter = secondaryButton("Load missing starter topics", () -> loadStarterSyllabus(true));
+        LinearLayout.LayoutParams starterLp = new LinearLayout.LayoutParams(-1, dp(40));
+        starterLp.bottomMargin = dp(10);
+        syllabusTopicsSection.addView(starter, starterLp);
+
+        syllabusSearch = new EditText(this);
+        syllabusSearch.setSingleLine(true);
+        syllabusSearch.setTextColor(color("#F2F7F3"));
+        syllabusSearch.setHintTextColor(color("#82948A"));
+        syllabusSearch.setHint("Search topics or subjects");
+        syllabusSearch.setText(syllabusQuery);
+        syllabusSearch.setPadding(dp(12), 0, dp(12), 0);
+        syllabusSearch.setBackground(bg("#18231E", 12));
+        LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(-1, dp(44));
+        searchLp.bottomMargin = dp(8);
+        syllabusTopicsSection.addView(syllabusSearch, searchLp);
+        syllabusSearch.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int st, int count, int after) {}
+            public void onTextChanged(CharSequence s, int st, int before, int count) {
+                syllabusQuery = s.toString();
+                refreshSyllabusRows();
+            }
+            public void afterTextChanged(Editable e) {}
+        });
+
+        HorizontalScrollView fs = new HorizontalScrollView(this);
+        fs.setHorizontalScrollBarEnabled(false);
+        LinearLayout filters = horizontal();
+        ArrayList<String> subjects = new ArrayList<>();
+        subjects.add("All");
+        subjects.addAll(Arrays.asList(SYLLABUS_SUBJECTS));
+        for (String subject : subjects) {
+            Button filter = chip(subject);
+            boolean selected = subject.equals(syllabusFilter);
+            filter.setTextColor(color(selected ? "#F2F7F3" : "#B7C7BC"));
+            filter.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
+            LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-2, dp(34));
+            fp.rightMargin = dp(6);
+            filters.addView(filter, fp);
+            filter.setOnClickListener(v -> {
+                syllabusFilter = subject;
+                refreshSyllabusRows();
+                refreshSyllabusFilterStyles(filters, subjects);
+            });
+        }
+        fs.addView(filters);
+        LinearLayout.LayoutParams filterLp = new LinearLayout.LayoutParams(-1, dp(38));
+        filterLp.bottomMargin = dp(8);
+        syllabusTopicsSection.addView(fs, filterLp);
+
+        syllabusList = vertical();
+        syllabusTopicsSection.addView(syllabusList, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private void refreshSyllabusFilterStyles(LinearLayout filters, ArrayList<String> subjects) {
+        for (int i = 0; i < filters.getChildCount() && i < subjects.size(); i++) {
+            View child = filters.getChildAt(i);
+            if (child instanceof Button) {
+                boolean selected = subjects.get(i).equals(syllabusFilter);
+                ((Button) child).setTextColor(color(selected ? "#F2F7F3" : "#B7C7BC"));
+                child.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
+            }
+        }
+    }
+
+    private void refreshRoadmapTabContent() {
+        if (monthlyGoalsSection == null || milestonesSection == null || syllabusTopicsSection == null) return;
+        monthlyGoalsSection.setVisibility("goals".equals(roadmapTab) ? View.VISIBLE : View.GONE);
+        milestonesSection.setVisibility("milestones".equals(roadmapTab) ? View.VISIBLE : View.GONE);
+        syllabusTopicsSection.setVisibility("topics".equals(roadmapTab) ? View.VISIBLE : View.GONE);
+        String[] tabKeys = {"goals", "milestones", "topics"};
+        for (String key : tabKeys) {
+            View v = roadmapTabRow == null ? null : roadmapTabRow.findViewWithTag("roadmap-tab-" + key);
+            if (v instanceof Button) {
+                boolean active = key.equals(roadmapTab);
+                ((Button) v).setTextColor(color(active ? "#F2F7F3" : "#B7C7BC"));
+                v.setBackground(bg(active ? "#286B55" : "#18231E", 12));
+            }
+        }
+        refreshRoadmapSummary();
+        if ("goals".equals(roadmapTab)) renderMonthlyGoals();
+        else if ("milestones".equals(roadmapTab)) renderMilestones();
+        else refreshSyllabusRows();
+    }
+
+    private void refreshRoadmapSummary() {
+        if (syllabusSummaryView == null) return;
+        ArrayList<SyllabusTopic> topics = readSyllabusTopics();
+        int cseTotal = 0, cseDone = 0, interviewTotal = 0, interviewDone = 0;
+        for (SyllabusTopic topic : topics) {
+            if ("Software Interview Prep".equals(topic.subject)) {
+                interviewTotal++;
+                if (topic.done) interviewDone++;
+            } else {
+                cseTotal++;
+                if (topic.done) cseDone++;
+            }
+        }
+        ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
+        Collections.sort(milestones, Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
+        RoadmapMilestone next = null;
+        for (RoadmapMilestone milestone : milestones) {
+            if (!milestone.done) { next = milestone; break; }
+        }
+        String nextLine = next == null
+                ? "Next milestone: all listed milestones are marked complete"
+                : (next.date.compareTo(todayKey()) < 0 ? "Overdue milestone: " : "Next milestone: ")
+                    + next.title + " · " + displayRoadmapDate(next.date);
+        syllabusSummaryView.setText("UPSC CSE  ·  " + cseDone + "/" + cseTotal + " topics complete"
+                + "\nSoftware interviews  ·  " + interviewDone + "/" + interviewTotal + " topics complete"
+                + "\n" + nextLine);
+    }
+
     private void refreshSyllabusRows() {
-        if(syllabusList==null||syllabusSummaryView==null)return;
-        ArrayList<SyllabusTopic> topics=readSyllabusTopics();
-        syllabusSummaryView.setText(syllabusOverview(topics));
+        if (syllabusList == null) return;
+        ArrayList<SyllabusTopic> topics = readSyllabusTopics();
+        refreshRoadmapSummary();
         renderSyllabusBreakdown(topics);
         syllabusList.removeAllViews();
-        String query=syllabusQuery.trim().toLowerCase(Locale.US);int shown=0;
-        for(SyllabusTopic topic:topics){
-            if(!"All".equals(syllabusFilter)&&!syllabusFilter.equals(topic.subject))continue;
-            if(!query.isEmpty()&&!topic.title.toLowerCase(Locale.US).contains(query)&&!topic.subject.toLowerCase(Locale.US).contains(query))continue;
-            shown++;LinearLayout row=horizontal();row.setGravity(Gravity.TOP);row.setPadding(dp(11),dp(10),dp(7),dp(10));row.setBackground(bg(topic.done?"#172B22":"#18231E",14));
-            LinearLayout.LayoutParams rowLp=new LinearLayout.LayoutParams(-1,-2);rowLp.bottomMargin=dp(7);syllabusList.addView(row,rowLp);
-            Button toggle=actionButton(topic.done?"✓":"○",color(topic.done?"#102017":"#A8BAAE"),topic.done?"#70D6A5":"#283A30");row.addView(toggle,new LinearLayout.LayoutParams(dp(38),dp(38)));
-            LinearLayout details=vertical();details.setPadding(dp(9),0,dp(3),0);details.addView(text(topic.title,13,color("#F2F7F3"),true));details.addView(text(topic.subject+(topic.done?" • Complete":" • Pending"),10,color("#9AABA0"),false));row.addView(details,new LinearLayout.LayoutParams(0,-2,1));
-            Button more=secondaryButton("⋮",()->showSyllabusTopicActions(topic));row.addView(more,new LinearLayout.LayoutParams(dp(36),dp(36)));
-            toggle.setOnClickListener(v->{topic.done=!topic.done;topic.completedAt=topic.done?System.currentTimeMillis():0L;persistSyllabusTopics(readSyllabusTopicsWith(topic));});
+        String query = syllabusQuery.trim().toLowerCase(Locale.US);
+        int shown = 0;
+        for (SyllabusTopic topic : topics) {
+            if (!"All".equals(syllabusFilter) && !syllabusFilter.equals(topic.subject)) continue;
+            if (!query.isEmpty()
+                    && !topic.title.toLowerCase(Locale.US).contains(query)
+                    && !topic.subject.toLowerCase(Locale.US).contains(query)) continue;
+            shown++;
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.TOP);
+            row.setPadding(dp(11), dp(10), dp(7), dp(10));
+            row.setBackground(bg(topic.done ? "#172B22" : "#18231E", 14));
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.bottomMargin = dp(7);
+            syllabusList.addView(row, rowLp);
+
+            Button toggle = actionButton(topic.done ? "✓" : "○",
+                    color(topic.done ? "#102017" : "#A8BAAE"),
+                    topic.done ? "#70D6A5" : "#283A30");
+            toggle.setContentDescription(topic.done ? "Mark pending" : "Mark complete");
+            row.addView(toggle, new LinearLayout.LayoutParams(dp(38), dp(38)));
+            LinearLayout details = vertical();
+            details.setPadding(dp(9), 0, dp(3), 0);
+            details.addView(text(topic.title, 13, color("#F2F7F3"), true));
+            details.addView(text(topic.subject + (topic.done ? " · Complete" : " · Not complete"), 10,
+                    color("#9AABA0"), false));
+            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+            Button more = secondaryButton("Edit", () -> editSyllabusTopic(topic));
+            row.addView(more, new LinearLayout.LayoutParams(dp(52), dp(36)));
+            toggle.setOnClickListener(v -> {
+                topic.done = !topic.done;
+                topic.completedAt = topic.done ? System.currentTimeMillis() : 0L;
+                persistSyllabusTopics(readSyllabusTopicsWith(topic));
+            });
             details.setOnClickListener(v -> editSyllabusTopic(topic));
         }
-        if(shown==0)syllabusList.addView(text("No topics match these filters. Try All or clear the search.",13,color("#9AABA0"),false));
-    }
-    private String syllabusOverview(ArrayList<SyllabusTopic> topics) {
-        int done=0,cseTotal=0,cseDone=0,interviewTotal=0,interviewDone=0;
-        for(SyllabusTopic topic:topics){
-            boolean interview="Software Interview Prep".equals(topic.subject);
-            if(interview){interviewTotal++;if(topic.done)interviewDone++;}
-            else{cseTotal++;if(topic.done)cseDone++;}
-            if(topic.done)done++;
+        if (shown == 0) {
+            syllabusList.addView(text("No topics match these filters. Try All, clear the search, or add a topic.",
+                    13, color("#9AABA0"), false));
         }
-        return "OVERALL  "+done+" / "+topics.size()+" complete  •  "+(topics.isEmpty()?0:Math.round(done*100f/topics.size()))+"%"
-                +"\nUPSC CSE  "+cseDone+" / "+cseTotal+"     •     SOFTWARE INTERVIEWS  "+interviewDone+" / "+interviewTotal;
+    }
+
+    private String syllabusOverview(ArrayList<SyllabusTopic> topics) {
+        int done = 0, cseTotal = 0, cseDone = 0, interviewTotal = 0, interviewDone = 0;
+        for (SyllabusTopic topic : topics) {
+            boolean interview = "Software Interview Prep".equals(topic.subject);
+            if (interview) { interviewTotal++; if (topic.done) interviewDone++; }
+            else { cseTotal++; if (topic.done) cseDone++; }
+            if (topic.done) done++;
+        }
+        return "UPSC CSE  " + cseDone + "/" + cseTotal
+                + " complete\nSoftware interviews  " + interviewDone + "/" + interviewTotal
+                + " complete\nCombined  " + done + "/" + topics.size() + " topics complete";
     }
 
     private void renderSyllabusBreakdown(ArrayList<SyllabusTopic> topics) {
-        if(syllabusBreakdown==null)return;
+        if (syllabusBreakdown == null) return;
         syllabusBreakdown.removeAllViews();
-        for(String subject:SYLLABUS_SUBJECTS){
-            int total=0,done=0;
-            for(SyllabusTopic topic:topics)if(subject.equals(topic.subject)){total++;if(topic.done)done++;}
-            LinearLayout card=surfaceCard();card.setPadding(dp(12),dp(11),dp(12),dp(11));
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(164),dp(104));lp.rightMargin=dp(7);card.setLayoutParams(lp);
-            TextView label=text(subject,11,color("#B7C7BC"),true);label.setMaxLines(2);label.setMinHeight(dp(28));card.addView(label);
-            card.addView(text(done+"/"+total,20,color("#F2F7F3"),true));
-            ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(Math.max(1,total));bar.setProgress(done);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(5));bp.topMargin=dp(5);card.addView(bar,bp);
-            card.setOnClickListener(v->{syllabusFilter=subject;syllabusQuery="";if(syllabusSearch!=null)syllabusSearch.setText("");refreshSyllabusRows();});
-            syllabusBreakdown.addView(card);
+        for (String subject : SYLLABUS_SUBJECTS) {
+            int total = 0, done = 0;
+            for (SyllabusTopic topic : topics) {
+                if (subject.equals(topic.subject)) {
+                    total++;
+                    if (topic.done) done++;
+                }
+            }
+            LinearLayout card = vertical();
+            card.setPadding(dp(12), dp(9), dp(12), dp(9));
+            card.setBackground(bg("#18231E", 13));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+            lp.bottomMargin = dp(6);
+            syllabusBreakdown.addView(card, lp);
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            TextView label = text(subject, 12, color("#F2F7F3"), true);
+            label.setMaxLines(2);
+            row.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
+            row.addView(text(done + "/" + total, 12, color("#B7C7BC"), true));
+            card.addView(row);
+            ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            bar.setMax(Math.max(1, total));
+            bar.setProgress(done);
+            bar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#40B58A")));
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(4));
+            bp.topMargin = dp(7);
+            card.addView(bar, bp);
+            card.setOnClickListener(v -> {
+                syllabusFilter = subject;
+                syllabusQuery = "";
+                if (syllabusSearch != null) syllabusSearch.setText("");
+                refreshSyllabusRows();
+            });
         }
-        LinearLayout roadmap=surfaceCard();roadmap.setPadding(dp(12),dp(11),dp(12),dp(11));
-        LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(dp(210),dp(104));rp.rightMargin=dp(7);roadmap.setLayoutParams(rp);
-        roadmap.addView(text("ROADMAP",11,color("#D5B56E"),true));
-        String start=getPrefs().getString(INTERVIEW_PLAN_START_KEY,todayKey());
-        Date sd=parseDateKey(start);Calendar six=Calendar.getInstance();if(sd!=null)six.setTime(sd);six.add(Calendar.MONTH,6);
-        roadmap.addView(text("CSE checkpoint  1 Apr 2027\nCSE target  1 Jan 2028\nTier 3/4  "+keyForDate(six.getTime())+"\nTier 1/2  "+getPrefs().getString(INTERVIEW_TARGET_KEY,"2027-07-11"),10,color("#D6E4DA"),false));
-        syllabusBreakdown.addView(roadmap);
+    }
+
+    private void renderMonthlyGoals() {
+        if (monthlyGoalList == null) return;
+        if (goalMonthLabel != null) goalMonthLabel.setText(monthLabelForKey(selectedGoalMonth));
+        monthlyGoalList.removeAllViews();
+        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+        ArrayList<MonthlyGoal> monthGoals = new ArrayList<>();
+        for (MonthlyGoal goal : goals) if (selectedGoalMonth.equals(goal.month)) monthGoals.add(goal);
+        Collections.sort(monthGoals, Comparator.comparingInt(g -> monthlyGoalTrackOrder(g.track)));
+        int done = 0;
+        for (MonthlyGoal goal : monthGoals) if (goal.done) done++;
+        LinearLayout summary = vertical();
+        summary.setPadding(dp(13), dp(10), dp(13), dp(10));
+        summary.setBackground(bg("#18231E", 13));
+        LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
+        summaryLp.bottomMargin = dp(9);
+        monthlyGoalList.addView(summary, summaryLp);
+        summary.addView(text(done + " of " + monthGoals.size() + " goals complete", 13, color("#F2F7F3"), true));
+        summary.addView(text("Three tracks stay separate: GS, Maths Optional and software interviews.", 11,
+                color("#9AABA0"), false));
+        if (monthGoals.isEmpty()) {
+            LinearLayout empty = vertical();
+            empty.setPadding(dp(14), dp(14), dp(14), dp(14));
+            empty.setBackground(bg("#18231E", 13));
+            empty.addView(text("No goals planned for this month yet.", 14, color("#F2F7F3"), true));
+            empty.addView(text("Add a goal below and choose its track, target and month.", 12, color("#9AABA0"), false));
+            monthlyGoalList.addView(empty);
+            return;
+        }
+        for (MonthlyGoal goal : monthGoals) {
+            LinearLayout card = vertical();
+            card.setPadding(dp(13), dp(12), dp(13), dp(12));
+            card.setBackground(bg(goal.done ? "#172B22" : "#18231E", 15));
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            cardLp.bottomMargin = dp(8);
+            monthlyGoalList.addView(card, cardLp);
+
+            TextView track = text(goal.track.toUpperCase(Locale.US), 10,
+                    "Software Interview Prep".equals(goal.track) ? color("#D5B56E") : color("#65C5A0"), true);
+            card.addView(track);
+            TextView title = text(goal.title, 15, color("#F2F7F3"), true);
+            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+            titleLp.topMargin = dp(5);
+            card.addView(title, titleLp);
+            if (goal.target != null && !goal.target.trim().isEmpty()) {
+                TextView target = text(goal.target, 12, color("#B7C7BC"), false);
+                target.setLineSpacing(dp(2), 1f);
+                LinearLayout.LayoutParams targetLp = new LinearLayout.LayoutParams(-1, -2);
+                targetLp.topMargin = dp(5);
+                card.addView(target, targetLp);
+            }
+            TextView status = text(goal.done ? "✓  COMPLETE" : "○  IN PROGRESS", 10,
+                    goal.done ? color("#70D6A5") : color("#9AABA0"), true);
+            LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
+            statusLp.topMargin = dp(8);
+            card.addView(status, statusLp);
+
+            LinearLayout actions = horizontal();
+            LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, dp(40));
+            actionsLp.topMargin = dp(8);
+            card.addView(actions, actionsLp);
+            Button mark = secondaryButton(goal.done ? "Reopen" : "Mark done", () -> toggleMonthlyGoal(goal));
+            actions.addView(mark, new LinearLayout.LayoutParams(0, -1, 1f));
+            Button edit = primaryButton("Edit", () -> editMonthlyGoal(goal));
+            LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(0, -1, 1f);
+            editLp.leftMargin = dp(6);
+            actions.addView(edit, editLp);
+            Button delete = secondaryButton("Delete", () -> confirmDeleteMonthlyGoal(goal));
+            LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(0, -1, 0.85f);
+            deleteLp.leftMargin = dp(6);
+            actions.addView(delete, deleteLp);
+        }
+    }
+
+    private int monthlyGoalTrackOrder(String track) {
+        if ("General Studies".equals(track)) return 0;
+        if ("Maths Optional".equals(track)) return 1;
+        if ("Software Interview Prep".equals(track)) return 2;
+        if ("CSE Revision & Tests".equals(track)) return 3;
+        return 4;
+    }
+
+    private void changeSelectedGoalMonth(int offset) {
+        if (selectedGoalMonth == null) selectedGoalMonth = monthKeyFromDate(todayKey());
+        Date date = parseDateKey(selectedGoalMonth + "-01");
+        Calendar c = Calendar.getInstance();
+        if (date != null) c.setTime(date);
+        c.set(Calendar.DAY_OF_MONTH, 1);
+        c.add(Calendar.MONTH, offset);
+        selectedGoalMonth = new SimpleDateFormat("yyyy-MM", Locale.US).format(c.getTime());
+        refreshRoadmapSummary();
+        renderMonthlyGoals();
+    }
+
+    private void chooseGoalMonth() {
+        Date date = parseDateKey((selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth) + "-01");
+        Calendar c = Calendar.getInstance();
+        if (date != null) c.setTime(date);
+        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar chosen = Calendar.getInstance();
+            chosen.set(year, month, 1, 0, 0, 0);
+            selectedGoalMonth = new SimpleDateFormat("yyyy-MM", Locale.US).format(chosen.getTime());
+            renderMonthlyGoals();
+            refreshRoadmapSummary();
+        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
+        picker.setTitle("Choose goal month");
+        picker.show();
+    }
+
+    private void editMonthlyGoal(MonthlyGoal existing) {
+        final String[] draftMonth = {existing == null
+                ? (selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth)
+                : existing.month};
+        LinearLayout form = vertical();
+        form.setPadding(dp(20), dp(4), dp(20), dp(10));
+        TextView help = text("Change the month, track, goal and success criteria. These changes are saved on this device.",
+                12, color("#687A70"), false);
+        help.setLineSpacing(dp(2), 1f);
+        form.addView(help);
+
+        Button month = secondaryButton(monthLabelForKey(draftMonth[0]), () -> {
+            Date parsed = parseDateKey(draftMonth[0] + "-01");
+            Calendar initial = Calendar.getInstance();
+            if (parsed != null) initial.setTime(parsed);
+            DatePickerDialog picker = new DatePickerDialog(this, (view, year, monthOfYear, day) -> {
+                Calendar chosen = Calendar.getInstance();
+                chosen.set(year, monthOfYear, 1, 0, 0, 0);
+                draftMonth[0] = new SimpleDateFormat("yyyy-MM", Locale.US).format(chosen.getTime());
+                month.setText(monthLabelForKey(draftMonth[0]));
+            }, initial.get(Calendar.YEAR), initial.get(Calendar.MONTH), initial.get(Calendar.DAY_OF_MONTH));
+            picker.setTitle("Goal month");
+            picker.show();
+        });
+        LinearLayout.LayoutParams monthLp = new LinearLayout.LayoutParams(-1, dp(44));
+        monthLp.topMargin = dp(12);
+        form.addView(month, monthLp);
+
+        form.addView(text("TRACK", 10, color("#687A70"), true));
+        Spinner track = new Spinner(this);
+        track.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, MONTHLY_GOAL_TRACKS));
+        if (existing != null) {
+            for (int i = 0; i < MONTHLY_GOAL_TRACKS.length; i++) {
+                if (MONTHLY_GOAL_TRACKS[i].equals(existing.track)) track.setSelection(i);
+            }
+        }
+        form.addView(track, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        TextView titleLabel = text("GOAL", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams titleLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLabelLp.topMargin = dp(10);
+        form.addView(titleLabel, titleLabelLp);
+        EditText title = new EditText(this);
+        title.setSingleLine(true);
+        title.setHint("What should be achieved this month?");
+        title.setTextColor(color("#18372E"));
+        title.setHintTextColor(color("#82948A"));
+        title.setPadding(dp(12), dp(5), dp(12), dp(5));
+        title.setBackground(bg("#FFFFFF", 12));
+        if (existing != null) title.setText(existing.title);
+        form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
+
+        TextView targetLabel = text("SUCCESS CRITERIA / TARGET", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams targetLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        targetLabelLp.topMargin = dp(10);
+        form.addView(targetLabel, targetLabelLp);
+        EditText target = new EditText(this);
+        target.setGravity(Gravity.TOP | Gravity.START);
+        target.setMinLines(3);
+        target.setHint("What does 'done' look like?");
+        target.setTextColor(color("#18372E"));
+        target.setHintTextColor(color("#82948A"));
+        target.setPadding(dp(12), dp(10), dp(12), dp(10));
+        target.setBackground(bg("#FFFFFF", 12));
+        target.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        if (existing != null && existing.target != null) target.setText(existing.target);
+        LinearLayout.LayoutParams targetLp = new LinearLayout.LayoutParams(-1, dp(110));
+        targetLp.topMargin = dp(4);
+        form.addView(target, targetLp);
+
+        showFullScreenEditor("MONTHLY GOALS", existing == null ? "Add monthly goal" : "Edit monthly goal",
+                "Keep the goal specific enough that you can honestly mark it complete.", form, () -> {
+                    String name = title.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        title.setError("Enter a goal");
+                        title.requestFocus();
+                        return false;
+                    }
+                    ArrayList<MonthlyGoal> all = readMonthlyGoals();
+                    MonthlyGoal updated = new MonthlyGoal(existing == null ? System.currentTimeMillis() : existing.id,
+                            draftMonth[0], track.getSelectedItem().toString(), name,
+                            target.getText().toString().trim(), existing != null && existing.done);
+                    boolean replaced = false;
+                    for (int i = 0; i < all.size(); i++) {
+                        if (existing != null && all.get(i).id == existing.id) {
+                            all.set(i, updated);
+                            replaced = true;
+                            break;
+                        }
+                    }
+                    if (!replaced) all.add(updated);
+                    selectedGoalMonth = draftMonth[0];
+                    persistMonthlyGoals(all);
+                    roadmapTab = "goals";
+                    refreshRoadmapTabContent();
+                    return true;
+                });
+    }
+
+    private void toggleMonthlyGoal(MonthlyGoal goal) {
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        for (MonthlyGoal item : all) {
+            if (item.id == goal.id) {
+                item.done = !item.done;
+                break;
+            }
+        }
+        persistMonthlyGoals(all);
+    }
+
+    private void confirmDeleteMonthlyGoal(MonthlyGoal goal) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete this goal?")
+                .setMessage("“" + goal.title + "” will be removed from " + monthLabelForKey(goal.month) + ".")
+                .setPositiveButton("Delete", (d, w) -> {
+                    ArrayList<MonthlyGoal> all = readMonthlyGoals();
+                    all.removeIf(item -> item.id == goal.id);
+                    persistMonthlyGoals(all);
+                })
+                .setNegativeButton("Keep goal", null)
+                .show();
+    }
+
+    private void renderMilestones() {
+        if (milestoneList == null) return;
+        milestoneList.removeAllViews();
+        ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
+        Collections.sort(milestones, Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
+        if (milestones.isEmpty()) {
+            milestoneList.addView(text("No milestones yet. Add one to give a goal a clear deadline.",
+                    13, color("#9AABA0"), false));
+            return;
+        }
+        for (RoadmapMilestone milestone : milestones) {
+            LinearLayout card = vertical();
+            card.setPadding(dp(13), dp(12), dp(13), dp(12));
+            card.setBackground(bg(milestone.done ? "#172B22" : "#18231E", 15));
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            cardLp.bottomMargin = dp(8);
+            milestoneList.addView(card, cardLp);
+
+            LinearLayout header = horizontal();
+            header.setGravity(Gravity.CENTER_VERTICAL);
+            TextView track = text(milestone.track.toUpperCase(Locale.US), 10,
+                    "Software interviews".equals(milestone.track) ? color("#D5B56E") : color("#65C5A0"), true);
+            header.addView(track, new LinearLayout.LayoutParams(0, -2, 1f));
+            TextView date = text(displayRoadmapDate(milestone.date), 11, color("#D6E4DA"), true);
+            date.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+            header.addView(date);
+            card.addView(header);
+
+            TextView title = text(milestone.title, 15, color("#F2F7F3"), true);
+            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+            titleLp.topMargin = dp(6);
+            card.addView(title, titleLp);
+            if (milestone.detail != null && !milestone.detail.trim().isEmpty()) {
+                TextView detail = text(milestone.detail, 12, color("#B7C7BC"), false);
+                detail.setLineSpacing(dp(2), 1f);
+                LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
+                detailLp.topMargin = dp(5);
+                card.addView(detail, detailLp);
+            }
+            TextView status = text(milestone.done ? "✓  COMPLETE" : "○  UPCOMING",
+                    10, milestone.done ? color("#70D6A5") : color("#9AABA0"), true);
+            LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
+            statusLp.topMargin = dp(8);
+            card.addView(status, statusLp);
+
+            LinearLayout actions = horizontal();
+            LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, dp(40));
+            actionsLp.topMargin = dp(8);
+            card.addView(actions, actionsLp);
+            actions.addView(secondaryButton(milestone.done ? "Reopen" : "Mark complete",
+                    () -> toggleRoadmapMilestone(milestone)),
+                    new LinearLayout.LayoutParams(0, -1, 1f));
+            Button edit = primaryButton("Edit milestone", () -> editRoadmapMilestone(milestone));
+            LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(0, -1, 1f);
+            editLp.leftMargin = dp(7);
+            actions.addView(edit, editLp);
+        }
+    }
+
+    private void editRoadmapMilestone(RoadmapMilestone existing) {
+        final String[] draftDate = {existing == null ? todayKey() : existing.date};
+        LinearLayout form = vertical();
+        form.setPadding(dp(20), dp(4), dp(20), dp(10));
+        TextView help = text("A milestone is a deadline or readiness checkpoint, not a syllabus topic. Editing a saved checkpoint also updates its date anywhere DayFlow shows it.",
+                12, color("#687A70"), false);
+        help.setLineSpacing(dp(2), 1f);
+        form.addView(help);
+
+        TextView trackLabel = text("TRACK", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams trackLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        trackLabelLp.topMargin = dp(10);
+        form.addView(trackLabel, trackLabelLp);
+        Spinner track = new Spinner(this);
+        track.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, MILESTONE_TRACKS));
+        if (existing != null) {
+            for (int i = 0; i < MILESTONE_TRACKS.length; i++) {
+                if (MILESTONE_TRACKS[i].equals(existing.track)) track.setSelection(i);
+            }
+        } else track.setSelection(0);
+        form.addView(track, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        TextView titleLabel = text("MILESTONE", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams titleLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLabelLp.topMargin = dp(10);
+        form.addView(titleLabel, titleLabelLp);
+        EditText title = new EditText(this);
+        title.setSingleLine(true);
+        title.setHint("Name this milestone");
+        title.setTextColor(color("#18372E"));
+        title.setHintTextColor(color("#82948A"));
+        title.setPadding(dp(12), dp(5), dp(12), dp(5));
+        title.setBackground(bg("#FFFFFF", 12));
+        if (existing != null) title.setText(existing.title);
+        form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
+
+        TextView dateLabel = text("DEADLINE", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams dateLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        dateLabelLp.topMargin = dp(10);
+        form.addView(dateLabel, dateLabelLp);
+        Button dateButton = secondaryButton(displayRoadmapDate(draftDate[0]), () -> {
+            Date parsed = parseDateKey(draftDate[0]);
+            Calendar initial = Calendar.getInstance();
+            if (parsed != null) initial.setTime(parsed);
+            DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
+                Calendar chosen = Calendar.getInstance();
+                chosen.set(year, month, day, 0, 0, 0);
+                draftDate[0] = keyForDate(chosen.getTime());
+                dateButton.setText(displayRoadmapDate(draftDate[0]));
+            }, initial.get(Calendar.YEAR), initial.get(Calendar.MONTH), initial.get(Calendar.DAY_OF_MONTH));
+            picker.setTitle("Milestone deadline");
+            picker.show();
+        });
+        form.addView(dateButton, new LinearLayout.LayoutParams(-1, dp(44)));
+
+        TextView detailLabel = text("SUCCESS CRITERIA", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams detailLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        detailLabelLp.topMargin = dp(10);
+        form.addView(detailLabel, detailLabelLp);
+        EditText detail = new EditText(this);
+        detail.setGravity(Gravity.TOP | Gravity.START);
+        detail.setMinLines(3);
+        detail.setHint("How will you know this checkpoint is achieved?");
+        detail.setTextColor(color("#18372E"));
+        detail.setHintTextColor(color("#82948A"));
+        detail.setPadding(dp(12), dp(10), dp(12), dp(10));
+        detail.setBackground(bg("#FFFFFF", 12));
+        detail.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        if (existing != null && existing.detail != null) detail.setText(existing.detail);
+        LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, dp(112));
+        detailLp.topMargin = dp(4);
+        form.addView(detail, detailLp);
+
+        showFullScreenEditor("MILESTONES", existing == null ? "Add milestone" : "Edit milestone",
+                "Use an observable outcome, not just a date.", form, () -> {
+                    String name = title.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        title.setError("Enter a milestone name");
+                        title.requestFocus();
+                        return false;
+                    }
+                    ArrayList<RoadmapMilestone> all = readRoadmapMilestones();
+                    RoadmapMilestone updated = new RoadmapMilestone(
+                            existing == null ? System.currentTimeMillis() : existing.id,
+                            existing == null ? "" : existing.key,
+                            track.getSelectedItem().toString(), name, draftDate[0],
+                            detail.getText().toString().trim(), existing != null && existing.done);
+                    boolean replaced = false;
+                    for (int i = 0; i < all.size(); i++) {
+                        if (existing != null && all.get(i).id == existing.id) {
+                            all.set(i, updated);
+                            replaced = true;
+                            break;
+                        }
+                    }
+                    if (!replaced) all.add(updated);
+                    persistRoadmapMilestones(all);
+                    roadmapTab = "milestones";
+                    refreshRoadmapTabContent();
+                    return true;
+                });
+    }
+
+    private void toggleRoadmapMilestone(RoadmapMilestone milestone) {
+        ArrayList<RoadmapMilestone> all = readRoadmapMilestones();
+        for (RoadmapMilestone item : all) {
+            if (item.id == milestone.id) {
+                item.done = !item.done;
+                break;
+            }
+        }
+        persistRoadmapMilestones(all);
+    }
+
+    private void confirmDeleteRoadmapMilestone(RoadmapMilestone milestone) {
+        if (milestone.key != null && !milestone.key.isEmpty()) {
+            Toast.makeText(this, "Edit this checkpoint instead of deleting a core roadmap date.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Delete this milestone?")
+                .setMessage("“" + milestone.title + "” will be removed from the roadmap.")
+                .setPositiveButton("Delete", (d, w) -> {
+                    ArrayList<RoadmapMilestone> all = readRoadmapMilestones();
+                    all.removeIf(item -> item.id == milestone.id);
+                    persistRoadmapMilestones(all);
+                })
+                .setNegativeButton("Keep milestone", null)
+                .show();
+    }
+
+    private ArrayList<MonthlyGoal> readMonthlyGoals() {
+        ArrayList<MonthlyGoal> goals = new ArrayList<>();
+        try {
+            JSONArray data = new JSONArray(getPrefs().getString(MONTHLY_GOALS_KEY, "[]"));
+            for (int i = 0; i < data.length(); i++) {
+                JSONObject item = data.optJSONObject(i);
+                if (item == null) continue;
+                goals.add(new MonthlyGoal(item.optLong("id", i + 1L),
+                        item.optString("month", monthKeyFromDate(todayKey())),
+                        item.optString("track", "General Studies"),
+                        item.optString("title", ""),
+                        item.optString("target", ""),
+                        item.optBoolean("done", false)));
+            }
+        } catch (Exception e) {
+            debugLog("Monthly goals read failed: " + e.getMessage());
+        }
+        return goals;
+    }
+
+    private void persistMonthlyGoals(ArrayList<MonthlyGoal> goals) {
+        JSONArray data = new JSONArray();
+        try {
+            for (MonthlyGoal goal : goals) {
+                JSONObject item = new JSONObject();
+                item.put("id", goal.id);
+                item.put("month", goal.month);
+                item.put("track", goal.track);
+                item.put("title", goal.title);
+                item.put("target", goal.target == null ? "" : goal.target);
+                item.put("done", goal.done);
+                data.put(item);
+            }
+            getPrefs().edit().putString(MONTHLY_GOALS_KEY, data.toString()).apply();
+            debugLog("Monthly roadmap goals saved: " + goals.size());
+            refreshRoadmapSummary();
+            if ("goals".equals(roadmapTab)) renderMonthlyGoals();
+        } catch (Exception e) {
+            debugLog("Monthly goals save failed: " + e.getMessage());
+            Toast.makeText(this, "Could not save monthly goals.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private ArrayList<RoadmapMilestone> readRoadmapMilestones() {
+        ArrayList<RoadmapMilestone> milestones = new ArrayList<>();
+        try {
+            JSONArray data = new JSONArray(getPrefs().getString(ROADMAP_MILESTONES_KEY, "[]"));
+            for (int i = 0; i < data.length(); i++) {
+                JSONObject item = data.optJSONObject(i);
+                if (item == null) continue;
+                milestones.add(new RoadmapMilestone(item.optLong("id", i + 1L),
+                        item.optString("key", ""),
+                        item.optString("track", "UPSC CSE"),
+                        item.optString("title", ""),
+                        item.optString("date", todayKey()),
+                        item.optString("detail", ""),
+                        item.optBoolean("done", false)));
+            }
+        } catch (Exception e) {
+            debugLog("Roadmap milestones read failed: " + e.getMessage());
+        }
+        return milestones;
+    }
+
+    private void persistRoadmapMilestones(ArrayList<RoadmapMilestone> milestones) {
+        JSONArray data = new JSONArray();
+        try {
+            SharedPreferences.Editor editor = getPrefs().edit();
+            for (RoadmapMilestone milestone : milestones) {
+                JSONObject item = new JSONObject();
+                item.put("id", milestone.id);
+                item.put("key", milestone.key == null ? "" : milestone.key);
+                item.put("track", milestone.track);
+                item.put("title", milestone.title);
+                item.put("date", milestone.date);
+                item.put("detail", milestone.detail == null ? "" : milestone.detail);
+                item.put("done", milestone.done);
+                data.put(item);
+                if ("cse-checkpoint".equals(milestone.key)) editor.putString(CSE_CHECKPOINT_KEY, milestone.date);
+                else if ("cse-target".equals(milestone.key)) editor.putString(SYLLABUS_TARGET_KEY, milestone.date);
+                else if ("tier34".equals(milestone.key)) editor.putString(INTERVIEW_TIER34_KEY, milestone.date);
+                else if ("tier12".equals(milestone.key)) editor.putString(INTERVIEW_TARGET_KEY, milestone.date);
+            }
+            editor.putString(ROADMAP_MILESTONES_KEY, data.toString()).apply();
+            debugLog("Roadmap milestones saved: " + milestones.size());
+            refreshRoadmapSummary();
+            if ("milestones".equals(roadmapTab)) renderMilestones();
+        } catch (Exception e) {
+            debugLog("Roadmap milestone save failed: " + e.getMessage());
+            Toast.makeText(this, "Could not save milestone changes.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void ensureRoadmapData() {
+        SharedPreferences prefs = getPrefs();
+        SharedPreferences.Editor defaults = prefs.edit();
+        if (!prefs.contains(CSE_CHECKPOINT_KEY)) defaults.putString(CSE_CHECKPOINT_KEY, "2027-04-01");
+        if (!prefs.contains(SYLLABUS_TARGET_KEY)) defaults.putString(SYLLABUS_TARGET_KEY, "2028-01-01");
+        if (!prefs.contains(INTERVIEW_TIER34_KEY)) {
+            String start = prefs.getString(INTERVIEW_PLAN_START_KEY, todayKey());
+            Date startDate = parseDateKey(start);
+            Calendar sixMonths = Calendar.getInstance();
+            if (startDate != null) sixMonths.setTime(startDate);
+            sixMonths.add(Calendar.MONTH, 6);
+            defaults.putString(INTERVIEW_TIER34_KEY, keyForDate(sixMonths.getTime()));
+        }
+        defaults.apply();
+
+        ArrayList<SyllabusTopic> oldTopics = readSyllabusTopics();
+        boolean tier34Done = false, tier12Done = false;
+        for (SyllabusTopic topic : oldTopics) {
+            if (topic.title.startsWith("Roadmap milestone:") && topic.title.toLowerCase(Locale.US).contains("tier 3/4")) {
+                tier34Done = topic.done;
+            } else if (topic.title.startsWith("Roadmap milestone:") && topic.title.toLowerCase(Locale.US).contains("tier 1/2")) {
+                tier12Done = topic.done;
+            }
+        }
+        if (!prefs.contains(ROADMAP_MILESTONES_KEY)) {
+            persistRoadmapMilestones(defaultRoadmapMilestones(tier34Done, tier12Done));
+        }
+
+        boolean removedLegacyRows = oldTopics.removeIf(topic ->
+                topic.title.startsWith("Roadmap milestone:")
+                        || topic.title.startsWith("Interview-prep time commitment:"));
+        if (removedLegacyRows) persistSyllabusTopics(oldTopics);
+
+        if (!prefs.contains(MONTHLY_GOALS_KEY)) {
+            persistMonthlyGoals(seedDefaultMonthlyGoals());
+        }
+    }
+
+    private ArrayList<RoadmapMilestone> defaultRoadmapMilestones(boolean tier34Done, boolean tier12Done) {
+        SharedPreferences prefs = getPrefs();
+        ArrayList<RoadmapMilestone> milestones = new ArrayList<>();
+        milestones.add(new RoadmapMilestone(System.currentTimeMillis() + 1, "cse-checkpoint", "UPSC CSE",
+                "CSE progress checkpoint", prefs.getString(CSE_CHECKPOINT_KEY, "2027-04-01"),
+                "Audit General Studies and Maths Optional coverage, review test performance, and reset the next monthly goals.",
+                false));
+        milestones.add(new RoadmapMilestone(System.currentTimeMillis() + 2, "cse-target", "UPSC CSE",
+                "CSE syllabus target", prefs.getString(SYLLABUS_TARGET_KEY, "2028-01-01"),
+                "Compare actual syllabus coverage with the target and plan the next revision and testing phase.",
+                false));
+        milestones.add(new RoadmapMilestone(System.currentTimeMillis() + 3, "tier34", "Software interviews",
+                "Tier 3/4 interview readiness", prefs.getString(INTERVIEW_TIER34_KEY, "2027-04-05"),
+                "Review timed coding, system-design basics, behavioural stories and mock-interview feedback before applying.",
+                tier34Done));
+        milestones.add(new RoadmapMilestone(System.currentTimeMillis() + 4, "tier12", "Software interviews",
+                "Tier 1/2 strong-hire readiness", prefs.getString(INTERVIEW_TARGET_KEY, "2027-07-11"),
+                "Evaluate coding, system design, leadership examples and project deep-dives against strong-hire expectations.",
+                tier12Done));
+        return milestones;
+    }
+
+    private ArrayList<MonthlyGoal> seedDefaultMonthlyGoals() {
+        String[][][] plan = {
+            {
+                {"General Studies", "Build the GS baseline", "Confirm your source list, begin current affairs, and complete the first planned Prelims topics."},
+                {"Maths Optional", "Start Paper I: Linear Algebra and Calculus", "Study concepts, solve worked examples, and keep an error log for completed units."},
+                {"Software Interview Prep", "Establish the interview-prep rhythm", "Protect the 12–13 hours in your saved prep plan; set a Java/DSA baseline and track questions reviewed."}
+            },
+            {
+                {"General Studies", "Polity and modern-history foundations", "Cover selected Constitution/governance and modern-history units; test recall each week."},
+                {"Maths Optional", "Linear Algebra and Calculus first pass", "Complete mapped topics, worked examples, and selected previous-year questions."},
+                {"Software Interview Prep", "Java fundamentals and core DSA", "Review OOP, collections and complexity; practise timed arrays, strings and hashing problems."}
+            },
+            {
+                {"General Studies", "Geography and Indian-culture foundations", "Cover mapped geography and culture topics, use maps where useful, and revise earlier notes."},
+                {"Maths Optional", "Analytic Geometry and Ordinary Differential Equations", "Work through standard problems and write complete solutions, not just final answers."},
+                {"Software Interview Prep", "Core data structures", "Practise linked lists, stacks/queues, trees and heaps under time limits; review mistakes."}
+            },
+            {
+                {"General Studies", "Constitution, governance and economy basics", "Finish mapped first-pass notes and test what you can recall without looking."},
+                {"Maths Optional", "Dynamics, Statics and Vector Analysis", "Build a topic checklist, solve worked problems and attempt selected PYQs."},
+                {"Software Interview Prep", "SQL and backend/API foundations", "Review transactions, indexes, REST, pagination and idempotency; explain trade-offs aloud."}
+            },
+            {
+                {"General Studies", "Environment, science and social issues", "Map these areas to your syllabus list and complete short recall tests."},
+                {"Maths Optional", "Paper II: Algebra and Real Analysis", "Strengthen definitions, theorem understanding and problem-solving with a written error log."},
+                {"Software Interview Prep", "System-design foundations", "Practise requirements, estimates, data modelling, caching and queues; complete a mock."}
+            },
+            {
+                {"General Studies", "Prepare for the 1 April CSE checkpoint", "Audit GS coverage, test weak subjects, and decide April priorities from evidence."},
+                {"Maths Optional", "Audit Paper I and map Paper II gaps", "Create a two-paper coverage map and practise PYQs from completed units."},
+                {"Software Interview Prep", "Timed mock cycle for Tier 3/4 readiness", "Run coding, design and behavioural mocks; identify gaps before the readiness checkpoint."}
+            },
+            {
+                {"General Studies", "Reset the CSE plan after the checkpoint", "Use the 1 April review to update monthly targets and start disciplined active recall."},
+                {"Maths Optional", "Repair the weakest Paper I/II units", "Prioritise gaps using PYQ performance and repeat timed questions you previously missed."},
+                {"Software Interview Prep", "Review Tier 3/4 readiness", "Use mock results to decide whether to apply now or spend another cycle on weak areas."}
+            },
+            {
+                {"General Studies", "Close remaining core GS first-pass gaps", "Prioritise uncovered GS topics and begin regular answer-writing practice."},
+                {"Maths Optional", "Paper II: Complex Analysis and Linear Programming", "Complete core concepts, standard problems and selected previous-year questions."},
+                {"Software Interview Prep", "Distributed-systems and reliability basics", "Explain consistency, replication, partitioning, retries, timeouts and failure trade-offs."}
+            },
+            {
+                {"General Studies", "Revise older subjects while closing coverage", "Combine current affairs with mixed MCQs and a written review of incorrect answers."},
+                {"Maths Optional", "Paper II: PDE and Numerical Analysis", "Work through standard methods with solved examples and timed practice."},
+                {"Software Interview Prep", "Practise system design end to end", "Complete an end-to-end design regularly and document assumptions, failure modes and cost."}
+            },
+            {
+                {"General Studies", "Consolidate GS using mixed tests", "Run regular mixed quizzes, review every error, and update concise revision notes."},
+                {"Maths Optional", "Paper I sectional tests and error repair", "Attempt timed sections and repeat failed questions until the method is clear."},
+                {"Software Interview Prep", "Tier 1/2 strong-hire readiness review", "Use coding, system-design and leadership mocks to identify the highest-value remaining gaps."}
+            },
+            {
+                {"General Studies", "Finish residual CSE topics and strengthen recall", "Keep the syllabus list complete and revisit missed MCQs and weak themes."},
+                {"Maths Optional", "Paper II sectional tests and weakness repair", "Practise mixed Paper II problems and track recurring errors."},
+                {"Software Interview Prep", "Leadership stories, résumé and project deep-dives", "Prepare measurable impact examples and be ready to defend important design decisions."}
+            },
+            {
+                {"General Studies", "Start a second pass of high-yield GS", "Use active recall, concise notes, answer-writing practice and current-affairs consolidation."},
+                {"Maths Optional", "Second pass: Linear Algebra, Calculus and ODE", "Work through PYQs, build a formula/result sheet, and revisit weak derivations."},
+                {"Software Interview Prep", "Turn mock feedback into targeted drills", "Practise weak interview areas and tune the target-company shortlist from evidence."}
+            },
+            {
+                {"General Studies", "Structured revision and a test cycle", "Combine weekly mixed practice with a written analysis of errors and gaps."},
+                {"Maths Optional", "Second pass of core Paper II areas", "Use timed practice to repair recurring mistakes and reinforce key results."},
+                {"Software Interview Prep", "Maintain job-search readiness", "Keep coding skills warm, practise system design, and refresh your career narrative."}
+            },
+            {
+                {"General Studies", "Previous-year questions and answer writing", "Consolidate recurring themes and organise examples and evidence for answers."},
+                {"Maths Optional", "Mixed Paper I/II previous-year questions", "Attempt timed sections, revise formulas and correct previously missed questions."},
+                {"Software Interview Prep", "Maintain a deliberate interview rhythm", "Use mock interviews and targeted revision without displacing CSE priorities."}
+            },
+            {
+                {"General Studies", "Audit syllabus completeness before the target", "Compare actual coverage with the 1 January target and list any carry-over topics explicitly."},
+                {"Maths Optional", "Close first-pass gaps and review weak units", "Audit both papers and schedule unresolved high-value topics honestly."},
+                {"Software Interview Prep", "Review target roles and career progress", "Update the résumé and choose next interview opportunities based on feedback."}
+            },
+            {
+                {"General Studies", "Review the CSE target and next revision phase", "Use actual coverage and test results to plan the next 8–12 weeks of revision."},
+                {"Maths Optional", "Set Maths Optional revision priorities", "Audit confidence, PYQ performance and unresolved proofs or problem types."},
+                {"Software Interview Prep", "Refresh career goals after the milestone review", "Reassess target tiers, interview readiness and the next application cycle."}
+            }
+        };
+        ArrayList<MonthlyGoal> goals = new ArrayList<>();
+        Calendar month = Calendar.getInstance();
+        month.set(Calendar.DAY_OF_MONTH, 1);
+        month.set(Calendar.HOUR_OF_DAY, 0);
+        month.set(Calendar.MINUTE, 0);
+        month.set(Calendar.SECOND, 0);
+        month.set(Calendar.MILLISECOND, 0);
+        Date targetDate = parseDateKey(getPrefs().getString(SYLLABUS_TARGET_KEY, "2028-01-01"));
+        Calendar target = Calendar.getInstance();
+        if (targetDate != null) target.setTime(targetDate);
+        int maxMonths = Math.max(1, (target.get(Calendar.YEAR) - month.get(Calendar.YEAR)) * 12
+                + target.get(Calendar.MONTH) - month.get(Calendar.MONTH) + 1);
+        maxMonths = Math.min(maxMonths, plan.length);
+        long baseId = System.currentTimeMillis();
+        for (int i = 0; i < maxMonths; i++) {
+            String monthKey = new SimpleDateFormat("yyyy-MM", Locale.US).format(month.getTime());
+            for (int j = 0; j < plan[i].length; j++) {
+                String[] row = plan[i][j];
+                goals.add(new MonthlyGoal(baseId + i * 10L + j, monthKey, row[0], row[1], row[2], false));
+            }
+            month.add(Calendar.MONTH, 1);
+        }
+        return goals;
+    }
+
+    private void persistMonthlyGoalsRaw(ArrayList<MonthlyGoal> goals) {
+        JSONArray data = new JSONArray();
+        try {
+            for (MonthlyGoal goal : goals) {
+                JSONObject item = new JSONObject();
+                item.put("id", goal.id);
+                item.put("month", goal.month);
+                item.put("track", goal.track);
+                item.put("title", goal.title);
+                item.put("target", goal.target == null ? "" : goal.target);
+                item.put("done", goal.done);
+                data.put(item);
+            }
+            getPrefs().edit().putString(MONTHLY_GOALS_KEY, data.toString()).apply();
+        } catch (Exception e) {
+            debugLog("Monthly starter goals save failed: " + e.getMessage());
+        }
+    }
+
+    private String monthKeyFromDate(String dateKey) {
+        if (dateKey != null && dateKey.length() >= 7) return dateKey.substring(0, 7);
+        return new SimpleDateFormat("yyyy-MM", Locale.US).format(new Date());
+    }
+
+    private String monthLabelForKey(String monthKey) {
+        Date date = parseDateKey((monthKey == null ? monthKeyFromDate(todayKey()) : monthKey) + "-01");
+        if (date == null) return monthKey == null ? "Choose month" : monthKey;
+        return new SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(date);
+    }
+
+    private String displayRoadmapDate(String dateKey) {
+        Date date = parseDateKey(dateKey == null ? "" : dateKey);
+        return date == null ? (dateKey == null ? "No date" : dateKey)
+                : new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(date);
+    }
+
+    private RoadmapMilestone roadmapMilestoneForKey(String key) {
+        for (RoadmapMilestone milestone : readRoadmapMilestones()) {
+            if (key.equals(milestone.key)) return milestone;
+        }
+        return null;
     }
 
     private ArrayList<SyllabusTopic> readSyllabusTopicsWith(SyllabusTopic changed) {
