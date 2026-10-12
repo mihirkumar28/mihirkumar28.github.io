@@ -2050,14 +2050,9 @@ public class MainActivity extends Activity {
                 {"Software Interview Prep", "Mock interviews and focused repairs", "Run realistic coding, design and behavioural mocks; spend the next study cycle on the top three observed weaknesses."}
             },
             {
-                {"General Studies", "Finish any outstanding first-pass GS topics", "Audit every GS/CSAT topic and either mark it complete or name it explicitly as carry-over. Keep current affairs and weekly recall active."},
-                {"Maths Optional", "Finish outstanding Maths Optional coverage", "Audit both papers against the topic tracker; close remaining high-priority topics and document any carry-over honestly."},
-                {"Software Interview Prep", "Review target roles and interview outcomes", "Update the resume, target-company list and practice priorities using mock/interview evidence rather than assuming readiness."}
-            },
-            {
-                {"General Studies", "By 1 January: verify CSE syllabus coverage", "Use the tracker to confirm first-pass coverage by the saved 1 January 2028 target. Start the next revision/test cycle and list any carry-over plainly."},
-                {"Maths Optional", "By 1 January: verify both papers", "Confirm every Maths Optional topic is covered or explicitly carried forward; set the next revision priorities from PYQs and the error log."},
-                {"Software Interview Prep", "Review milestones and set the next career cycle", "Compare actual readiness with the Tier 3/4 and Tier 1/2 checkpoints; update target roles and the next interview plan."}
+                {"General Studies", "1 January checkpoint: verify CSE first-pass completion", "The first pass should be complete by 31 December. On 1 January, audit every GS/CSAT item; name any carry-over explicitly and move into a revision/test cycle."},
+                {"Maths Optional", "1 January checkpoint: verify both papers", "The first pass should be complete by 31 December. Audit Paper I and II, document any carry-over clearly, and set revision priorities from PYQs and the error log."},
+                {"Software Interview Prep", "Review career milestones and set the next cycle", "Compare actual readiness with Tier 3/4 and Tier 1/2 checkpoints; update target roles and the next interview plan from mock and interview evidence."}
             }
         };
         };
