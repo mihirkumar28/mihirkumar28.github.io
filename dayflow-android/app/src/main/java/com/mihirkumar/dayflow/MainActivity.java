@@ -3047,7 +3047,11 @@ public class MainActivity extends Activity {
         for (MonthlyGoal item : all) {
             if (Objects.equals(target.month, item.month) && Objects.equals(target.track, item.track)
                     && target.parentGoalId == item.parentGoalId
-                    && MonthlyGoalLifecycle.showInMonthlyPanel(item.lifecycleStatus)) {
+                    && (MonthlyGoalLifecycle.showInMonthlyPanel(item.lifecycleStatus)
+                        || MonthlyGoalLifecycle.SPLIT_PARENT.equals(item.lifecycleStatus))) {
+                // Split parents are structural anchors. They have no row in the summary,
+                // but remain in the ordering sequence so neighbouring goals move around
+                // the whole parent group instead of jumping over its children.
                 siblings.add(item);
             }
         }
@@ -3505,8 +3509,12 @@ public class MainActivity extends Activity {
         if (stored == null) return;
         String oldMonth = stored.month;
         boolean splitGroup = MonthlyGoalLifecycle.SPLIT_PARENT.equals(stored.lifecycleStatus);
+        if (!Objects.equals(oldMonth, newMonth)) {
+            stored.sortOrder = nextMonthlyGoalSortOrder(all, newMonth, stored.track, 0L);
+        }
         if (!splitGroup && stored.parentGoalId > 0L) {
             stored.parentGoalId = 0L;
+            stored.sortOrder = nextMonthlyGoalSortOrder(all, newMonth, stored.track, 0L);
             recordMonthlyGoalEvent(stored, "Detached from split goal before rescheduling");
         }
         stored.month = newMonth;
@@ -3567,6 +3575,9 @@ public class MainActivity extends Activity {
             MonthlyGoal parent = null; for (MonthlyGoal item : all) if (item.id == goal.id) parent = item;
             if (parent == null) return;
             String oldMonth = parent.month, schedule = currentMonthKey();
+            if (!Objects.equals(parent.month, schedule)) {
+                parent.sortOrder = nextMonthlyGoalSortOrder(all, schedule, parent.track, 0L);
+            }
             parent.month = schedule; parent.done = false; parent.completedAt = 0L;
             parent.lifecycleStatus = MonthlyGoalLifecycle.SPLIT_PARENT;
             recordMonthlyGoalEvent(parent, "Split from " + monthLabelForKey(oldMonth) + " into two smaller goals");
