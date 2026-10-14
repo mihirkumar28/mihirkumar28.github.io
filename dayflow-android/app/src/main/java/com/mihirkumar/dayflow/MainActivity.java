@@ -2536,7 +2536,8 @@ public class MainActivity extends Activity {
         roadmapActiveFilter = "All";
         roadmapSearchText = "";
         refreshRoadmapFilterStyles();
-        if (roadmapSearchInput != null && roadmapSearchInput.length() > 0) {
+        if (roadmapSearchInput != null && roadmapSearchInput.getText() != null
+                && roadmapSearchInput.getText().length() > 0) {
             roadmapSearchInput.setText("");
         }
 
