@@ -1966,7 +1966,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean isValidRoadmapMonthKey(String month) {
-        return month != null && month.matches("\\\\d{4}-(0[1-9]|1[0-2])");
+        return month != null && month.matches("\\d{4}-(0[1-9]|1[0-2])");
     }
 
     private ArrayList<String> readRoadmapMonthSlots(String track) {
@@ -2741,7 +2741,9 @@ public class MainActivity extends Activity {
             addChild.setOnClickListener(v -> childAction.run());
         }
         String editDropHint = roadmapTreeEditMode && isRoadmapMonthDropNode(node)
-                ? ". Drop a goal here to add it as a sub-goal; choose a parent if needed."
+                ? (node.children.isEmpty()
+                    ? ". Drop a goal here to move it into this month."
+                    : ". Drop a goal here to add it as a sub-goal; choose a parent if needed.")
                 : (roadmapTreeEditMode && isRoadmapGoalNode(node)
                     ? ". Drop another goal here to swap its slot." : "");
         row.setContentDescription(node.title + ". " + metadata
