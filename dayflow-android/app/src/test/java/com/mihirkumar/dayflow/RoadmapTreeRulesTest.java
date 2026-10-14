@@ -52,6 +52,42 @@ public class RoadmapTreeRulesTest {
                 "General Studies", 0L, "2026-11", false));
     }
 
+    @Test public void monthDropAllowsGeneralStudiesRootGoalToChangeMonth() {
+        assertTrue(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 0L, "2026-11", false,
+                "General Studies", "2026-10"));
+    }
+
+    @Test public void monthDropKeepsOtherTracksChronological() {
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "Maths Optional", 0L, "2026-11", false,
+                "Maths Optional", "2026-10"));
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "Software Interview Prep", 0L, "2026-11", false,
+                "Software Interview Prep", "2026-10"));
+    }
+
+    @Test public void monthDropRejectsCrossSubjectAndNestedGoalMoves() {
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 0L, "2026-11", false,
+                "Maths Optional", "2026-10"));
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 42L, "2026-10", false,
+                "General Studies", "2026-10"));
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 0L, "2026-11", true,
+                "General Studies", "2026-10"));
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 0L, "2026-11", false,
+                "General Studies", "bad-month"));
+    }
+
+    @Test public void sameMonthRootGoalCanTargetItsMonthWithoutBreakingSequence() {
+        assertTrue(RoadmapTreeRules.canDropGoalOnMonth(
+                "Maths Optional", 0L, "2026-10", false,
+                "Maths Optional", "2026-10"));
+    }
+
     @Test public void branchProgressCombinesCompletedAndIncompleteLeaves() {
         int[] total = RoadmapTreeRules.combineProgress(
                 RoadmapTreeRules.leafProgress(true),
