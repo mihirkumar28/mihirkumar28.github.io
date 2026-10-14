@@ -34,6 +34,22 @@ final class RoadmapTreeRules {
         return true;
     }
 
+    /**
+     * Whether two goals can be reordered without changing their logical track/parent.
+     * Only General Studies root goals may exchange month slots; other tracks remain
+     * chronological, and nested goals must remain within their existing parent.
+     */
+    static boolean canReorderGoals(String draggedTrack, long draggedParentId, String draggedMonth,
+                                   boolean draggedDone, String targetTrack, long targetParentId,
+                                   String targetMonth, boolean targetDone) {
+        if (draggedDone || targetDone) return false;
+        if (!java.util.Objects.equals(draggedTrack, targetTrack)
+                || draggedParentId != targetParentId) return false;
+        boolean generalStudiesRootSlots = draggedParentId == 0L && targetParentId == 0L
+                && "General Studies".equals(draggedTrack);
+        return generalStudiesRootSlots || java.util.Objects.equals(draggedMonth, targetMonth);
+    }
+
     static int[] leafProgress(boolean done) {
         return new int[]{done ? 1 : 0, 1};
     }
