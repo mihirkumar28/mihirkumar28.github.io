@@ -89,6 +89,18 @@ public class RoadmapTreeRulesTest {
     }
 
 
+    @Test public void droppingIntoAnEmptyMonthKeepsTheGoalAtRootLevel() {
+        assertTrue(RoadmapTreeRules.shouldMoveDroppedGoalAsRoot(false));
+        assertFalse(RoadmapTreeRules.shouldMoveDroppedGoalAsRoot(true));
+    }
+
+    @Test public void emptyCustomMonthSlotRemainsVisibleAfterItsGoalMovesOut() {
+        assertEquals(java.util.Arrays.asList("2027-03"),
+                RoadmapTreeRules.monthKeysForPeriod("2027-01", true,
+                        java.util.Collections.emptyList(),
+                        java.util.Arrays.asList("2027-03")));
+    }
+
     @Test public void monthDropCanNestRootGoalsUnderARootGoalInTheSameMonth() {
         assertTrue(RoadmapTreeRules.canNestGoalUnderParent(
                 "Maths Optional", 0L, "2026-10", false,
