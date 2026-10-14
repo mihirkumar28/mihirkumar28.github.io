@@ -50,6 +50,21 @@ final class RoadmapTreeRules {
         return generalStudiesRootSlots || java.util.Objects.equals(draggedMonth, targetMonth);
     }
 
+    /**
+     * Dropping a root goal onto a month adds it under that month in the roadmap tree.
+     * To preserve subject continuity, cross-month moves are limited to General Studies
+     * root goals. Nested goals must travel with their parent, and completed work is locked.
+     */
+    static boolean canDropGoalOnMonth(String draggedTrack, long draggedParentId, String draggedMonth,
+                                      boolean hasCompletedWork, String targetTrack, String targetMonth) {
+        if (hasCompletedWork || draggedParentId > 0L
+                || !java.util.Objects.equals(draggedTrack, targetTrack)
+                || draggedMonth == null || draggedMonth.length() != 7
+                || targetMonth == null || targetMonth.length() != 7) return false;
+        if (java.util.Objects.equals(draggedMonth, targetMonth)) return true;
+        return "General Studies".equals(draggedTrack);
+    }
+
     static int[] leafProgress(boolean done) {
         return new int[]{done ? 1 : 0, 1};
     }
