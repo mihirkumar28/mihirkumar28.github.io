@@ -51,9 +51,9 @@ final class RoadmapTreeRules {
     }
 
     /**
-     * Dropping a root goal onto a month adds it under that month in the roadmap tree.
-     * To preserve subject continuity, cross-month moves are limited to General Studies
-     * root goals. Nested goals must travel with their parent, and completed work is locked.
+     * Whether a root goal is eligible to be added as a sub-goal in the dropped-on month.
+     * The parent is selected from that month's existing root goals after this check.
+     * Cross-month moves are limited to General Studies; completed work stays in place.
      */
     static boolean canDropGoalOnMonth(String draggedTrack, long draggedParentId, String draggedMonth,
                                       boolean hasCompletedWork, String targetTrack, String targetMonth) {
@@ -63,6 +63,30 @@ final class RoadmapTreeRules {
                 || targetMonth == null || targetMonth.length() != 7) return false;
         if (java.util.Objects.equals(draggedMonth, targetMonth)) return true;
         return "General Studies".equals(draggedTrack);
+    }
+
+
+    /**
+     * Whether an eligible root goal can be nested under a root goal in the destination month.
+     * Nested goals stay within a track and month sequence, and neither branch may contain
+     * completed work. Only General Studies root goals may be nested across month boundaries.
+     */
+    static boolean canNestGoalUnderParent(String draggedTrack, long draggedParentId, String draggedMonth,
+                                          boolean draggedHasCompletedWork, String parentTrack,
+                                          long parentParentId, String parentMonth,
+                                          boolean parentHasCompletedWork, String targetMonth) {
+        if (draggedHasCompletedWork || parentHasCompletedWork
+                || draggedParentId != 0L || parentParentId != 0L
+                || !java.util.Objects.equals(draggedTrack, parentTrack)
+                || !isValidMonthKey(draggedMonth) || !isValidMonthKey(parentMonth)
+                || !isValidMonthKey(targetMonth)
+                || !java.util.Objects.equals(parentMonth, targetMonth)) return false;
+        return java.util.Objects.equals(draggedMonth, targetMonth)
+                || "General Studies".equals(draggedTrack);
+    }
+
+    private static boolean isValidMonthKey(String month) {
+        return month != null && month.matches("\\d{4}-(0[1-9]|1[0-2])");
     }
 
     static int[] leafProgress(boolean done) {
