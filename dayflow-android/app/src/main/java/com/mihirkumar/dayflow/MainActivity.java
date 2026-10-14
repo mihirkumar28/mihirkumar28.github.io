@@ -60,7 +60,8 @@ public class MainActivity extends Activity {
     private static final String INTERVIEW_PLAN_START_KEY = "softwareInterviewPlanStart";
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
     private static final String MONTHLY_GOALS_KEY = "monthlyGoals";
-    private static final String MONTHLY_PLAN_MIGRATION_KEY = "monthlyGoalsSourcePlanMigration_v1";
+    private static final String MONTHLY_PLAN_MIGRATION_KEY = "monthlyGoalsSourcePlanMigrationVersion";
+    private static final int MONTHLY_PLAN_MIGRATION_VERSION = 2;
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
     private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v1";
     private static final String CSE_CHECKPOINT_KEY = "cseCheckpointDate";
@@ -3250,7 +3251,7 @@ public class MainActivity extends Activity {
      */
     private void reconcileMonthlyGoalsWithSourcePlans() {
         SharedPreferences prefs = getPrefs();
-        if (prefs.getBoolean(MONTHLY_PLAN_MIGRATION_KEY, false)) return;
+        if (prefs.getInt(MONTHLY_PLAN_MIGRATION_KEY, 0) >= MONTHLY_PLAN_MIGRATION_VERSION) return;
 
         ArrayList<MonthlyGoal> goals = readMonthlyGoals();
         HashSet<String> legacyStarterFingerprints = new HashSet<>();
@@ -3300,8 +3301,9 @@ public class MainActivity extends Activity {
             debugLog("Monthly roadmap plan migration failed; will retry at next launch.");
             return;
         }
-        prefs.edit().putBoolean(MONTHLY_PLAN_MIGRATION_KEY, true).apply();
-        debugLog("Monthly roadmap plans reconciled without deleting existing goal history.");
+        prefs.edit().putInt(MONTHLY_PLAN_MIGRATION_KEY, MONTHLY_PLAN_MIGRATION_VERSION).apply();
+        debugLog("Monthly roadmap plans reconciled (source-plan version "
+                + MONTHLY_PLAN_MIGRATION_VERSION + ") without deleting existing goal history.");
     }
 
     private String monthlyGoalFingerprint(String track, String title, String target) {
