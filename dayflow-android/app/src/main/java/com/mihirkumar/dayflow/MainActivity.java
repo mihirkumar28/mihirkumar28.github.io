@@ -486,6 +486,13 @@ public class MainActivity extends Activity {
         return s;
     }
 
+    private int statusBarInsetTop(WindowInsets insets) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return insets.getInsets(WindowInsets.Type.statusBars()).top;
+        }
+        return insets.getSystemWindowInsetTop();
+    }
+
     private void buildUi() {
         LinearLayout shell = vertical();
         shell.setBackgroundColor(color("#0D1512"));
@@ -503,7 +510,7 @@ public class MainActivity extends Activity {
         setContentView(shell);
 
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            int top = Math.max(dp(10), insets.getSystemWindowInsetTop() + dp(4));
+            int top = Math.max(dp(10), statusBarInsetTop(insets) + dp(4));
             v.setPadding(dp(18), top, dp(18), dp(20));
             return insets;
         });
@@ -539,7 +546,14 @@ public class MainActivity extends Activity {
         pagePlan = vertical(); pageProgress = vertical(); pageOffice = vertical();
         pageMore = vertical(); pageSyllabus = vertical(); pageScreenTime = vertical();
         for (LinearLayout page : new LinearLayout[]{pagePlan,pageProgress,pageOffice,pageMore,pageSyllabus,pageScreenTime}) {
-            page.setPadding(dp(18),dp(18),dp(18),dp(24));
+            page.setPadding(dp(18), dp(18), dp(18), dp(24));
+            page.setOnApplyWindowInsetsListener((v, insets) -> {
+                // Secondary tabs share the same edge-to-edge window as Today.
+                // Reserve the system status-bar height plus normal page spacing.
+                int top = Math.max(dp(18), statusBarInsetTop(insets) + dp(18));
+                v.setPadding(dp(18), top, dp(18), dp(24));
+                return insets;
+            });
             page.setVisibility(View.GONE);
             screenFrame.addView(page,new FrameLayout.LayoutParams(-1,-2));
         }
