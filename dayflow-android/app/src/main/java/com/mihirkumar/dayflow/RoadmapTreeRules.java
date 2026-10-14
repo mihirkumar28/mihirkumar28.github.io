@@ -89,6 +89,36 @@ final class RoadmapTreeRules {
         return month != null && month.matches("\\d{4}-(0[1-9]|1[0-2])");
     }
 
+    /**
+     * Returns the roadmap month slots on one side of the selected month. Planned slots stay
+     * visible even when no goals currently occupy them; goal-derived months preserve custom dates.
+     * Upcoming slots are chronological, while past slots are reverse chronological.
+     */
+    static java.util.ArrayList<String> monthKeysForPeriod(String selectedMonth, boolean ascending,
+                                                          java.util.List<String> goalMonthKeys,
+                                                          java.util.List<String> plannedMonthKeys) {
+        java.util.ArrayList<String> ordered = new java.util.ArrayList<>();
+        if (!isValidMonthKey(selectedMonth)) return ordered;
+        java.util.TreeSet<String> monthKeys = new java.util.TreeSet<>();
+        addMonthKeysForPeriod(monthKeys, selectedMonth, ascending, goalMonthKeys);
+        addMonthKeysForPeriod(monthKeys, selectedMonth, ascending, plannedMonthKeys);
+        ordered.addAll(monthKeys);
+        if (!ascending) java.util.Collections.reverse(ordered);
+        return ordered;
+    }
+
+    private static void addMonthKeysForPeriod(java.util.Set<String> destination, String selectedMonth,
+                                              boolean ascending, java.util.List<String> candidates) {
+        if (candidates == null) return;
+        for (String month : candidates) {
+            if (!isValidMonthKey(month)) continue;
+            int comparison = month.compareTo(selectedMonth);
+            if ((ascending && comparison > 0) || (!ascending && comparison < 0)) {
+                destination.add(month);
+            }
+        }
+    }
+
     static int[] leafProgress(boolean done) {
         return new int[]{done ? 1 : 0, 1};
     }
