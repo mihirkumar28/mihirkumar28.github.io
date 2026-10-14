@@ -3044,37 +3044,67 @@ public class MainActivity extends Activity {
     private ArrayList<MonthlyGoal> reorderableMonthlyGoalSiblings(MonthlyGoal target,
                                                                     ArrayList<MonthlyGoal> all) {
         ArrayList<MonthlyGoal> siblings = new ArrayList<>();
+        boolean canChangeMonth = target.parentGoalId == 0L
+                && "General Studies".equals(target.track);
         for (MonthlyGoal item : all) {
-            if (Objects.equals(target.month, item.month) && Objects.equals(target.track, item.track)
+            boolean sameGroup = Objects.equals(target.track, item.track)
                     && target.parentGoalId == item.parentGoalId
+                    && (canChangeMonth || Objects.equals(target.month, item.month));
+            if (sameGroup
                     && (MonthlyGoalLifecycle.showInMonthlyPanel(item.lifecycleStatus)
                         || MonthlyGoalLifecycle.SPLIT_PARENT.equals(item.lifecycleStatus))) {
-                // Split parents are structural anchors. They have no row in the summary,
-                // but remain in the ordering sequence so neighbouring goals move around
-                // the whole parent group instead of jumping over its children.
+                // Split parents are structural anchors. Their children move with the parent.
                 siblings.add(item);
             }
         }
-        siblings.sort(Comparator.comparingInt((MonthlyGoal g) -> g.sortOrder)
-                .thenComparingLong(g -> g.id));
+        Comparator<MonthlyGoal> comparator = Comparator.comparingInt((MonthlyGoal g) -> g.month == null ? 0 : g.month.hashCode())
+                .thenComparingInt(g -> g.sortOrder).thenComparingLong(g -> g.id);
+        if (!canChangeMonth) {
+            comparator = Comparator.comparingInt((MonthlyGoal g) -> g.sortOrder).thenComparingLong(g -> g.id);
+        }
+        siblings.sort(comparator);
         return siblings;
     }
 
+    private boolean monthlyGoalGroupHasCompletedWork(MonthlyGoal root, ArrayList<MonthlyGoal> all) {
+        if (root.done) return true;
+        for (MonthlyGoal candidate : all) {
+            if (isDescendantOf(all, candidate, root.id) && candidate.done) return true;
+        }
+        return false;
+    }
+
+    private void moveMonthlyGoalGroupToMonth(MonthlyGoal root, String month, ArrayList<MonthlyGoal> all) {
+        root.month = month;
+        for (MonthlyGoal candidate : all) {
+            if (isDescendantOf(all, candidate, root.id)) {
+                candidate.month = month;
+                recordMonthlyGoalEvent(candidate, "Moved with parent goal to " + monthLabelForKey(month));
+            }
+        }
+    }
+
     private boolean canMoveMonthlyGoal(MonthlyGoal target, int delta) {
-        if (target == null || delta == 0) return false;
-        ArrayList<MonthlyGoal> siblings = reorderableMonthlyGoalSiblings(target, readMonthlyGoals());
+        if (target == null || target.done || delta == 0) return false;
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        ArrayList<MonthlyGoal> siblings = reorderableMonthlyGoalSiblings(target, all);
         for (int i = 0; i < siblings.size(); i++) {
-            if (siblings.get(i).id == target.id) return i + delta >= 0 && i + delta < siblings.size();
+            if (siblings.get(i).id == target.id) {
+                int next = i + delta;
+                if (next < 0 || next >= siblings.size()) return false;
+                MonthlyGoal other = siblings.get(next);
+                return !monthlyGoalGroupHasCompletedWork(other, all);
+            }
         }
         return false;
     }
 
     private void moveMonthlyGoal(MonthlyGoal target, int delta) {
-        if (target == null || delta == 0) return;
+        if (target == null || target.done || delta == 0) return;
         ArrayList<MonthlyGoal> all = readMonthlyGoals();
         MonthlyGoal stored = null;
         for (MonthlyGoal item : all) if (item.id == target.id) { stored = item; break; }
-        if (stored == null) return;
+        if (stored == null || stored.done) return;
         ArrayList<MonthlyGoal> siblings = reorderableMonthlyGoalSiblings(stored, all);
         int at = -1;
         for (int i = 0; i < siblings.size(); i++) if (siblings.get(i).id == stored.id) { at = i; break; }
@@ -3084,14 +3114,29 @@ public class MainActivity extends Activity {
             return;
         }
         MonthlyGoal other = siblings.get(next);
+        if (monthlyGoalGroupHasCompletedWork(other, all)) {
+            Toast.makeText(this, "Completed goals stay in place to preserve the recorded sequence.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        String oldMonth = stored.month;
+        String otherMonth = other.month;
+        boolean movesAcrossMonths = !Objects.equals(oldMonth, otherMonth);
+        if (movesAcrossMonths) {
+            // Only General Studies root goals can cross month slots. Maths Optional and
+            // interview-prep tracks remain chronological to preserve cumulative learning.
+            moveMonthlyGoalGroupToMonth(stored, otherMonth, all);
+            moveMonthlyGoalGroupToMonth(other, oldMonth, all);
+        }
         int order = stored.sortOrder;
         stored.sortOrder = other.sortOrder;
         other.sortOrder = order;
-        recordMonthlyGoalEvent(stored, delta < 0 ? "Moved earlier in group" : "Moved later in group");
-        recordMonthlyGoalEvent(other, delta < 0 ? "Moved later in group" : "Moved earlier in group");
+        recordMonthlyGoalEvent(stored, delta < 0 ? "Moved earlier in plan" : "Moved later in plan");
+        recordMonthlyGoalEvent(other, delta < 0 ? "Moved later in plan" : "Moved earlier in plan");
         persistMonthlyGoals(all);
         refreshRoadmapTabContent();
-        Toast.makeText(this, "Order saved for this month and goal group.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, movesAcrossMonths
+                ? "General Studies plan updated; month summaries refreshed."
+                : "Order saved within this month and goal group.", Toast.LENGTH_SHORT).show();
     }
 
     private Comparator<SyllabusTopic> syllabusTopicOrderComparator() {
@@ -3583,9 +3628,13 @@ public class MainActivity extends Activity {
             recordMonthlyGoalEvent(parent, "Split from " + monthLabelForKey(oldMonth) + " into two smaller goals");
             long nextId = System.currentTimeMillis(); for (MonthlyGoal item : all) nextId = Math.max(nextId, item.id + 1L);
             MonthlyGoal one = new MonthlyGoal(nextId++, schedule, parent.track, a, firstTarget.getText().toString().trim(), false);
-            one.parentGoalId = parent.id; recordMonthlyGoalEvent(one, "Created by splitting " + parent.title);
+            one.parentGoalId = parent.id;
+            one.sortOrder = nextMonthlyGoalSortOrder(all, schedule, parent.track, parent.id);
+            recordMonthlyGoalEvent(one, "Created by splitting " + parent.title);
             MonthlyGoal two = new MonthlyGoal(nextId, schedule, parent.track, b, secondTarget.getText().toString().trim(), false);
-            two.parentGoalId = parent.id; recordMonthlyGoalEvent(two, "Created by splitting " + parent.title);
+            two.parentGoalId = parent.id;
+            two.sortOrder = one.sortOrder + 100;
+            recordMonthlyGoalEvent(two, "Created by splitting " + parent.title);
             all.add(one); all.add(two); persistMonthlyGoals(all);
             selectedGoalMonth = schedule; refreshRoadmapTabContent(); dialog.dismiss();
             Toast.makeText(this, "Goal split into two smaller tasks.", Toast.LENGTH_SHORT).show();
