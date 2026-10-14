@@ -2280,7 +2280,10 @@ public class MainActivity extends Activity {
                 }
             }
         }
-        boolean hasTrackGoals = !goals.isEmpty();
+        boolean hasTrackGoals = false;
+        for (MonthlyGoal goal : goals) {
+            if (goalTrack.equals(goal.track)) { hasTrackGoals = true; break; }
+        }
         boolean hasRememberedMonthSlots = !readRoadmapMonthSlots(goalTrack).isEmpty();
         // Keep a usable current-month drop target for any track that has a plan or month history.
         if (!current.isEmpty() || selectedMonthIsPlanned || hasTrackGoals || hasRememberedMonthSlots) {
