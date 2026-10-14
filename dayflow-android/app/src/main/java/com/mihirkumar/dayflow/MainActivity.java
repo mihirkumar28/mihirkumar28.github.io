@@ -2132,71 +2132,112 @@ public class MainActivity extends Activity {
     private void addRoadmapGoalGroups(RoadmapNode parent, String rootKey, String goalTrack,
                                       ArrayList<MonthlyGoal> goals, String selectedMonth) {
         if (goalTrack == null) return;
-        ArrayList<MonthlyGoal> currentGoals = new ArrayList<>();
-        ArrayList<MonthlyGoal> futureGoals = new ArrayList<>();
-        ArrayList<MonthlyGoal> pastGoals = new ArrayList<>();
+        ArrayList<MonthlyGoal> current = new ArrayList<>(), future = new ArrayList<>(),
+                past = new ArrayList<>(), retired = new ArrayList<>();
         for (MonthlyGoal goal : goals) {
-            if (!goalTrack.equals(goal.track)) continue;
-            if (selectedMonth.equals(goal.month)) currentGoals.add(goal);
-            else if (goal.month.compareTo(selectedMonth) > 0) futureGoals.add(goal);
-            else pastGoals.add(goal);
+            if (!goalTrack.equals(goal.track) || goal.parentGoalId > 0L) continue;
+            if (MonthlyGoalLifecycle.RETIRED.equals(goal.lifecycleStatus)) retired.add(goal);
+            else if (selectedMonth.equals(goal.month)) current.add(goal);
+            else if (goal.month.compareTo(selectedMonth) > 0) future.add(goal);
+            else past.add(goal);
         }
         Comparator<MonthlyGoal> byTitle = Comparator.comparing(g -> g.title == null ? "" : g.title,
                 String.CASE_INSENSITIVE_ORDER);
-        currentGoals.sort(byTitle);
-        if (!currentGoals.isEmpty()) {
-            RoadmapNode current = newRoadmapNode(
-                    roadmapId("group", "current-goals", rootKey, goalTrack),
-                    monthLabelForKey(selectedMonth) + " · " + currentGoals.size() + " goal"
-                            + (currentGoals.size() == 1 ? "" : "s"), "group");
-            current.rootKey = rootKey;
-            current.goalTrack = goalTrack;
-            current.month = selectedMonth;
-            current.groupKind = "current-goals";
-            current.subtitle = "Current focus";
-            for (MonthlyGoal goal : currentGoals) current.children.add(roadmapGoalLeaf(rootKey, goal));
-            parent.children.add(current);
+        current.sort(byTitle);
+        if (!current.isEmpty()) {
+            int count = 0;
+            for (MonthlyGoal goal : current) count += countScheduledGoalLeaves(goal, goals);
+            RoadmapNode group = newRoadmapNode(roadmapId("group", "current-goals", rootKey, goalTrack),
+                    monthLabelForKey(selectedMonth) + " · " + count + " goal" + (count == 1 ? "" : "s"), "group");
+            group.rootKey = rootKey; group.goalTrack = goalTrack; group.month = selectedMonth;
+            group.groupKind = "current-goals"; group.subtitle = "Current focus";
+            for (MonthlyGoal goal : current) group.children.add(roadmapGoalTreeNode(rootKey, goal, goals));
+            parent.children.add(group);
         }
-        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, futureGoals,
-                "Upcoming goals", "upcoming-goals", true);
-        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, pastGoals,
-                "Past goals", "past-goals", false);
+        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, future, "Upcoming goals", "upcoming-goals", true, goals);
+        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, past, "Past goals", "past-goals", false, goals);
+        if (!retired.isEmpty()) {
+            retired.sort(byTitle);
+            RoadmapNode archive = newRoadmapNode(roadmapId("group", "retired-goals", rootKey, goalTrack),
+                    "Retired goals · " + retired.size(), "group");
+            archive.rootKey = rootKey; archive.goalTrack = goalTrack; archive.groupKind = "retired-goals";
+            archive.subtitle = "Archived intentionally; excluded from active progress";
+            for (MonthlyGoal goal : retired) archive.children.add(roadmapArchivedGoalLeaf(rootKey, goal));
+            parent.children.add(archive);
+        }
+    }
+
+    private int countScheduledGoalLeaves(MonthlyGoal goal, ArrayList<MonthlyGoal> all) {
+        if (MonthlyGoalLifecycle.RETIRED.equals(goal.lifecycleStatus)) return 0;
+        if (!MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus)) return 1;
+        int count = 0;
+        for (MonthlyGoal child : all) {
+            if (child.parentGoalId == goal.id && Objects.equals(goal.month, child.month)) {
+                count += countScheduledGoalLeaves(child, all);
+            }
+        }
+        return count;
     }
 
     private void addRoadmapMonthGoalGroup(RoadmapNode parent, String rootKey, String goalTrack,
                                            ArrayList<MonthlyGoal> goals, String title,
-                                           String groupKind, boolean ascending) {
+                                           String groupKind, boolean ascending, ArrayList<MonthlyGoal> allGoals) {
         if (goals.isEmpty()) return;
         TreeSet<String> monthKeys = new TreeSet<>();
         for (MonthlyGoal goal : goals) if (goal.month != null) monthKeys.add(goal.month);
         ArrayList<String> orderedMonths = new ArrayList<>(monthKeys);
         if (!ascending) Collections.reverse(orderedMonths);
-
         RoadmapNode group = newRoadmapNode(roadmapId("group", groupKind, rootKey, goalTrack),
                 title + " · " + goals.size(), "group");
-        group.rootKey = rootKey;
-        group.goalTrack = goalTrack;
-        group.groupKind = groupKind;
+        group.rootKey = rootKey; group.goalTrack = goalTrack; group.groupKind = groupKind;
         group.subtitle = "Expand a month to see its goals";
         for (String monthKey : orderedMonths) {
             ArrayList<MonthlyGoal> inMonth = new ArrayList<>();
             for (MonthlyGoal goal : goals) if (monthKey.equals(goal.month)) inMonth.add(goal);
             inMonth.sort(Comparator.comparing(g -> g.title == null ? "" : g.title,
                     String.CASE_INSENSITIVE_ORDER));
+            int count = 0;
+            for (MonthlyGoal goal : inMonth) count += countScheduledGoalLeaves(goal, allGoals);
             RoadmapNode month = newRoadmapNode(roadmapId("group", "goal-month", rootKey, goalTrack, monthKey),
-                    monthLabelForKey(monthKey) + " · " + inMonth.size() + " goal"
-                            + (inMonth.size() == 1 ? "" : "s"), "group");
-            month.rootKey = rootKey;
-            month.goalTrack = goalTrack;
-            month.month = monthKey;
-            month.groupKind = "goal-month";
-            for (MonthlyGoal goal : inMonth) month.children.add(roadmapGoalLeaf(rootKey, goal));
+                    monthLabelForKey(monthKey) + " · " + count + " goal" + (count == 1 ? "" : "s"), "group");
+            month.rootKey = rootKey; month.goalTrack = goalTrack; month.month = monthKey; month.groupKind = "goal-month";
+            for (MonthlyGoal goal : inMonth) month.children.add(roadmapGoalTreeNode(rootKey, goal, allGoals));
             group.children.add(month);
         }
         parent.children.add(group);
     }
 
-    private RoadmapNode roadmapGoalLeaf(String rootKey, MonthlyGoal goal) {
+    private RoadmapNode roadmapGoalTreeNode(String rootKey, MonthlyGoal goal, ArrayList<MonthlyGoal> all) {
+        if (MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus)) {
+            RoadmapNode group = newRoadmapNode(roadmapId("split-goal", rootKey, goal.track,
+                    Long.toString(goal.id)), goal.title, "group");
+            group.rootKey = rootKey; group.goalTrack = goal.track; group.month = goal.month;
+            group.groupKind = "split-goal"; group.item = goal;
+            group.subtitle = "Smaller goals · originally planned "
+                    + monthLabelForKey(goal.originalMonth == null ? goal.month : goal.originalMonth);
+            for (MonthlyGoal child : all) {
+                if (child.parentGoalId == goal.id && Objects.equals(goal.month, child.month)
+                        && !MonthlyGoalLifecycle.RETIRED.equals(child.lifecycleStatus)) {
+                    group.children.add(roadmapGoalTreeNode(rootKey, child, all));
+                }
+            }
+            return group;
+        }
+        if (MonthlyGoalLifecycle.RETIRED.equals(goal.lifecycleStatus)) return roadmapArchivedGoalLeaf(rootKey, goal);
+        return roadmapGoalLeaf(rootKey, goal);
+    }
+
+    private RoadmapNode roadmapArchivedGoalLeaf(String rootKey, MonthlyGoal goal) {
+        RoadmapNode leaf = newRoadmapNode(roadmapId("goal-archive", rootKey, goal.track, Long.toString(goal.id)),
+                goal.title, "goal-archive");
+        leaf.rootKey = rootKey; leaf.goalTrack = goal.track; leaf.month = goal.month; leaf.statusPeriod = goal.month;
+        leaf.subtitle = "Retired · originally planned "
+                + monthLabelForKey(goal.originalMonth == null ? goal.month : goal.originalMonth);
+        leaf.item = goal; leaf.done = false;
+        return leaf;
+    }
+
+        private RoadmapNode roadmapGoalLeaf(String rootKey, MonthlyGoal goal) {
         RoadmapNode leaf = newRoadmapNode(roadmapId("goal", rootKey, goal.track,
                 Long.toString(goal.id)), goal.title, "goal");
         leaf.rootKey = rootKey;
@@ -2247,6 +2288,11 @@ public class MainActivity extends Activity {
 
     private int[] roadmapNodeProgress(RoadmapNode node) {
         if (node == null) return new int[]{0, 0};
+        if ("goal-archive".equals(node.type)) return new int[]{0, 0};
+        if ("goal".equals(node.type) && node.item instanceof MonthlyGoal
+                && MonthlyGoalLifecycle.RETIRED.equals(((MonthlyGoal) node.item).lifecycleStatus)) {
+            return new int[]{0, 0};
+        }
         if (isRoadmapActionNode(node)) return RoadmapTreeRules.leafProgress(node.done);
         int[] progress = new int[]{0, 0};
         for (RoadmapNode child : node.children) {
@@ -2258,14 +2304,22 @@ public class MainActivity extends Activity {
     private String roadmapNodeMetadata(RoadmapNode node) {
         if (node == null) return "";
         String today = todayKey();
-        boolean overdue = RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, today);
+        boolean overdue = "goal".equals(node.type) && node.item instanceof MonthlyGoal
+                ? MonthlyGoalLifecycle.isPastUnfinished(((MonthlyGoal) node.item).lifecycleStatus,
+                        node.done, node.statusPeriod, monthKeyFromDate(today))
+                : RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, today);
         if ("track".equals(node.type) || "subject".equals(node.type)) {
             return node.subtitle == null ? "" : node.subtitle;
         }
         if ("group".equals(node.type)) {
             if ("goal-month".equals(node.groupKind)) return "Expand to see or add this month's goals";
+            if ("split-goal".equals(node.groupKind)) {
+                return (node.subtitle == null ? "Split into smaller goals" : node.subtitle)
+                        + " · progress counts smaller goals only";
+            }
             return node.subtitle == null ? "" : node.subtitle;
         }
+        if ("goal-archive".equals(node.type)) return node.subtitle == null ? "Retired" : node.subtitle;
         if ("topic".equals(node.type)) {
             SyllabusTopic topic = (SyllabusTopic) node.item;
             return topic.subject + (topic.done ? " · Complete" : " · Open");
@@ -2273,6 +2327,16 @@ public class MainActivity extends Activity {
         if ("goal".equals(node.type)) {
             String line = monthLabelForKey(node.month);
             if (node.subtitle != null && !node.subtitle.trim().isEmpty()) line += " · " + node.subtitle.trim();
+            if (node.item instanceof MonthlyGoal) {
+                MonthlyGoal goal = (MonthlyGoal) node.item;
+                if (goal.originalMonth != null && !goal.originalMonth.equals(goal.month)) {
+                    line += " · Originally " + monthLabelForKey(goal.originalMonth);
+                }
+                if (goal.done && goal.completedAt > 0L) {
+                    line += " · Completed " + new SimpleDateFormat("d MMM", Locale.getDefault())
+                            .format(new Date(goal.completedAt));
+                }
+            }
             if (overdue) line += " · Overdue";
             return line;
         }
@@ -2590,7 +2654,11 @@ public class MainActivity extends Activity {
 
     private void openRoadmapLeaf(RoadmapNode node) {
         if (node == null) return;
-        if (node.item instanceof MonthlyGoal) editMonthlyGoal((MonthlyGoal) node.item);
+        if (node.item instanceof MonthlyGoal) {
+            MonthlyGoal goal = (MonthlyGoal) node.item;
+            if (MonthlyGoalLifecycle.RETIRED.equals(goal.lifecycleStatus)) showMonthlyGoalActions(goal);
+            else if (!MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus)) editMonthlyGoal(goal);
+        }
         else if (node.item instanceof SyllabusTopic) editSyllabusTopic((SyllabusTopic) node.item);
         else if (node.item instanceof RoadmapMilestone) editRoadmapMilestone((RoadmapMilestone) node.item);
         else if ("career".equals(node.type)) editCareerGoal();
