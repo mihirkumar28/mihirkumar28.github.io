@@ -2773,13 +2773,15 @@ public class MainActivity extends Activity {
                     + (MonthlyGoalLifecycle.SPLIT_PARENT.equals(candidate.lifecycleStatus)
                         ? " · has sub-goals" : "");
         }
+        final long draggedGoalIdForDialog = dragged.id;
+        final String targetMonthForDialog = monthNode.month;
         new AlertDialog.Builder(this)
                 .setTitle("Choose a parent goal")
                 .setMessage("Add “" + dragged.title + "” as a sub-goal in "
                         + monthLabelForKey(monthNode.month) + ".")
                 .setItems(parentTitles, (dialog, which) -> {
                     if (which >= 0 && which < parentCandidates.size()) {
-                        addRoadmapGoalAsSubgoal(dragged.id, parentCandidates.get(which).id, monthNode.month);
+                        addRoadmapGoalAsSubgoal(draggedGoalIdForDialog, parentCandidates.get(which).id, targetMonthForDialog);
                     }
                 })
                 .setNegativeButton("Cancel", null)
