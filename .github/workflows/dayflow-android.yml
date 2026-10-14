@@ -57,6 +57,9 @@ jobs:
             exit 1
           fi
 
+      - name: Run attendance regression tests
+        run: gradle :app:testDebugUnitTest
+
       - name: Verify persistent release key
         if: env.DAYFLOW_SIGNED == 'true'
         env:

@@ -4917,29 +4917,11 @@ public class MainActivity extends Activity {
 
     private long officeDuration(JSONObject day, long now) {
         if (day == null) return 0;
-        long total = 0;
-        JSONArray sessions = day.optJSONArray("sessions");
-        if (sessions == null) return 0;
-        for (int i = 0; i < sessions.length(); i++) {
-            JSONObject s = sessions.optJSONObject(i);
-            if (s == null) continue;
-            long in = s.optLong("in", 0);
-            long out = s.optLong("out", 0);
-            if (in > 0) total += (out > in ? out : now) - in;
-        }
-        return Math.max(0, total);
+        return OfficeAttendanceTime.officeDuration(day.optJSONArray("sessions"), now);
     }
 
     private long commuteDuration(JSONObject day, long now) {
-        if (day == null) return 0;
-        long total = 0;
-        long a = day.optLong("commuteInStart", 0);
-        long b = day.optLong("commuteInEnd", 0);
-        if (a > 0) total += (b > a ? b : now) - a;
-        a = day.optLong("commuteOutStart", 0);
-        b = day.optLong("commuteOutEnd", 0);
-        if (a > 0) total += (b > a ? b : now) - a;
-        return Math.max(0, total);
+        return OfficeAttendanceTime.commuteDuration(day, now);
     }
 
     private void toggleOfficeAttendance() {
@@ -5029,6 +5011,7 @@ public class MainActivity extends Activity {
             stp.topMargin = dp(14);
             stp.bottomMargin = dp(6);
             content.addView(sessionsTitle, stp);
+            final android.app.Dialog[] attendanceDetailDialog = new android.app.Dialog[1];
             JSONArray sessions = day.optJSONArray("sessions");
             boolean anySession = false;
             if (sessions != null) {
@@ -5040,7 +5023,13 @@ public class MainActivity extends Activity {
                     long out = session.optLong("out", 0);
                     String value = "Session " + (i + 1);
                     String times = (in > 0 ? clock(in) : "Not recorded") + "  →  " + (out > 0 ? clock(out) : "Still open");
-                    addManageRow(content, value, times, () -> editAttendanceDay(dayKey));
+                    final int selectedSessionIndex = i;
+                    addManageRow(content, value, times, () -> {
+                        if (attendanceDetailDialog[0] != null && attendanceDetailDialog[0].isShowing()) {
+                            attendanceDetailDialog[0].dismiss();
+                        }
+                        editAttendanceDay(dayKey, selectedSessionIndex, true);
+                    });
                 }
             }
             if (!anySession) content.addView(text("No office sessions recorded.", 12, color("#687A70"), false));
@@ -5061,9 +5050,9 @@ public class MainActivity extends Activity {
             travel.addView(text("Home", 12, color("#18372E"), true), homeLp);
             travel.addView(text(timeLabel(coStart) + "  →  " + timeLabel(coEnd), 12, color("#687A70"), false));
 
-            showFullScreenViewer("ATTENDANCE HISTORY", date,
+            attendanceDetailDialog[0] = showFullScreenViewer("ATTENDANCE HISTORY", date,
                     "Exact office and commute records for this day.", content, "Edit recorded times",
-                    () -> editAttendanceDay(dayKey));
+                    () -> editAttendanceDay(dayKey, 0, true));
         } catch (Exception e) {
             debugLog("Attendance detail open failed: " + e.getMessage());
             Toast.makeText(this, "Couldn't load that day.", Toast.LENGTH_SHORT).show();
@@ -5071,6 +5060,10 @@ public class MainActivity extends Activity {
     }
 
     private void editAttendanceDay(String dayKey) {
+        editAttendanceDay(dayKey, 0, false);
+    }
+
+    private void editAttendanceDay(String dayKey, int requestedSessionIndex, boolean returnToDetail) {
         try {
             JSONObject day = getOfficeDay(dayKey, true);
             JSONArray sessions = day.optJSONArray("sessions");
@@ -5078,42 +5071,61 @@ public class MainActivity extends Activity {
                 sessions = new JSONArray();
                 day.put("sessions", sessions);
             }
-            JSONObject session;
             if (sessions.length() == 0) {
-                session = new JSONObject();
-                session.put("in", 0);
-                session.put("out", 0);
+                JSONObject session = new JSONObject();
+                session.put(OfficeAttendanceTime.SESSION_IN, 0);
+                session.put(OfficeAttendanceTime.SESSION_OUT, 0);
                 sessions.put(session);
-            } else {
-                session = sessions.optJSONObject(0);
+            }
+            int sessionIndex = Math.max(0, Math.min(requestedSessionIndex, sessions.length() - 1));
+            JSONObject session = sessions.optJSONObject(sessionIndex);
+            if (session == null) {
+                session = new JSONObject();
+                session.put(OfficeAttendanceTime.SESSION_IN, 0);
+                session.put(OfficeAttendanceTime.SESSION_OUT, 0);
+                sessions.put(sessionIndex, session);
             }
 
             LinearLayout content = vertical();
             content.setPadding(dp(18), dp(2), dp(18), dp(2));
-            TextView note = text("Correct the recorded times. DayFlow stores the exact date + time.", 11, color("#91A197"), false);
+            TextView note = text("Correct the recorded times. Changes are applied only when you save.", 11, color("#687A70"), false);
             content.addView(note);
 
-            Button inBtn = actionButton("Office in  •  " + (session.optLong("in", 0) > 0 ? clock(session.optLong("in", 0)) : "Not set"), Color.WHITE, "#263A31");
-            Button outBtn = actionButton("Office out  •  " + (session.optLong("out", 0) > 0 ? clock(session.optLong("out", 0)) : "Not set"), Color.WHITE, "#263A31");
-            Button ciBtn = actionButton("Commute to office  •  " + timeLabel(day.optLong("commuteInStart", 0)) + " → " + timeLabel(day.optLong("commuteInEnd", 0)), Color.WHITE, "#263A31");
-            Button coBtn = actionButton("Commute home  •  " + timeLabel(day.optLong("commuteOutStart", 0)) + " → " + timeLabel(day.optLong("commuteOutEnd", 0)), Color.WHITE, "#263A31");
-            content.addView(inBtn, new LinearLayout.LayoutParams(-1, dp(42)));
-            LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(outBtn, ml);
-            ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(ciBtn, ml);
-            ml = new LinearLayout.LayoutParams(-1, dp(42)); ml.topMargin = dp(7); content.addView(coBtn, ml);
+            Button inBtn = actionButton("Office in  •  " + (session.optLong(OfficeAttendanceTime.SESSION_IN, 0) > 0 ? clock(session.optLong(OfficeAttendanceTime.SESSION_IN, 0)) : "Not set"), Color.WHITE, "#263A31");
+            Button outBtn = actionButton("Office out  •  " + (session.optLong(OfficeAttendanceTime.SESSION_OUT, 0) > 0 ? clock(session.optLong(OfficeAttendanceTime.SESSION_OUT, 0)) : "Not set"), Color.WHITE, "#263A31");
+            Button ciStartBtn = actionButton("Commute to office · start  •  " + timeLabel(day.optLong("commuteInStart", 0)), Color.WHITE, "#263A31");
+            Button ciEndBtn = actionButton("Commute to office · end  •  " + timeLabel(day.optLong("commuteInEnd", 0)), Color.WHITE, "#263A31");
+            Button coStartBtn = actionButton("Commute home · start  •  " + timeLabel(day.optLong("commuteOutStart", 0)), Color.WHITE, "#263A31");
+            Button coEndBtn = actionButton("Commute home · end  •  " + timeLabel(day.optLong("commuteOutEnd", 0)), Color.WHITE, "#263A31");
+
+            for (Button b : new Button[]{inBtn, outBtn, ciStartBtn, ciEndBtn, coStartBtn, coEndBtn}) {
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(42));
+                lp.topMargin = dp(7);
+                content.addView(b, lp);
+            }
 
             showFullScreenEditor("OFFICE RECORD", "Edit attendance",
-                    "Correct the exact timestamps. These records are separate from the daily plan.", content, () -> {
+                    "Correct the exact timestamps. Totals are recalculated from these saved times.", content, () -> {
                         saveOfficeDay(day);
                         render();
                         renderOfficePage();
+                        if (returnToDetail) {
+                            handler.post(() -> {
+                                Date parsed = parseDateKey(dayKey);
+                                String label = parsed == null ? dayKey
+                                        : new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(parsed);
+                                showAttendanceDayDetail(label, dayKey, getOfficeDay(dayKey, false));
+                            });
+                        }
                         return true;
                     });
 
-            inBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "officeIn", session, inBtn));
-            outBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "officeOut", session, outBtn));
-            ciBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteInStart", day, ciBtn));
-            coBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteOutStart", day, coBtn));
+            inBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, OfficeAttendanceTime.SESSION_IN, session, inBtn));
+            outBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, OfficeAttendanceTime.SESSION_OUT, session, outBtn));
+            ciStartBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteInStart", day, ciStartBtn));
+            ciEndBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteInEnd", day, ciEndBtn));
+            coStartBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteOutStart", day, coStartBtn));
+            coEndBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteOutEnd", day, coEndBtn));
         } catch (Exception ignored) {
             Toast.makeText(this, "Couldn't edit attendance.", Toast.LENGTH_SHORT).show();
         }
@@ -5126,23 +5138,27 @@ public class MainActivity extends Activity {
     private void pickAttendanceTime(String dayKey, String field, JSONObject target, Button button) {
         long existing = target.optLong(field, 0);
         Calendar c = Calendar.getInstance();
-        Date d = parseDateKey(dayKey);
-        if (d != null) c.setTime(d);
-        if (existing > 0) c.setTimeInMillis(existing);
+        Date selectedDate = parseDateKey(dayKey);
+        if (selectedDate != null) c.setTime(selectedDate);
+        if (existing > 0) {
+            Calendar previous = Calendar.getInstance();
+            previous.setTimeInMillis(existing);
+            c.set(Calendar.HOUR_OF_DAY, previous.get(Calendar.HOUR_OF_DAY));
+            c.set(Calendar.MINUTE, previous.get(Calendar.MINUTE));
+        }
         TimePickerDialog picker = new TimePickerDialog(this, (v, h, m) -> {
-            Calendar chosen = Calendar.getInstance();
-            chosen.set(Calendar.YEAR, c.get(Calendar.YEAR));
-            chosen.set(Calendar.MONTH, c.get(Calendar.MONTH));
-            chosen.set(Calendar.DAY_OF_MONTH, c.get(Calendar.DAY_OF_MONTH));
-            chosen.set(Calendar.HOUR_OF_DAY, h);
-            chosen.set(Calendar.MINUTE, m);
-            chosen.set(Calendar.SECOND, 0);
-            chosen.set(Calendar.MILLISECOND, 0);
             try {
-                target.put(field, chosen.getTimeInMillis());
-                button.setText(button.getText().toString().split("  •  ")[0] + "  •  " + clock(chosen.getTimeInMillis()));
-                saveOfficeDay(getOfficeDay(dayKey, false));
-            } catch (Exception ignored) {
+                long chosenTimestamp = OfficeAttendanceTime.timestampForDayAndTime(dayKey, h, m);
+                if (OfficeAttendanceTime.SESSION_IN.equals(field) || OfficeAttendanceTime.SESSION_OUT.equals(field)) {
+                    OfficeAttendanceTime.setSessionTimestamp(target, field, chosenTimestamp);
+                } else {
+                    target.put(field, chosenTimestamp);
+                }
+                String[] parts = button.getText().toString().split("  •  ");
+                button.setText((parts.length == 0 ? "Time" : parts[0]) + "  •  " + clock(chosenTimestamp));
+            } catch (Exception e) {
+                debugLog("Attendance time edit failed: " + e.getMessage());
+                Toast.makeText(this, "Couldn't update that time.", Toast.LENGTH_SHORT).show();
             }
         }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true);
         picker.show();
