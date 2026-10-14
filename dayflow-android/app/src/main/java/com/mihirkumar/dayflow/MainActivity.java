@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import androidx.core.content.FileProvider;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
@@ -43,6 +44,13 @@ public class MainActivity extends Activity {
     private static final String OFFICE_LOG_KEY = "officeLog";
     private static final String DEBUG_LOG_KEY = "debugLog";
     private static final String DEBUG_TAG = "DayFlow";
+    private static final String UPDATE_METADATA_URL = "https://github.com/mihirkumar28/mihirkumar28.github.io/releases/download/latest/update.json";
+    private static final String UPDATE_APK_URL = "https://github.com/mihirkumar28/mihirkumar28.github.io/releases/download/latest/app-release.apk";
+    private static final String UPDATE_LAST_CHECK_KEY = "appUpdateLastCheckAt";
+    private static final String UPDATE_PROMPTED_VERSION_KEY = "appUpdatePromptedVersion";
+    private static final String PENDING_UPDATE_APK_KEY = "pendingUpdateApkPath";
+    private static final long UPDATE_CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L;
+    private static final long MAX_UPDATE_APK_BYTES = 120L * 1024L * 1024L;
     private static final String SYLLABUS_KEY = "syllabusTopics";
     private static final String SYLLABUS_TARGET_KEY = "syllabusTargetDate";
     private static final String SYLLABUS_START_KEY = "syllabusStartDate";
@@ -96,6 +104,7 @@ public class MainActivity extends Activity {
     private Button officeAction, commuteAction, focusAction;
     private String mode = "wfh";
     private String selectedDateKey;
+    private boolean updateCheckRunning;
 
     private static class Block {
         long id;
@@ -226,6 +235,8 @@ public class MainActivity extends Activity {
         if (ScreenTimeTracker.refreshRecentDays(this, 7)) DayFlowWidgetProvider.refreshAll(this);
         render();
         DayFlowWidgetProvider.refreshAll(this);
+        if (canRequestPackageInstalls()) maybeInstallPendingUpdate();
+        checkForAppUpdate(false);
     }
 
     @Override
@@ -1038,8 +1049,314 @@ public class MainActivity extends Activity {
         addMoreRow("Attendance history","Review and correct office hours","↗",()->showAttendanceHistory());
         addMoreRow("Export backup","Save plans, attendance, syllabus and screen-time history","↗",()->requestExportBackup());
         addMoreRow("Import backup","Restore a previously exported DayFlow backup","↗",()->requestImportBackup());
+        addMoreRow("Check for updates","Find and install the latest DayFlow version","↻",()->checkForAppUpdate(true));
         addMoreRow("Diagnostics","Inspect app and widget event logs","↗",()->showDiagnostics());
         addMoreRow("Clear selected plan","Remove blocks from the selected date","↗",()->clearDay());
+    }
+
+
+    private long installedVersionCode() {
+        try {
+            android.content.pm.PackageInfo p = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return 0L;
+        }
+    }
+
+    private String installedVersionName() {
+        try {
+            android.content.pm.PackageInfo p = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return p.versionName == null ? "unknown" : p.versionName;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return "unknown";
+        }
+    }
+
+    private boolean canRequestPackageInstalls() {
+        return Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls();
+    }
+
+    /** Queries a stable GitHub Release manifest; Android validates the downloaded package signature. */
+    private void checkForAppUpdate(boolean manual) {
+        if (updateCheckRunning) {
+            if (manual) Toast.makeText(this, "Already checking for updates…", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (!manual && now - getPrefs().getLong(UPDATE_LAST_CHECK_KEY, 0L) < UPDATE_CHECK_INTERVAL_MS) return;
+        updateCheckRunning = true;
+
+        new Thread(() -> {
+            DayFlowUpdateInfo.ReleaseInfo latest = null;
+            String failure = null;
+            boolean channelMissing = false;
+            java.net.HttpURLConnection connection = null;
+            try {
+                connection = (java.net.HttpURLConnection) new java.net.URL(UPDATE_METADATA_URL).openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(20000);
+                connection.setInstanceFollowRedirects(true);
+                connection.setRequestProperty("User-Agent", "DayFlow-Android");
+                connection.setRequestProperty("Accept", "application/json");
+                int response = connection.getResponseCode();
+                if (response == 404) {
+                    channelMissing = true;
+                } else if (response < 200 || response >= 300) {
+                    throw new java.io.IOException("Update server returned HTTP " + response);
+                } else {
+                    java.io.InputStream input = connection.getInputStream();
+                    java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+                    byte[] buffer = new byte[4096];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                    input.close();
+                    latest = DayFlowUpdateInfo.parse(bytes.toString("UTF-8"));
+                }
+            } catch (Exception e) {
+                failure = e.getMessage() == null ? "Network request failed" : e.getMessage();
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+
+            final DayFlowUpdateInfo.ReleaseInfo result = latest;
+            final String error = failure;
+            final boolean missing = channelMissing;
+            runOnUiThread(() -> {
+                updateCheckRunning = false;
+                getPrefs().edit().putLong(UPDATE_LAST_CHECK_KEY, System.currentTimeMillis()).apply();
+                if (result == null) {
+                    if (manual) {
+                        String message = missing
+                                ? "The in-app update channel is not published yet. A persistent release-signing key must be configured in GitHub Actions before signed updates can be published."
+                                : "DayFlow couldn't check for updates. Check your connection and try again.\n\n" + (error == null ? "" : error);
+                        new AlertDialog.Builder(this)
+                                .setTitle(missing ? "Updates not set up yet" : "Couldn't check for updates")
+                                .setMessage(message)
+                                .setPositiveButton("OK", null)
+                                .show();
+                    }
+                    return;
+                }
+
+                long current = installedVersionCode();
+                if (DayFlowUpdateInfo.isNewerThan(current, result)) {
+                    String prompted = getPrefs().getString(UPDATE_PROMPTED_VERSION_KEY, "");
+                    if (manual || !String.valueOf(result.versionCode).equals(prompted)) {
+                        getPrefs().edit().putString(UPDATE_PROMPTED_VERSION_KEY, String.valueOf(result.versionCode)).apply();
+                        showAvailableUpdate(result);
+                    }
+                } else if (manual) {
+                    new AlertDialog.Builder(this)
+                            .setTitle("You're up to date")
+                            .setMessage("DayFlow " + installedVersionName() + " is the latest published version.")
+                            .setPositiveButton("Done", null)
+                            .show();
+                }
+            });
+        }, "DayFlow-update-check").start();
+    }
+
+    private void showAvailableUpdate(DayFlowUpdateInfo.ReleaseInfo release) {
+        String notes = release.releaseNotes.isEmpty() ? "Bug fixes and improvements." : release.releaseNotes;
+        new AlertDialog.Builder(this)
+                .setTitle("DayFlow update available")
+                .setMessage("Installed: " + installedVersionName()
+                        + "\nAvailable: " + release.versionName
+                        + "\n\n" + notes
+                        + "\n\nFor a normal in-place update, Android must recognize the same signing identity. Android will ask you to approve installation.")
+                .setPositiveButton("Download & install", (dialog, which) -> downloadAndInstallUpdate(release))
+                .setNegativeButton("Later", null)
+                .show();
+    }
+
+    private void downloadAndInstallUpdate(DayFlowUpdateInfo.ReleaseInfo release) {
+        LinearLayout body = vertical();
+        body.setPadding(dp(20), dp(12), dp(20), dp(12));
+        TextView status = text("Downloading DayFlow…", 13, color("#18372E"), false);
+        body.addView(status);
+        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100);
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(8));
+        progressLp.topMargin = dp(12);
+        body.addView(progress, progressLp);
+        AlertDialog progressDialog = new AlertDialog.Builder(this).setTitle("Downloading update")
+                .setView(body).setCancelable(false).create();
+        progressDialog.show();
+
+        new Thread(() -> {
+            java.io.File apkFile = null;
+            String failure = null;
+            boolean signatureMatches = false;
+            try {
+                java.io.File folder = new java.io.File(getCacheDir(), "updates");
+                if (!folder.exists() && !folder.mkdirs()) throw new java.io.IOException("Couldn't create update cache.");
+                apkFile = new java.io.File(folder, "dayflow-update.apk");
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(UPDATE_APK_URL).openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(30000);
+                connection.setInstanceFollowRedirects(true);
+                connection.setRequestProperty("User-Agent", "DayFlow-Android");
+                int response = connection.getResponseCode();
+                if (response < 200 || response >= 300) {
+                    connection.disconnect();
+                    throw new java.io.IOException("Update download returned HTTP " + response);
+                }
+                long expectedBytes = connection.getContentLengthLong();
+                if (expectedBytes > MAX_UPDATE_APK_BYTES) {
+                    connection.disconnect();
+                    throw new java.io.IOException("The update file is unexpectedly large.");
+                }
+                long downloaded = 0L;
+                java.io.InputStream input = connection.getInputStream();
+                try (java.io.FileOutputStream output = new java.io.FileOutputStream(apkFile, false)) {
+                    byte[] buffer = new byte[16 * 1024];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        downloaded += count;
+                        if (downloaded > MAX_UPDATE_APK_BYTES) throw new java.io.IOException("The update file exceeded the size limit.");
+                        output.write(buffer, 0, count);
+                        if (expectedBytes > 0 && (downloaded % (256 * 1024) < count)) {
+                            final int percent = (int) Math.min(100L, downloaded * 100L / expectedBytes);
+                            runOnUiThread(() -> {
+                                progress.setProgress(percent);
+                                status.setText("Downloading DayFlow… " + percent + "%");
+                            });
+                        }
+                    }
+                    output.flush();
+                } finally {
+                    input.close();
+                    connection.disconnect();
+                }
+                if (apkFile.length() == 0L) throw new java.io.IOException("The downloaded update was empty.");
+
+                int flags = Build.VERSION.SDK_INT >= 28
+                        ? android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+                        : android.content.pm.PackageManager.GET_SIGNATURES;
+                android.content.pm.PackageInfo candidate = getPackageManager().getPackageArchiveInfo(apkFile.getAbsolutePath(), flags);
+                if (candidate == null || !getPackageName().equals(candidate.packageName)) {
+                    throw new java.io.IOException("The downloaded APK isn't a valid DayFlow package.");
+                }
+                long downloadedVersion = Build.VERSION.SDK_INT >= 28 ? candidate.getLongVersionCode() : candidate.versionCode;
+                if (downloadedVersion != release.versionCode) {
+                    throw new java.io.IOException("The APK version does not match the published update information.");
+                }
+                if (downloadedVersion <= installedVersionCode()) {
+                    throw new java.io.IOException("This downloaded build is not newer than the installed app.");
+                }
+                signatureMatches = apkMatchesInstalledSigner(apkFile.getAbsolutePath(), flags);
+            } catch (Exception e) {
+                failure = e.getMessage() == null ? "Download failed" : e.getMessage();
+            }
+
+            final java.io.File resultFile = apkFile;
+            final String error = failure;
+            final boolean sameSigner = signatureMatches;
+            runOnUiThread(() -> {
+                if (progressDialog.isShowing()) progressDialog.dismiss();
+                if (error != null) {
+                    if (resultFile != null && resultFile.exists()) resultFile.delete();
+                    new AlertDialog.Builder(this).setTitle("Update download failed")
+                            .setMessage(error + "\n\nTry again from More → Check for updates.")
+                            .setPositiveButton("OK", null).show();
+                    return;
+                }
+                if (!sameSigner) {
+                    showSigningMigrationHelp();
+                    return;
+                }
+                getPrefs().edit().putString(PENDING_UPDATE_APK_KEY, resultFile.getAbsolutePath()).apply();
+                if (!canRequestPackageInstalls()) {
+                    new AlertDialog.Builder(this)
+                            .setTitle("Allow DayFlow to install updates")
+                            .setMessage("Android requires a one-time permission for apps installed outside the Play Store. Allow installs from DayFlow on the next screen, then return here; installation will resume.")
+                            .setPositiveButton("Open settings", (d, w) -> {
+                                try {
+                                    startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                            Uri.parse("package:" + getPackageName())));
+                                } catch (Exception e) {
+                                    Toast.makeText(this, "Open Android Settings and allow installs from DayFlow.", Toast.LENGTH_LONG).show();
+                                }
+                            })
+                            .setNegativeButton("Not now", null).show();
+                } else {
+                    maybeInstallPendingUpdate();
+                }
+            });
+        }, "DayFlow-update-download").start();
+    }
+
+    private boolean apkMatchesInstalledSigner(String apkPath, int packageFlags) {
+        try {
+            android.content.pm.PackageManager pm = getPackageManager();
+            android.content.pm.PackageInfo installed = pm.getPackageInfo(getPackageName(), packageFlags);
+            android.content.pm.PackageInfo candidate = pm.getPackageArchiveInfo(apkPath, packageFlags);
+            if (candidate == null || !getPackageName().equals(candidate.packageName)) return false;
+            android.content.pm.Signature[] installedSigners;
+            android.content.pm.Signature[] candidateSigners;
+            if (Build.VERSION.SDK_INT >= 28) {
+                if (installed.signingInfo == null || candidate.signingInfo == null) return false;
+                installedSigners = installed.signingInfo.getApkContentsSigners();
+                candidateSigners = candidate.signingInfo.getApkContentsSigners();
+            } else {
+                installedSigners = installed.signatures;
+                candidateSigners = candidate.signatures;
+            }
+            if (installedSigners == null || candidateSigners == null || installedSigners.length == 0
+                    || candidateSigners.length == 0 || installedSigners.length != candidateSigners.length) return false;
+            for (android.content.pm.Signature current : installedSigners) {
+                boolean found = false;
+                for (android.content.pm.Signature incoming : candidateSigners) {
+                    if (current.equals(incoming)) { found = true; break; }
+                }
+                if (!found) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            debugLog("Update signature preflight failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private void showSigningMigrationHelp() {
+        new AlertDialog.Builder(this)
+                .setTitle("One-time update setup needed")
+                .setMessage("This APK is signed with a different key, so Android will not install it over the current app. This can happen when moving from temporary CI debug builds to a permanent release key.\n\n1. Export a backup from More → Export backup.\n2. Download the stable APK.\n3. Uninstall the current DayFlow, install the downloaded APK, then use More → Import backup.\n\nAfter this one-time move, future releases signed with the same key can install as normal updates.")
+                .setPositiveButton("Export backup", (d, w) -> requestExportBackup())
+                .setNeutralButton("Download stable APK", (d, w) -> openStableApkDownload())
+                .setNegativeButton("Later", null).show();
+    }
+
+    private void openStableApkDownload() {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(UPDATE_APK_URL)));
+        } catch (Exception e) {
+            Toast.makeText(this, "Couldn't open the APK download link.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void maybeInstallPendingUpdate() {
+        String path = getPrefs().getString(PENDING_UPDATE_APK_KEY, "");
+        if (path.isEmpty() || !canRequestPackageInstalls()) return;
+        java.io.File apk = new java.io.File(path);
+        if (!apk.exists() || apk.length() == 0L) {
+            getPrefs().edit().remove(PENDING_UPDATE_APK_KEY).apply();
+            return;
+        }
+        try {
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", apk);
+            Intent installer = new Intent(Intent.ACTION_VIEW);
+            installer.setDataAndType(uri, "application/vnd.android.package-archive");
+            installer.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            getPrefs().edit().remove(PENDING_UPDATE_APK_KEY).apply();
+            startActivity(installer);
+        } catch (Exception e) {
+            debugLog("Could not open Android package installer: " + e.getMessage());
+            Toast.makeText(this, "Couldn't open Android's installer. Download the update again.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void buildSyllabusPage() {
