@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
     private static final int MONTHLY_PLAN_MIGRATION_VERSION = 2;
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
     private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v1";
+    private static final String ROADMAP_MONTHLY_PANEL_COLLAPSED_KEY = "roadmapMonthlyGoalsCollapsed_v1";
     private static final String CSE_CHECKPOINT_KEY = "cseCheckpointDate";
     private static final String INTERVIEW_TIER34_KEY = "softwareTier34Target";
     private static final String CAREER_TARGET_KEY = "careerTargetMonthlyTakeHome";
@@ -93,7 +94,7 @@ public class MainActivity extends Activity {
     private LinearLayout monthlyGoalsSection, monthlyGoalList, milestonesSection, milestoneList, syllabusTopicsSection;
     private LinearLayout roadmapDetailsSection;
     private TextView goalMonthLabel, careerGoalSummary;
-    private LinearLayout roadmapFocusGoalList, roadmapFilterChips, roadmapTreeContainer, roadmapSearchRow;
+    private LinearLayout roadmapFocusGoalList, roadmapFilterChips, roadmapTreeContainer, roadmapSearchRow, roadmapMonthlyGoalsContent;
     private TextView roadmapFocusMonthLabel, roadmapFocusCount, roadmapTreeSummary;
     private EditText roadmapSearchInput;
     private ImageButton roadmapSearchToggle;
@@ -105,6 +106,8 @@ public class MainActivity extends Activity {
     private Button syllabusProgressToggle, roadmapDetailsToggle;
     private boolean syllabusDetailsExpanded = false;
     private boolean roadmapDetailsExpanded = false;
+    private boolean roadmapMonthlyGoalsCollapsed = false;
+    private Button roadmapMonthlyGoalsToggle;
     private String selectedGoalMonth;
     private String activePage = "home";
     private String syllabusFilter = "All";
@@ -1529,14 +1532,71 @@ public class MainActivity extends Activity {
         pageHeading(pageSyllabus, "YOUR PLAN", "Roadmap",
                 "One connected map for syllabus, monthly goals and deadlines.");
 
-        // The selected month filters the goal groups nested inside their parent tracks.
-        roadmapFocusMonthLabel = text("", 11, color("#18372E"), true);
+        // Compact execution panel: one shared source of truth with the full roadmap tree.
+        roadmapMonthlyGoalsCollapsed = getPrefs().getBoolean(ROADMAP_MONTHLY_PANEL_COLLAPSED_KEY, false);
+        LinearLayout monthlyCard = vertical();
+        monthlyCard.setPadding(dp(14), dp(11), dp(14), dp(10));
+        monthlyCard.setBackground(bg("#FFFFFF", 16));
+        LinearLayout.LayoutParams monthlyCardLp = new LinearLayout.LayoutParams(-1, -2);
+        monthlyCardLp.topMargin = dp(8);
+        monthlyCardLp.bottomMargin = dp(3);
+
+        LinearLayout monthlyHeader = horizontal();
+        monthlyHeader.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout monthlyHeaderText = vertical();
+        monthlyHeaderText.addView(text("MONTHLY GOALS", 12, color("#2E8060"), true));
+        roadmapFocusCount = text("", 10, color("#687A70"), false);
+        roadmapFocusCount.setSingleLine(true);
+        roadmapFocusCount.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams focusCountLp = new LinearLayout.LayoutParams(-1, -2);
+        focusCountLp.topMargin = dp(2);
+        monthlyHeaderText.addView(roadmapFocusCount, focusCountLp);
+        monthlyHeader.addView(monthlyHeaderText, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        Button addMonthlyGoal = secondaryButton("+ Goal",
+                () -> editMonthlyGoal(null, null, selectedGoalMonth));
+        addMonthlyGoal.setTextSize(10);
+        addMonthlyGoal.setContentDescription("Add a goal for the selected month");
+        monthlyHeader.addView(addMonthlyGoal, new LinearLayout.LayoutParams(dp(66), dp(36)));
+
+        roadmapMonthlyGoalsToggle = secondaryButton(roadmapMonthlyGoalsCollapsed ? "›" : "⌄",
+                () -> setRoadmapMonthlyGoalsCollapsed(!roadmapMonthlyGoalsCollapsed));
+        roadmapMonthlyGoalsToggle.setTextSize(18);
+        roadmapMonthlyGoalsToggle.setContentDescription(roadmapMonthlyGoalsCollapsed
+                ? "Expand monthly goals" : "Collapse monthly goals");
+        LinearLayout.LayoutParams monthlyToggleLp = new LinearLayout.LayoutParams(dp(34), dp(36));
+        monthlyToggleLp.leftMargin = dp(5);
+        monthlyHeader.addView(roadmapMonthlyGoalsToggle, monthlyToggleLp);
+        monthlyCard.addView(monthlyHeader);
+
+        roadmapMonthlyGoalsContent = vertical();
+        LinearLayout monthNav = horizontal();
+        monthNav.setGravity(Gravity.CENTER_VERTICAL);
+        monthNav.setPadding(0, dp(7), 0, dp(4));
+        monthNav.addView(secondaryButton("‹", () -> changeSelectedGoalMonth(-1)),
+                new LinearLayout.LayoutParams(dp(36), dp(36)));
+        roadmapFocusMonthLabel = text("", 12, color("#18372E"), true);
         roadmapFocusMonthLabel.setGravity(Gravity.CENTER);
-        roadmapFocusMonthLabel.setBackground(bg("#FFFFFF", 9));
+        roadmapFocusMonthLabel.setBackground(bg("#F3F7F3", 9));
         roadmapFocusMonthLabel.setPadding(dp(8), 0, dp(8), 0);
         roadmapFocusMonthLabel.setOnClickListener(v -> chooseGoalMonth());
-        roadmapFocusMonthLabel.setContentDescription("Choose roadmap focus month");
-        
+        roadmapFocusMonthLabel.setContentDescription("Choose roadmap goal month");
+        LinearLayout.LayoutParams monthLabelLp = new LinearLayout.LayoutParams(0, dp(36), 1f);
+        monthLabelLp.leftMargin = dp(8);
+        monthLabelLp.rightMargin = dp(8);
+        monthNav.addView(roadmapFocusMonthLabel, monthLabelLp);
+        monthNav.addView(secondaryButton("›", () -> changeSelectedGoalMonth(1)),
+                new LinearLayout.LayoutParams(dp(36), dp(36)));
+        roadmapMonthlyGoalsContent.addView(monthNav);
+
+        roadmapFocusGoalList = vertical();
+        roadmapMonthlyGoalsContent.addView(roadmapFocusGoalList,
+                new LinearLayout.LayoutParams(-1, -2));
+        monthlyCard.addView(roadmapMonthlyGoalsContent);
+        roadmapMonthlyGoalsContent.setVisibility(roadmapMonthlyGoalsCollapsed ? View.GONE : View.VISIBLE);
+        pageSyllabus.addView(monthlyCard, monthlyCardLp);
+
+
         LinearLayout treeHeading = horizontal();
         treeHeading.setGravity(Gravity.CENTER_VERTICAL);
         TextView treeHeadingLabel = text("ROADMAP TREE", 14, color("#18372E"), true);
@@ -1642,6 +1702,19 @@ public class MainActivity extends Activity {
         pageSyllabus.addView(roadmapTreeContainer, new LinearLayout.LayoutParams(-1, -2));
         refreshRoadmapFilterStyles();
         refreshRoadmapTabContent();
+    }
+
+    private void setRoadmapMonthlyGoalsCollapsed(boolean collapsed) {
+        roadmapMonthlyGoalsCollapsed = collapsed;
+        getPrefs().edit().putBoolean(ROADMAP_MONTHLY_PANEL_COLLAPSED_KEY, collapsed).apply();
+        if (roadmapMonthlyGoalsContent != null) {
+            roadmapMonthlyGoalsContent.setVisibility(collapsed ? View.GONE : View.VISIBLE);
+        }
+        if (roadmapMonthlyGoalsToggle != null) {
+            roadmapMonthlyGoalsToggle.setText(collapsed ? "›" : "⌄");
+            roadmapMonthlyGoalsToggle.setContentDescription(collapsed
+                    ? "Expand monthly goals" : "Collapse monthly goals");
+        }
     }
 
     private void setRoadmapSearchExpanded(boolean expanded) {
@@ -2313,6 +2386,7 @@ public class MainActivity extends Activity {
         boolean expanded = hasChildren && (expandedRoadmapNodeIds.contains(node.id) || autoExpand);
 
         LinearLayout row = horizontal();
+        row.setTag(node.id);
         row.setGravity(Gravity.CENTER_VERTICAL);
         int left = 4 + Math.min(depth, 5) * 13;
         row.setPadding(dp(left), dp(7), dp(4), dp(7));
@@ -2461,6 +2535,39 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean collectRoadmapPath(List<RoadmapNode> nodes, String targetId, List<String> path) {
+        if (nodes == null) return false;
+        for (RoadmapNode node : nodes) {
+            path.add(node.id);
+            if (targetId.equals(node.id) || collectRoadmapPath(node.children, targetId, path)) return true;
+            path.remove(path.size() - 1);
+        }
+        return false;
+    }
+
+    private void openMonthlyGoalInRoadmap(MonthlyGoal goal) {
+        if (goal == null) return;
+        selectedGoalMonth = goal.month;
+        String rootKey = "Other".equals(goal.track) ? "other"
+                : "Software Interview Prep".equals(goal.track) ? "software" : "upsc";
+        String targetId = roadmapId("goal", rootKey, goal.track, Long.toString(goal.id));
+        ArrayList<String> path = new ArrayList<>();
+        if (collectRoadmapPath(buildRoadmapTreeNodes(), targetId, path)) {
+            expandedRoadmapNodeIds.addAll(path);
+            persistRoadmapExpansionState();
+        }
+        refreshRoadmapSummary();
+        if (roadmapTreeContainer != null) {
+            roadmapTreeContainer.post(() -> {
+                View target = roadmapTreeContainer.findViewWithTag(targetId);
+                if (target != null) {
+                    target.requestRectangleOnScreen(
+                            new android.graphics.Rect(0, 0, target.getWidth(), target.getHeight()), true);
+                }
+            });
+        }
+    }
+
     private void openRoadmapLeaf(RoadmapNode node) {
         if (node == null) return;
         if (node.item instanceof MonthlyGoal) editMonthlyGoal((MonthlyGoal) node.item);
@@ -2473,40 +2580,50 @@ public class MainActivity extends Activity {
         if (roadmapFocusMonthLabel == null) return;
         String month = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
         roadmapFocusMonthLabel.setText(monthLabelForKey(month));
-        roadmapFocusMonthLabel.setContentDescription("Choose roadmap focus month, currently "
+        roadmapFocusMonthLabel.setContentDescription("Choose roadmap goal month, currently "
                 + monthLabelForKey(month));
         if (roadmapFocusGoalList == null || roadmapFocusCount == null) return;
         roadmapFocusGoalList.removeAllViews();
+
         ArrayList<MonthlyGoal> goals = readMonthlyGoals();
         ArrayList<MonthlyGoal> focus = new ArrayList<>();
         for (MonthlyGoal goal : goals) if (month.equals(goal.month)) focus.add(goal);
-        focus.sort(Comparator.comparingInt(g -> monthlyGoalTrackOrder(g.track)));
+        focus.sort(Comparator.comparingInt((MonthlyGoal g) -> monthlyGoalTrackOrder(g.track))
+                .thenComparing(g -> g.title == null ? "" : g.title, String.CASE_INSENSITIVE_ORDER));
+
         int done = 0;
         for (MonthlyGoal goal : focus) if (goal.done) done++;
-        roadmapFocusCount.setText(done + "/" + focus.size() + " goals complete · tracked in the tree below");
+        roadmapFocusCount.setText(monthLabelForKey(month) + " · " + done + "/" + focus.size() + " complete");
+
         if (focus.isEmpty()) {
-            TextView empty = text("No goals for this month yet. Add a priority with + Goal.",
+            TextView empty = text("No goals planned for this month yet. Add one with + Goal.",
                     12, color("#687A70"), false);
-            empty.setPadding(dp(2), dp(8), dp(2), dp(5));
+            empty.setPadding(dp(2), dp(10), dp(2), dp(8));
             roadmapFocusGoalList.addView(empty);
             return;
         }
-        int shown = Math.min(3, focus.size());
-        for (int i = 0; i < shown; i++) {
+
+        for (int i = 0; i < focus.size(); i++) {
             MonthlyGoal goal = focus.get(i);
             LinearLayout row = horizontal();
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(1), dp(5), dp(1), dp(5));
+
             Button mark = actionButton(goal.done ? "✓" : "○",
                     color(goal.done ? "#F5FBF7" : "#50635A"),
                     goal.done ? "#23845F" : "#FFFFFF");
-            row.addView(mark, new LinearLayout.LayoutParams(dp(28), dp(28)));
+            mark.setTextSize(12);
+            mark.setContentDescription(goal.done ? "Reopen monthly goal" : "Mark monthly goal complete");
+            row.addView(mark, new LinearLayout.LayoutParams(dp(30), dp(30)));
+
             LinearLayout details = vertical();
             LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(0, -2, 1f);
             detailsLp.leftMargin = dp(8);
+            detailsLp.rightMargin = dp(4);
             row.addView(details, detailsLp);
+            boolean softwareTrack = "Software Interview Prep".equals(goal.track);
             details.addView(text(goal.track.toUpperCase(Locale.US), 9,
-                    color("Software Interview Prep".equals(goal.track) ? "#A76821" : "#2E8060"), true));
+                    color(softwareTrack ? "#A76821" : "#2E8060"), true));
             TextView goalTitle = text(goal.title, 12,
                     color(goal.done ? "#687A70" : "#18372E"), true);
             goalTitle.setMaxLines(2);
@@ -2514,23 +2631,33 @@ public class MainActivity extends Activity {
             if (goal.done) goalTitle.setPaintFlags(goalTitle.getPaintFlags()
                     | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
             details.addView(goalTitle);
-            row.setContentDescription(goal.track + ": " + goal.title + ". Tap to edit.");
+
+            Button viewInTree = actionButton("↗", color("#2E8060"), "#F3F7F3");
+            viewInTree.setTextSize(13);
+            viewInTree.setContentDescription("View " + goal.title + " in roadmap tree");
+            row.addView(viewInTree, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            viewInTree.setOnClickListener(v -> openMonthlyGoalInRoadmap(goal));
+
+            row.setContentDescription(goal.track + ": " + goal.title
+                    + (goal.done ? ". Complete." : ". Open.")
+                    + " Tap the goal to edit or use the arrow to view it in the roadmap tree.");
             row.setOnClickListener(v -> editMonthlyGoal(goal));
             row.setOnLongClickListener(v -> {
                 confirmDeleteMonthlyGoal(goal);
                 return true;
             });
-            mark.setContentDescription(goal.done ? "Reopen monthly goal" : "Mark monthly goal complete");
             mark.setOnClickListener(v -> toggleMonthlyGoal(goal));
             roadmapFocusGoalList.addView(row);
-        }
-        if (focus.size() > shown) {
-            roadmapFocusGoalList.addView(text("+" + (focus.size() - shown)
-                    + " more goals in the expanded roadmap branches.", 10, color("#687A70"), false));
+
+            if (i < focus.size() - 1) {
+                View divider = new View(this);
+                divider.setBackgroundColor(color("#E5ECE6"));
+                LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
+                dividerLp.topMargin = dp(2);
+                roadmapFocusGoalList.addView(divider, dividerLp);
+            }
         }
     }
-
-
 
     private void refreshRoadmapSummary() {
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
