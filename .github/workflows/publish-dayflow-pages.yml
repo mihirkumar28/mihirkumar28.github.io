@@ -1,0 +1,51 @@
+name: Publish public DayFlow downloads
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build DayFlow Android"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Download signed APK and update metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p site
+          gh release download latest \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern app-release.apk \
+            --pattern update.json \
+            --dir site
+          test -s site/app-release.apk
+          test -s site/update.json
+          echo "Prepared public DayFlow download files."
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Deploy public download endpoint
+        id: deployment
+        uses: actions/deploy-pages@v4
