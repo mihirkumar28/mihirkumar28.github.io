@@ -71,6 +71,7 @@ public class MainActivity extends Activity {
     private static final int MONTHLY_PLAN_MIGRATION_VERSION = 2;
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
     private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v1";
+    private static final String ROADMAP_MONTH_SLOTS_KEY_PREFIX = "roadmapMonthSlots_v1_";
     private static final String ROADMAP_MONTHLY_PANEL_COLLAPSED_KEY = "roadmapMonthlyGoalsCollapsed_v1";
     private static final String CSE_CHECKPOINT_KEY = "cseCheckpointDate";
     private static final String INTERVIEW_TIER34_KEY = "softwareTier34Target";
@@ -1959,6 +1960,88 @@ public class MainActivity extends Activity {
         }
     }
 
+    private String roadmapMonthSlotsPrefsKey(String track) {
+        String safeTrack = track == null ? "" : track.trim().replaceAll("[^A-Za-z0-9_-]", "_");
+        return ROADMAP_MONTH_SLOTS_KEY_PREFIX + safeTrack;
+    }
+
+    private boolean isValidRoadmapMonthKey(String month) {
+        return month != null && month.matches("\\d{4}-(0[1-9]|1[0-2])");
+    }
+
+    private ArrayList<String> readRoadmapMonthSlots(String track) {
+        ArrayList<String> months = new ArrayList<>();
+        if (track == null || track.trim().isEmpty()) return months;
+        Set<String> stored = getPrefs().getStringSet(roadmapMonthSlotsPrefsKey(track), Collections.emptySet());
+        if (stored != null) {
+            for (String month : stored) if (isValidRoadmapMonthKey(month)) months.add(month);
+        }
+        Collections.sort(months);
+        return months;
+    }
+
+    private void rememberRoadmapMonthSlot(String track, String month) {
+        if (track == null || track.trim().isEmpty() || !isValidRoadmapMonthKey(month)) return;
+        String key = roadmapMonthSlotsPrefsKey(track);
+        Set<String> stored = getPrefs().getStringSet(key, Collections.emptySet());
+        HashSet<String> updated = new HashSet<>(stored == null ? Collections.emptySet() : stored);
+        if (updated.add(month)) getPrefs().edit().putStringSet(key, updated).apply();
+    }
+
+    private void rememberRoadmapMonthSlotsFromGoals(List<MonthlyGoal> goals) {
+        if (goals == null || goals.isEmpty()) return;
+        for (String track : MONTHLY_GOAL_TRACKS) {
+            String key = roadmapMonthSlotsPrefsKey(track);
+            Set<String> stored = getPrefs().getStringSet(key, Collections.emptySet());
+            HashSet<String> updated = new HashSet<>(stored == null ? Collections.emptySet() : stored);
+            int previousSize = updated.size();
+            for (MonthlyGoal goal : goals) {
+                if (!track.equals(goal.track)) continue;
+                if (isValidRoadmapMonthKey(goal.month)) updated.add(goal.month);
+                if (isValidRoadmapMonthKey(goal.originalMonth)) updated.add(goal.originalMonth);
+            }
+            if (updated.size() != previousSize) getPrefs().edit().putStringSet(key, updated).apply();
+        }
+    }
+
+    private String roadmapRootKeyForGoalTrack(String track) {
+        return "Other".equals(track) ? "other"
+                : "Software Interview Prep".equals(track) ? "software" : "upsc";
+    }
+
+    private void revealRoadmapMonthSlotsInTree(String track, String sourceMonth, String targetMonth) {
+        if (track == null || track.trim().isEmpty()) return;
+        String rootKey = roadmapRootKeyForGoalTrack(track);
+        ArrayList<RoadmapNode> roots = buildRoadmapTreeNodes();
+        String[] months = {sourceMonth, targetMonth};
+        String sourceNodeId = null;
+        for (String month : months) {
+            if (!isValidRoadmapMonthKey(month)) continue;
+            String targetId = Objects.equals(month, selectedGoalMonth)
+                    ? roadmapId("group", "current-goals", rootKey, track)
+                    : roadmapId("group", "goal-month", rootKey, track, month);
+            ArrayList<String> path = new ArrayList<>();
+            if (collectRoadmapPath(roots, targetId, path)) {
+                expandedRoadmapNodeIds.addAll(path);
+                if (Objects.equals(month, sourceMonth) && !Objects.equals(sourceMonth, targetMonth)) {
+                    sourceNodeId = targetId;
+                }
+            }
+        }
+        persistRoadmapExpansionState();
+        refreshRoadmapSummary();
+        if (sourceNodeId != null && roadmapTreeContainer != null) {
+            final String scrollTargetId = sourceNodeId;
+            roadmapTreeContainer.post(() -> {
+                View target = roadmapTreeContainer.findViewWithTag(scrollTargetId);
+                if (target != null) {
+                    target.requestRectangleOnScreen(
+                            new android.graphics.Rect(0, 0, target.getWidth(), target.getHeight()), true);
+                }
+            });
+        }
+    }
+
     private void refreshRoadmapTabContent() {
         if (roadmapTreeContainer == null) return;
         refreshRoadmapSummary();
@@ -2071,6 +2154,7 @@ public class MainActivity extends Activity {
     private ArrayList<RoadmapNode> buildRoadmapTreeNodes() {
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
         ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+        rememberRoadmapMonthSlotsFromGoals(goals);
         ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
         String selectedMonth = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
         ArrayList<RoadmapNode> roots = new ArrayList<>();
@@ -2134,7 +2218,11 @@ public class MainActivity extends Activity {
         if (goalTrack != null) {
             for (MonthlyGoal goal : allGoals) if (goalTrack.equals(goal.track)) subjectGoals.add(goal);
         }
-        if (subjectTopics.isEmpty() && subjectGoals.isEmpty()) return;
+        boolean hasGoalMonthSlots = goalTrack != null && !readRoadmapMonthSlots(goalTrack).isEmpty();
+        boolean isPlannedGoalTrack = "General Studies".equals(goalTrack)
+                || "Maths Optional".equals(goalTrack)
+                || "Software Interview Prep".equals(goalTrack);
+        if (subjectTopics.isEmpty() && subjectGoals.isEmpty() && !hasGoalMonthSlots && !isPlannedGoalTrack) return;
 
         RoadmapNode subject = newRoadmapNode(
                 roadmapId("subject", rootKey, subjectKey == null ? goalTrack : subjectKey),
@@ -2192,8 +2280,13 @@ public class MainActivity extends Activity {
                 }
             }
         }
-        // Keep the selected month available as a drop target even after its final goal moves out.
-        if (!current.isEmpty() || selectedMonthIsPlanned) {
+        boolean hasTrackGoals = false;
+        for (MonthlyGoal goal : goals) {
+            if (goalTrack.equals(goal.track)) { hasTrackGoals = true; break; }
+        }
+        boolean hasRememberedMonthSlots = !readRoadmapMonthSlots(goalTrack).isEmpty();
+        // Keep a usable current-month drop target for any track that has a plan or month history.
+        if (!current.isEmpty() || selectedMonthIsPlanned || hasTrackGoals || hasRememberedMonthSlots) {
             int count = 0;
             for (MonthlyGoal goal : current) count += countScheduledGoalLeaves(goal, goals);
             RoadmapNode group = newRoadmapNode(roadmapId("group", "current-goals", rootKey, goalTrack),
@@ -2233,7 +2326,11 @@ public class MainActivity extends Activity {
                                            String groupKind, boolean ascending, ArrayList<MonthlyGoal> allGoals,
                                            String selectedMonth) {
         ArrayList<String> goalMonthKeys = new ArrayList<>();
-        for (MonthlyGoal goal : goals) if (goal.month != null) goalMonthKeys.add(goal.month);
+        for (MonthlyGoal goal : allGoals) {
+            if (goalTrack.equals(goal.track) && goal.month != null) goalMonthKeys.add(goal.month);
+        }
+        // Month slots are independent of current goal occupancy: remember the source after its last goal leaves.
+        goalMonthKeys.addAll(readRoadmapMonthSlots(goalTrack));
         ArrayList<String> plannedMonthKeys = new ArrayList<>();
         for (int i = 0; i < RoadmapMonthlyPlan.monthCount(); i++) {
             plannedMonthKeys.add(RoadmapMonthlyPlan.monthKeyAt(i));
@@ -2376,7 +2473,16 @@ public class MainActivity extends Activity {
             return node.subtitle == null ? "" : node.subtitle;
         }
         if ("group".equals(node.type)) {
-            if ("goal-month".equals(node.groupKind)) return "Expand to see goals; drop here to add a sub-goal under a goal in this month";
+            if ("goal-month".equals(node.groupKind)) {
+                return node.children.isEmpty()
+                        ? "Empty month · drop a goal here to move it into this month"
+                        : "Drop a goal here to add it as a sub-goal; choose a parent if needed";
+            }
+            if ("current-goals".equals(node.groupKind)) {
+                return node.children.isEmpty()
+                        ? "Empty month · drop a goal here to move it into this month"
+                        : "Drop a goal here to add it as a sub-goal; choose a parent if needed";
+            }
             if ("split-goal".equals(node.groupKind)) {
                 return (node.subtitle == null ? "Split into smaller goals" : node.subtitle)
                         + " · progress counts smaller goals only";
@@ -2488,7 +2594,7 @@ public class MainActivity extends Activity {
         }
         if (next != null) status += " Next deadline: " + next.title + " · " + displayRoadmapDate(next.date) + ".";
         if (roadmapTreeEditMode) {
-            status += " Edit mode: drop onto a goal to swap positions, or onto a month to nest the goal under a goal in that month; continuity rules stay enforced.";
+            status += " Edit mode: drop onto a goal to swap positions; drop onto an empty month to move a goal there, or a populated month to make it a sub-goal. Continuity rules stay enforced.";
         } else if (roadmapSearchText.trim().isEmpty() && roadmapActiveFilter.equals("All")) {
             status += " Expand a branch to explore; tap a leaf to edit it.";
         } else {
@@ -2635,7 +2741,9 @@ public class MainActivity extends Activity {
             addChild.setOnClickListener(v -> childAction.run());
         }
         String editDropHint = roadmapTreeEditMode && isRoadmapMonthDropNode(node)
-                ? ". Drop a goal here to add it as a sub-goal; choose a parent if needed."
+                ? (node.children.isEmpty()
+                    ? ". Drop a goal here to move it into this month."
+                    : ". Drop a goal here to add it as a sub-goal; choose a parent if needed.")
                 : (roadmapTreeEditMode && isRoadmapGoalNode(node)
                     ? ". Drop another goal here to swap its slot." : "");
         row.setContentDescription(node.title + ". " + metadata
@@ -2760,6 +2868,26 @@ public class MainActivity extends Activity {
             return;
         }
 
+        boolean hasOtherActiveGoalsInTargetMonth = false;
+        for (MonthlyGoal candidate : all) {
+            if (candidate.id == dragged.id || isDescendantOf(all, candidate, dragged.id)
+                    || !Objects.equals(candidate.track, monthNode.goalTrack)
+                    || !Objects.equals(candidate.month, monthNode.month)
+                    || MonthlyGoalLifecycle.RETIRED.equals(candidate.lifecycleStatus)) {
+                continue;
+            }
+            hasOtherActiveGoalsInTargetMonth = true;
+            break;
+        }
+        if (RoadmapTreeRules.shouldMoveDroppedGoalAsRoot(hasOtherActiveGoalsInTargetMonth)) {
+            if (Objects.equals(dragged.month, monthNode.month)) {
+                Toast.makeText(this, "That goal is already in " + monthLabelForKey(monthNode.month) + ".", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            moveRoadmapGoalToEmptyMonth(dragged, monthNode.month, all);
+            return;
+        }
+
         ArrayList<MonthlyGoal> parentCandidates = new ArrayList<>();
         for (MonthlyGoal candidate : all) {
             if (candidate.id == dragged.id || candidate.parentGoalId != 0L
@@ -2774,7 +2902,7 @@ public class MainActivity extends Activity {
         parentCandidates.sort(monthlyGoalOrderComparator(all));
         if (parentCandidates.isEmpty()) {
             Toast.makeText(this,
-                    "This month has no unfinished goal that can safely contain a sub-goal. Add a goal to this month first.",
+                    "This month already has goals, but none can safely contain another goal because of completed-work rules. Drop onto an eligible goal to swap positions, or choose an empty month.",
                     Toast.LENGTH_LONG).show();
             return;
         }
@@ -2803,6 +2931,26 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private void moveRoadmapGoalToEmptyMonth(MonthlyGoal dragged, String targetMonth, ArrayList<MonthlyGoal> all) {
+        if (dragged == null || all == null || targetMonth == null) return;
+        String sourceMonth = dragged.month;
+        if (Objects.equals(sourceMonth, targetMonth)) return;
+        rememberRoadmapMonthSlot(dragged.track, sourceMonth);
+        rememberRoadmapMonthSlot(dragged.track, targetMonth);
+        int nextSortOrder = nextMonthlyGoalSortOrder(all, targetMonth, dragged.track, 0L);
+        moveMonthlyGoalGroupToMonth(dragged, targetMonth, all);
+        dragged.sortOrder = nextSortOrder;
+        recordMonthlyGoalEvent(dragged, "Moved from " + monthLabelForKey(sourceMonth)
+                + " to " + monthLabelForKey(targetMonth) + " by dropping onto an empty month");
+        selectedGoalMonth = targetMonth;
+        persistMonthlyGoals(all);
+        openMonthlyGoalInRoadmap(dragged);
+        revealRoadmapMonthSlotsInTree(dragged.track, sourceMonth, targetMonth);
+        Toast.makeText(this, "Goal moved to " + monthLabelForKey(targetMonth)
+                + "; the empty source month remains visible and the monthly summary is updated.",
+                Toast.LENGTH_LONG).show();
     }
 
     private void addRoadmapGoalAsSubgoal(long draggedId, long parentId, String targetMonth) {
@@ -2845,6 +2993,8 @@ public class MainActivity extends Activity {
 
         int nextSortOrder = nextMonthlyGoalSortOrder(all, targetMonth, parent.track, parent.id);
         String previousMonth = dragged.month;
+        rememberRoadmapMonthSlot(dragged.track, previousMonth);
+        rememberRoadmapMonthSlot(dragged.track, targetMonth);
         if (!Objects.equals(dragged.month, targetMonth)) {
             moveMonthlyGoalGroupToMonth(dragged, targetMonth, all);
         }
@@ -2857,10 +3007,10 @@ public class MainActivity extends Activity {
         recordMonthlyGoalEvent(dragged, "Added as a sub-goal under “" + parent.title + "”"
                 + (Objects.equals(previousMonth, targetMonth) ? "" : "; moved from "
                     + monthLabelForKey(previousMonth) + " to " + monthLabelForKey(targetMonth)));
-        persistMonthlyGoals(all);
         selectedGoalMonth = targetMonth;
-        refreshRoadmapTabContent();
+        persistMonthlyGoals(all);
         openMonthlyGoalInRoadmap(parent);
+        revealRoadmapMonthSlotsInTree(parent.track, previousMonth, targetMonth);
         Toast.makeText(this, "Sub-goal added under “" + parent.title
                 + "”; month and roadmap summaries updated.", Toast.LENGTH_LONG).show();
     }
