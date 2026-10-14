@@ -1,4 +1,5 @@
 name: Build DayFlow Android
+# Keep release builds independent from Pages publication retries.
 
 on:
   push:
