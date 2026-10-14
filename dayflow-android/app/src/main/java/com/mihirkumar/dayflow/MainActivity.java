@@ -2676,7 +2676,7 @@ public class MainActivity extends Activity {
             }
             attachRoadmapGoalDropTarget(row, node);
         } else if (roadmapTreeEditMode && isRoadmapMonthDropNode(node)) {
-            attachRoadmapMonthDropTarget(row, node);
+            // Attach after the row's children are built so text and the + button are drop targets too.
         }
 
         if (isRoadmapActionNode(node)) {
@@ -2776,6 +2776,12 @@ public class MainActivity extends Activity {
             return false;
         });
 
+        // Attach after all row children (especially the + Add button) exist. Android routes
+        // drag events to the child under the pointer, so the whole month row must accept drops.
+        if (roadmapTreeEditMode && isRoadmapMonthDropNode(node)) {
+            attachRoadmapMonthDropTarget(row, node);
+        }
+
         if (expanded) {
             boolean forceChildren = forceInclude || ownMatch;
             for (RoadmapNode child : node.children) {
@@ -2810,21 +2816,29 @@ public class MainActivity extends Activity {
     }
 
     private void attachRoadmapMonthDropTarget(LinearLayout row, RoadmapNode monthNode) {
-        row.setOnDragListener((target, event) -> {
+        // Multiple child views can receive the same drag sequence. Share a guard so one drop
+        // can never move the goal twice, while allowing drops over the title, hint, or + button.
+        final boolean[] dropHandled = {false};
+        View.OnDragListener listener = (target, event) -> {
             if (!roadmapTreeEditMode || !isRoadmapMonthDropNode(monthNode)) return false;
             switch (event.getAction()) {
                 case android.view.DragEvent.ACTION_DRAG_STARTED:
+                    dropHandled[0] = false;
                     return event.getClipDescription() != null
                             && "dayflow-roadmap-goal-id".contentEquals(event.getClipDescription().getLabel());
                 case android.view.DragEvent.ACTION_DRAG_ENTERED:
-                    target.setBackground(bg("#DDF3E4", 9));
+                    row.setBackground(bg("#DDF3E4", 9));
                     return true;
                 case android.view.DragEvent.ACTION_DRAG_EXITED:
+                    // Keep the row highlighted while moving between its child views.
+                    return true;
                 case android.view.DragEvent.ACTION_DRAG_ENDED:
-                    target.setBackgroundColor(Color.TRANSPARENT);
+                    row.setBackgroundColor(Color.TRANSPARENT);
                     return true;
                 case android.view.DragEvent.ACTION_DROP:
-                    target.setBackgroundColor(Color.TRANSPARENT);
+                    row.setBackgroundColor(Color.TRANSPARENT);
+                    if (dropHandled[0]) return true;
+                    dropHandled[0] = true;
                     try {
                         long draggedId = Long.parseLong(
                                 event.getClipData().getItemAt(0).getText().toString());
@@ -2836,7 +2850,18 @@ public class MainActivity extends Activity {
                 default:
                     return true;
             }
-        });
+        };
+        attachRoadmapMonthDropListenerRecursively(row, listener);
+    }
+
+    private void attachRoadmapMonthDropListenerRecursively(View view, View.OnDragListener listener) {
+        view.setOnDragListener(listener);
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                attachRoadmapMonthDropListenerRecursively(group.getChildAt(i), listener);
+            }
+        }
     }
 
     private void moveRoadmapGoalToMonth(long draggedId, RoadmapNode monthNode) {
@@ -2946,6 +2971,9 @@ public class MainActivity extends Activity {
                 + " to " + monthLabelForKey(targetMonth) + " by dropping onto an empty month");
         selectedGoalMonth = targetMonth;
         persistMonthlyGoals(all);
+        // Persist slots again after the goal save, then refresh both projections from the same state.
+        rememberRoadmapMonthSlot(dragged.track, sourceMonth);
+        rememberRoadmapMonthSlot(dragged.track, targetMonth);
         openMonthlyGoalInRoadmap(dragged);
         revealRoadmapMonthSlotsInTree(dragged.track, sourceMonth, targetMonth);
         Toast.makeText(this, "Goal moved to " + monthLabelForKey(targetMonth)
