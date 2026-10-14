@@ -82,9 +82,11 @@ public class MainActivity extends Activity {
     private LinearLayout syllabusDetailContent;
     private EditText syllabusSearch;
     private LinearLayout monthlyGoalsSection, monthlyGoalList, milestonesSection, milestoneList, syllabusTopicsSection;
+    private LinearLayout roadmapDetailsSection;
     private TextView goalMonthLabel, careerGoalSummary;
-    private Button syllabusProgressToggle;
+    private Button syllabusProgressToggle, roadmapDetailsToggle;
     private boolean syllabusDetailsExpanded = false;
+    private boolean roadmapDetailsExpanded = false;
     private String selectedGoalMonth;
     private String activePage = "home";
     private String syllabusFilter = "All";
@@ -1045,26 +1047,42 @@ public class MainActivity extends Activity {
     private void buildSyllabusPage() {
         if (selectedGoalMonth == null) selectedGoalMonth = monthKeyFromDate(todayKey());
         pageHeading(pageSyllabus, "YOUR PLAN", "Roadmap",
-                "This month, what is coming next, and the full syllabus when you need it.");
-
-        syllabusSummaryView = text("", 12, color("#D6E4DA"), false);
-        syllabusSummaryView.setLineSpacing(dp(2), 1f);
-        syllabusSummaryView.setPadding(dp(12), dp(10), dp(12), dp(10));
-        syllabusSummaryView.setBackground(bg("#18231E", 13));
-        LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
-        summaryLp.bottomMargin = dp(14);
-        pageSyllabus.addView(syllabusSummaryView, summaryLp);
+                "One month at a time. Check off goals as you complete them.");
 
         monthlyGoalsSection = vertical();
-        milestonesSection = vertical();
-        syllabusTopicsSection = vertical();
         pageSyllabus.addView(monthlyGoalsSection, new LinearLayout.LayoutParams(-1, -2));
-        addSectionDivider(pageSyllabus);
-        pageSyllabus.addView(milestonesSection, new LinearLayout.LayoutParams(-1, -2));
-        addSectionDivider(pageSyllabus);
-        pageSyllabus.addView(syllabusTopicsSection, new LinearLayout.LayoutParams(-1, -2));
-
         buildMonthlyGoalsSection();
+
+        roadmapDetailsToggle = secondaryButton("Later milestones & syllabus  ↓", () -> {
+            roadmapDetailsExpanded = !roadmapDetailsExpanded;
+            if (roadmapDetailsSection != null) {
+                roadmapDetailsSection.setVisibility(roadmapDetailsExpanded ? View.VISIBLE : View.GONE);
+            }
+            if (roadmapDetailsToggle != null) {
+                roadmapDetailsToggle.setText(roadmapDetailsExpanded
+                        ? "Hide milestones & syllabus  ↑" : "Later milestones & syllabus  ↓");
+            }
+            if (roadmapDetailsExpanded) {
+                renderMilestones();
+                refreshSyllabusRows();
+            }
+        });
+        LinearLayout.LayoutParams detailsToggleLp = new LinearLayout.LayoutParams(-1, dp(44));
+        detailsToggleLp.topMargin = dp(18);
+        detailsToggleLp.bottomMargin = dp(10);
+        pageSyllabus.addView(roadmapDetailsToggle, detailsToggleLp);
+
+        roadmapDetailsSection = vertical();
+        roadmapDetailsSection.setVisibility(View.GONE);
+        pageSyllabus.addView(roadmapDetailsSection, new LinearLayout.LayoutParams(-1, -2));
+
+        milestonesSection = vertical();
+        roadmapDetailsSection.addView(milestonesSection, new LinearLayout.LayoutParams(-1, -2));
+        addSectionDivider(roadmapDetailsSection);
+
+        syllabusTopicsSection = vertical();
+        roadmapDetailsSection.addView(syllabusTopicsSection, new LinearLayout.LayoutParams(-1, -2));
+
         buildMilestonesSection();
         buildSyllabusTopicsSection();
         refreshRoadmapTabContent();
@@ -1238,16 +1256,20 @@ public class MainActivity extends Activity {
 
     private void refreshRoadmapTabContent() {
         if (monthlyGoalsSection == null || milestonesSection == null || syllabusTopicsSection == null) return;
-        // All roadmap essentials live on one scrollable page. Only the long
-        // topic checklist is collapsed, because it is reference material rather
-        // than the user's next action.
+        // Keep the current month's goals as the only default focus. Deadlines
+        // and the full syllabus are available together on demand.
         monthlyGoalsSection.setVisibility(View.VISIBLE);
-        milestonesSection.setVisibility(View.VISIBLE);
-        syllabusTopicsSection.setVisibility(View.VISIBLE);
         refreshRoadmapSummary();
         renderMonthlyGoals();
         renderMilestones();
         refreshSyllabusRows();
+        if (roadmapDetailsSection != null) {
+            roadmapDetailsSection.setVisibility(roadmapDetailsExpanded ? View.VISIBLE : View.GONE);
+        }
+        if (roadmapDetailsToggle != null) {
+            roadmapDetailsToggle.setText(roadmapDetailsExpanded
+                    ? "Hide milestones & syllabus  ↑" : "Later milestones & syllabus  ↓");
+        }
     }
 
     private void refreshRoadmapSummary() {
