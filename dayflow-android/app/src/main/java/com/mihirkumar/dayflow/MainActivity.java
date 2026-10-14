@@ -2758,27 +2758,32 @@ public class MainActivity extends Activity {
                         9, color("#687A70"), false));
             }
 
-            Button moveEarlier = actionButton("↑", color("#2E8060"), "#F3F7F3");
-            moveEarlier.setTextSize(12);
-            moveEarlier.setEnabled(canMoveMonthlyGoal(goal, -1));
-            moveEarlier.setContentDescription("General Studies".equals(goal.track) && goal.parentGoalId == 0L
-                    ? "Move " + goal.title + " earlier in the General Studies plan and update its month"
-                    : "Move " + goal.title + " earlier within this month's " + goal.track + " goal group");
-            LinearLayout.LayoutParams moveLp = new LinearLayout.LayoutParams(dp(26), dp(30));
-            moveLp.leftMargin = dp(2);
-            row.addView(moveEarlier, moveLp);
-            moveEarlier.setOnClickListener(v -> moveMonthlyGoal(goal, -1));
+            if (goal.parentGoalId > 0L) {
+                Button moveEarlier = actionButton("↑", color("#2E8060"), "#F3F7F3");
+                moveEarlier.setTextSize(12);
+                moveEarlier.setEnabled(canMoveMonthlyGoal(goal, -1));
+                moveEarlier.setContentDescription("Move " + goal.title
+                        + " earlier within its parent goal");
+                LinearLayout.LayoutParams moveLp = new LinearLayout.LayoutParams(dp(26), dp(30));
+                moveLp.leftMargin = dp(2);
+                row.addView(moveEarlier, moveLp);
+                moveEarlier.setOnClickListener(v -> moveMonthlyGoal(goal, -1));
 
-            Button moveLater = actionButton("↓", color("#2E8060"), "#F3F7F3");
-            moveLater.setTextSize(12);
-            moveLater.setEnabled(canMoveMonthlyGoal(goal, 1));
-            moveLater.setContentDescription("General Studies".equals(goal.track) && goal.parentGoalId == 0L
-                    ? "Move " + goal.title + " later in the General Studies plan and update its month"
-                    : "Move " + goal.title + " later within this month's " + goal.track + " goal group");
-            LinearLayout.LayoutParams moveLaterLp = new LinearLayout.LayoutParams(dp(26), dp(30));
-            moveLaterLp.leftMargin = dp(2);
-            row.addView(moveLater, moveLaterLp);
-            moveLater.setOnClickListener(v -> moveMonthlyGoal(goal, 1));
+                Button moveLater = actionButton("↓", color("#2E8060"), "#F3F7F3");
+                moveLater.setTextSize(12);
+                moveLater.setEnabled(canMoveMonthlyGoal(goal, 1));
+                moveLater.setContentDescription("Move " + goal.title
+                        + " later within its parent goal");
+                LinearLayout.LayoutParams moveLaterLp = new LinearLayout.LayoutParams(dp(26), dp(30));
+                moveLaterLp.leftMargin = dp(2);
+                row.addView(moveLater, moveLaterLp);
+                moveLater.setOnClickListener(v -> moveMonthlyGoal(goal, 1));
+            } else {
+                TextView sequenceLock = text("↕", 13, color("#687A70"), true);
+                sequenceLock.setGravity(Gravity.CENTER);
+                sequenceLock.setContentDescription("Top-level plan order is preserved to protect sequential goals");
+                row.addView(sequenceLock, new LinearLayout.LayoutParams(dp(26), dp(30)));
+            }
 
             Button viewInTree = actionButton("↗", color("#2E8060"), "#F3F7F3");
             viewInTree.setTextSize(13);
@@ -3009,12 +3014,48 @@ public class MainActivity extends Activity {
 
     private Comparator<MonthlyGoal> monthlyGoalOrderComparator(List<MonthlyGoal> source) {
         final ArrayList<MonthlyGoal> all = new ArrayList<>(source);
-        return Comparator.comparingInt((MonthlyGoal g) -> monthlyGoalTrackOrder(g.track))
-                .thenComparingLong(g -> monthlyGoalRoot(all, g).sortOrder)
-                .thenComparingLong(g -> monthlyGoalRoot(all, g).id)
-                .thenComparingInt(g -> g.parentGoalId > 0L ? 1 : 0)
-                .thenComparingInt(g -> g.sortOrder)
-                .thenComparing(g -> g.title == null ? "" : g.title, String.CASE_INSENSITIVE_ORDER);
+        return (left, right) -> {
+            int trackOrder = Integer.compare(monthlyGoalTrackOrder(left.track), monthlyGoalTrackOrder(right.track));
+            if (trackOrder != 0) return trackOrder;
+            int monthOrder = safeGoalMonth(left.month).compareTo(safeGoalMonth(right.month));
+            if (monthOrder != 0) return monthOrder;
+            ArrayList<MonthlyGoal> leftPath = monthlyGoalPath(all, left);
+            ArrayList<MonthlyGoal> rightPath = monthlyGoalPath(all, right);
+            int length = Math.min(leftPath.size(), rightPath.size());
+            for (int i = 0; i < length; i++) {
+                MonthlyGoal l = leftPath.get(i), r = rightPath.get(i);
+                int order = Integer.compare(l.sortOrder, r.sortOrder);
+                if (order != 0) return order;
+                order = Long.compare(l.id, r.id);
+                if (order != 0) return order;
+            }
+            // A parent is shown before its descendants; descendants remain grouped
+            // together instead of being pushed to the end of the month summary.
+            if (leftPath.size() != rightPath.size()) return Integer.compare(leftPath.size(), rightPath.size());
+            return Long.compare(left.id, right.id);
+        };
+    }
+
+    private String safeGoalMonth(String month) {
+        return month == null ? "" : month;
+    }
+
+    private ArrayList<MonthlyGoal> monthlyGoalPath(List<MonthlyGoal> all, MonthlyGoal goal) {
+        ArrayList<MonthlyGoal> path = new ArrayList<>();
+        HashSet<Long> visited = new HashSet<>();
+        MonthlyGoal current = goal;
+        while (current != null && visited.add(current.id)) {
+            path.add(current);
+            MonthlyGoal parent = null;
+            if (current.parentGoalId > 0L) {
+                for (MonthlyGoal candidate : all) {
+                    if (candidate.id == current.parentGoalId) { parent = candidate; break; }
+                }
+            }
+            current = parent;
+        }
+        Collections.reverse(path);
+        return path;
     }
 
     private MonthlyGoal monthlyGoalRoot(List<MonthlyGoal> all, MonthlyGoal goal) {
