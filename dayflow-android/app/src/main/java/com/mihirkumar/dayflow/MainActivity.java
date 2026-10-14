@@ -38,8 +38,6 @@ public class MainActivity extends Activity {
     private static final String MODE_KEY = "mode";
     private static final String COMMUTE_IN_START = "commuteInStart";
     private static final String COMMUTE_IN_END = "commuteInEnd";
-    private static final String OFFICE_IN = "officeIn";
-    private static final String OFFICE_OUT = "officeOut";
     private static final String COMMUTE_OUT_START = "commuteOutStart";
     private static final String COMMUTE_OUT_END = "commuteOutEnd";
     private static final String OFFICE_LOG_KEY = "officeLog";
@@ -5085,6 +5083,7 @@ public class MainActivity extends Activity {
                 session.put(OfficeAttendanceTime.SESSION_OUT, 0);
                 sessions.put(sessionIndex, session);
             }
+            final JSONObject sessionForEdit = session;
 
             LinearLayout content = vertical();
             content.setPadding(dp(18), dp(2), dp(18), dp(2));
@@ -5120,8 +5119,8 @@ public class MainActivity extends Activity {
                         return true;
                     });
 
-            inBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, OfficeAttendanceTime.SESSION_IN, session, inBtn));
-            outBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, OfficeAttendanceTime.SESSION_OUT, session, outBtn));
+            inBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, OfficeAttendanceTime.SESSION_IN, sessionForEdit, inBtn));
+            outBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, OfficeAttendanceTime.SESSION_OUT, sessionForEdit, outBtn));
             ciStartBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteInStart", day, ciStartBtn));
             ciEndBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteInEnd", day, ciEndBtn));
             coStartBtn.setOnClickListener(v -> pickAttendanceTime(dayKey, "commuteOutStart", day, coStartBtn));
