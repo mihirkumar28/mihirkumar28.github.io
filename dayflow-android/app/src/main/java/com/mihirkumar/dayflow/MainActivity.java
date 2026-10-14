@@ -95,7 +95,8 @@ public class MainActivity extends Activity {
     private LinearLayout roadmapDetailsSection;
     private TextView goalMonthLabel, careerGoalSummary;
     private LinearLayout roadmapFocusGoalList, roadmapFilterChips, roadmapTreeContainer, roadmapSearchRow, roadmapMonthlyGoalsContent;
-    private TextView roadmapFocusMonthLabel, roadmapFocusCount, roadmapTreeSummary;
+    private LinearLayout roadmapOverdueReviewBanner;
+    private TextView roadmapFocusMonthLabel, roadmapFocusCount, roadmapTreeSummary, roadmapOverdueReviewText;
     private EditText roadmapSearchInput;
     private ImageButton roadmapSearchToggle;
     private final Map<String, Button> roadmapFilterButtons = new LinkedHashMap<>();
@@ -180,7 +181,11 @@ public class MainActivity extends Activity {
     private static class MonthlyGoal {
         long id;
         String month, track, title, target;
+        String originalMonth, lifecycleStatus;
+        long completedAt, parentGoalId;
         boolean done;
+        final ArrayList<String> history = new ArrayList<>();
+
         MonthlyGoal(long id, String month, String track, String title, String target, boolean done) {
             this.id = id;
             this.month = month;
@@ -188,10 +193,14 @@ public class MainActivity extends Activity {
             this.title = title;
             this.target = target;
             this.done = done;
+            this.originalMonth = month;
+            this.lifecycleStatus = done ? MonthlyGoalLifecycle.COMPLETED : MonthlyGoalLifecycle.ACTIVE;
+            this.completedAt = 0L;
+            this.parentGoalId = 0L;
         }
     }
 
-    private static class RoadmapMilestone {
+        private static class RoadmapMilestone {
         long id;
         String key, track, title, date, detail;
         boolean done;
@@ -1589,6 +1598,24 @@ public class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(dp(36), dp(36)));
         roadmapMonthlyGoalsContent.addView(monthNav);
 
+        roadmapOverdueReviewBanner = horizontal();
+        roadmapOverdueReviewBanner.setGravity(Gravity.CENTER_VERTICAL);
+        roadmapOverdueReviewBanner.setPadding(dp(9), dp(7), dp(7), dp(7));
+        roadmapOverdueReviewBanner.setBackground(bg("#FFF4E5", 10));
+        roadmapOverdueReviewText = text("", 11, color("#81531D"), true);
+        roadmapOverdueReviewText.setMaxLines(2);
+        LinearLayout.LayoutParams overdueTextLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        overdueTextLp.rightMargin = dp(6);
+        roadmapOverdueReviewBanner.addView(roadmapOverdueReviewText, overdueTextLp);
+        Button reviewOverdue = secondaryButton("Review", () -> showUnfinishedGoalReview());
+        reviewOverdue.setTextSize(10);
+        roadmapOverdueReviewBanner.addView(reviewOverdue, new LinearLayout.LayoutParams(dp(66), dp(32)));
+        roadmapOverdueReviewBanner.setVisibility(View.GONE);
+        LinearLayout.LayoutParams overdueBannerLp = new LinearLayout.LayoutParams(-1, -2);
+        overdueBannerLp.topMargin = dp(5);
+        overdueBannerLp.bottomMargin = dp(4);
+        roadmapMonthlyGoalsContent.addView(roadmapOverdueReviewBanner, overdueBannerLp);
+
         roadmapFocusGoalList = vertical();
         roadmapMonthlyGoalsContent.addView(roadmapFocusGoalList,
                 new LinearLayout.LayoutParams(-1, -2));
@@ -2453,7 +2480,7 @@ public class MainActivity extends Activity {
         });
         row.setOnLongClickListener(v -> {
             if (node.item instanceof MonthlyGoal) {
-                confirmDeleteMonthlyGoal((MonthlyGoal) node.item);
+                showMonthlyGoalActions((MonthlyGoal) node.item);
                 return true;
             }
             if (node.item instanceof SyllabusTopic) {
@@ -2580,13 +2607,28 @@ public class MainActivity extends Activity {
 
         ArrayList<MonthlyGoal> goals = readMonthlyGoals();
         ArrayList<MonthlyGoal> focus = new ArrayList<>();
-        for (MonthlyGoal goal : goals) if (month.equals(goal.month)) focus.add(goal);
+        for (MonthlyGoal goal : goals) {
+            if (month.equals(goal.month) && MonthlyGoalLifecycle.showInMonthlyPanel(goal.lifecycleStatus)) {
+                focus.add(goal);
+            }
+        }
         focus.sort(Comparator.comparingInt((MonthlyGoal g) -> monthlyGoalTrackOrder(g.track))
                 .thenComparing(g -> g.title == null ? "" : g.title, String.CASE_INSENSITIVE_ORDER));
 
         int done = 0;
         for (MonthlyGoal goal : focus) if (goal.done) done++;
         roadmapFocusCount.setText(monthLabelForKey(month) + " · " + done + "/" + focus.size() + " complete");
+
+        int overdueCount = unfinishedLeafCountFromEarlierMonths();
+        boolean viewingCurrentMonth = month.equals(currentMonthKey());
+        if (roadmapOverdueReviewBanner != null) {
+            roadmapOverdueReviewBanner.setVisibility(viewingCurrentMonth && overdueCount > 0
+                    ? View.VISIBLE : View.GONE);
+            if (roadmapOverdueReviewText != null && overdueCount > 0) {
+                roadmapOverdueReviewText.setText(overdueCount + " unfinished goal"
+                        + (overdueCount == 1 ? "" : "s") + " from earlier months");
+            }
+        }
 
         if (focus.isEmpty()) {
             TextView empty = text("No goals planned for this month yet. Add one with + Goal.",
@@ -2624,6 +2666,17 @@ public class MainActivity extends Activity {
             if (goal.done) goalTitle.setPaintFlags(goalTitle.getPaintFlags()
                     | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
             details.addView(goalTitle);
+            if (goal.parentGoalId > 0L) {
+                TextView subgoalLabel = text("SUBGOAL · smaller part of a larger target", 9,
+                        color("#687A70"), false);
+                LinearLayout.LayoutParams subgoalLp = new LinearLayout.LayoutParams(-1, -2);
+                subgoalLp.topMargin = dp(1);
+                details.addView(subgoalLabel, subgoalLp);
+            }
+            if (goal.originalMonth != null && !goal.originalMonth.equals(goal.month)) {
+                details.addView(text("Originally planned for " + monthLabelForKey(goal.originalMonth),
+                        9, color("#687A70"), false));
+            }
 
             Button viewInTree = actionButton("↗", color("#2E8060"), "#F3F7F3");
             viewInTree.setTextSize(13);
@@ -2636,7 +2689,7 @@ public class MainActivity extends Activity {
                     + " Tap the goal to edit or use the arrow to view it in the roadmap tree.");
             row.setOnClickListener(v -> editMonthlyGoal(goal));
             row.setOnLongClickListener(v -> {
-                confirmDeleteMonthlyGoal(goal);
+                showMonthlyGoalActions(goal);
                 return true;
             });
             mark.setOnClickListener(v -> toggleMonthlyGoal(goal));
@@ -2827,7 +2880,7 @@ public class MainActivity extends Activity {
             row.setContentDescription(goal.track + ": " + goal.title + ". Tap to edit; long press to delete.");
             row.setOnClickListener(v -> editMonthlyGoal(goal));
             row.setOnLongClickListener(v -> {
-                confirmDeleteMonthlyGoal(goal);
+                showMonthlyGoalActions(goal);
                 return true;
             });
             mark.setOnClickListener(v -> toggleMonthlyGoal(goal));
@@ -2975,6 +3028,24 @@ public class MainActivity extends Activity {
                     MonthlyGoal updated = new MonthlyGoal(existing == null ? System.currentTimeMillis() : existing.id,
                             draftMonth[0], track.getSelectedItem().toString(), name,
                             target.getText().toString().trim(), existing != null && existing.done);
+                    if (existing != null) {
+                        updated.originalMonth = existing.originalMonth == null ? existing.month : existing.originalMonth;
+                        updated.completedAt = existing.completedAt;
+                        updated.parentGoalId = existing.parentGoalId;
+                        updated.lifecycleStatus = existing.lifecycleStatus;
+                        updated.history.addAll(existing.history);
+                        if (!Objects.equals(existing.month, draftMonth[0])) {
+                            recordMonthlyGoalEvent(updated,
+                                    "Scheduled month changed from " + monthLabelForKey(existing.month)
+                                            + " to " + monthLabelForKey(draftMonth[0]));
+                            if (updated.parentGoalId > 0L) {
+                                updated.parentGoalId = 0L;
+                                recordMonthlyGoalEvent(updated, "Detached from its split-goal group");
+                            }
+                        }
+                    } else {
+                        recordMonthlyGoalEvent(updated, "Created");
+                    }
                     boolean replaced = false;
                     for (int i = 0; i < all.size(); i++) {
                         if (existing != null && all.get(i).id == existing.id) {
@@ -2993,13 +3064,17 @@ public class MainActivity extends Activity {
 
     private void toggleMonthlyGoal(MonthlyGoal goal) {
         if (goal == null) return;
+        String scheduledMonth = goal.month;
+        String completedTrack = goal.track;
         ArrayList<MonthlyGoal> all = readMonthlyGoals();
-        boolean found = false;
-        boolean completed = false;
+        boolean found = false, completed = false;
         for (MonthlyGoal item : all) {
             if (item.id == goal.id) {
                 item.done = !item.done;
                 completed = item.done;
+                item.lifecycleStatus = item.done ? MonthlyGoalLifecycle.COMPLETED : MonthlyGoalLifecycle.ACTIVE;
+                item.completedAt = item.done ? System.currentTimeMillis() : 0L;
+                recordMonthlyGoalEvent(item, item.done ? "Completed" : "Reopened");
                 found = true;
                 break;
             }
@@ -3007,25 +3082,332 @@ public class MainActivity extends Activity {
         if (!found) return;
         persistMonthlyGoals(all);
         refreshRoadmapTabContent();
-        Toast.makeText(this,
-                completed ? "Goal completed · progress updated" : "Goal reopened · progress updated",
+        Toast.makeText(this, completed ? "Goal completed · progress updated" : "Goal reopened · progress updated",
                 Toast.LENGTH_SHORT).show();
+        if (completed) maybeOfferEarlyCompletion(scheduledMonth, completedTrack);
+    }
+
+        private void recordMonthlyGoalEvent(MonthlyGoal goal, String action) {
+        if (goal == null) return;
+        goal.history.add(System.currentTimeMillis() + "|" + action + "|" + (goal.month == null ? "" : goal.month));
+        while (goal.history.size() > 80) goal.history.remove(0);
+    }
+
+    private String monthlyGoalHistoryText(MonthlyGoal goal) {
+        StringBuilder out = new StringBuilder();
+        String original = goal.originalMonth == null ? goal.month : goal.originalMonth;
+        out.append("Originally planned: ").append(monthLabelForKey(original));
+        if (!Objects.equals(original, goal.month)) out.append("\nCurrently scheduled: ").append(monthLabelForKey(goal.month));
+        if (goal.completedAt > 0L) {
+            out.append("\nLast completed: ").append(new SimpleDateFormat("dd MMM yyyy, HH:mm",
+                    Locale.getDefault()).format(new Date(goal.completedAt)));
+        }
+        if (!goal.history.isEmpty()) {
+            out.append("\n\nACTIVITY");
+            int start = Math.max(0, goal.history.size() - 12);
+            for (int i = goal.history.size() - 1; i >= start; i--) {
+                String[] parts = goal.history.get(i).split("\\|", 3);
+                out.append("\n• ");
+                try {
+                    out.append(new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+                            .format(new Date(Long.parseLong(parts[0]))));
+                } catch (Exception ignored) { out.append("Recorded"); }
+                if (parts.length > 1) out.append(" · ").append(parts[1]);
+                if (parts.length > 2 && !parts[2].isEmpty()) out.append(" (").append(monthLabelForKey(parts[2])).append(")");
+            }
+        } else {
+            out.append("\n\nNo recorded activity yet. Earlier completion dates weren't stored by older versions.");
+        }
+        return out.toString();
+    }
+
+    private void showMonthlyGoalHistory(MonthlyGoal goal) {
+        new AlertDialog.Builder(this).setTitle("Goal history")
+                .setMessage(monthlyGoalHistoryText(goal)).setPositiveButton("Close", null).show();
+    }
+
+    private void showMonthlyGoalActions(MonthlyGoal goal) {
+        if (goal == null) return;
+        if (MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus)) {
+            new AlertDialog.Builder(this).setTitle(goal.title)
+                    .setItems(new String[]{"View history", "Delete goal group"}, (dialog, which) -> {
+                        if (which == 0) showMonthlyGoalHistory(goal);
+                        else confirmDeleteMonthlyGoal(goal);
+                    }).setNegativeButton("Cancel", null).show();
+            return;
+        }
+        ArrayList<String> options = new ArrayList<>();
+        options.add("Edit goal"); options.add("View history");
+        if (MonthlyGoalLifecycle.RETIRED.equals(goal.lifecycleStatus)) options.add("Restore to active plan");
+        options.add("Delete goal");
+        new AlertDialog.Builder(this).setTitle(goal.title)
+                .setItems(options.toArray(new String[0]), (dialog, which) -> {
+                    String action = options.get(which);
+                    if ("Edit goal".equals(action)) editMonthlyGoal(goal);
+                    else if ("View history".equals(action)) showMonthlyGoalHistory(goal);
+                    else if ("Restore to active plan".equals(action)) restoreMonthlyGoal(goal);
+                    else if ("Delete goal".equals(action)) confirmDeleteMonthlyGoal(goal);
+                }).setNegativeButton("Cancel", null).show();
+    }
+
+    private void restoreMonthlyGoal(MonthlyGoal goal) {
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        for (MonthlyGoal item : all) if (item.id == goal.id) {
+            item.lifecycleStatus = MonthlyGoalLifecycle.ACTIVE; item.done = false; item.completedAt = 0L;
+            recordMonthlyGoalEvent(item, "Restored to active plan");
+        }
+        persistMonthlyGoals(all);
+        Toast.makeText(this, "Goal restored.", Toast.LENGTH_SHORT).show();
+    }
+
+    private String currentMonthKey() { return monthKeyFromDate(todayKey()); }
+
+    private ArrayList<MonthlyGoal> unfinishedGoalsFromEarlierMonths() {
+        String currentMonth = currentMonthKey();
+        ArrayList<MonthlyGoal> missed = new ArrayList<>();
+        for (MonthlyGoal goal : readMonthlyGoals()) {
+            if (MonthlyGoalLifecycle.isPastUnfinished(goal.lifecycleStatus, goal.done, goal.month, currentMonth)) missed.add(goal);
+        }
+        return missed;
+    }
+
+    private ArrayList<MonthlyGoal> goalsToReview() {
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        LinkedHashMap<Long, MonthlyGoal> review = new LinkedHashMap<>();
+        for (MonthlyGoal goal : unfinishedGoalsFromEarlierMonths()) {
+            if (goal.parentGoalId > 0L) {
+                MonthlyGoal parent = null;
+                for (MonthlyGoal candidate : all) if (candidate.id == goal.parentGoalId) parent = candidate;
+                if (parent != null && MonthlyGoalLifecycle.SPLIT_PARENT.equals(parent.lifecycleStatus)) {
+                    review.put(parent.id, parent); continue;
+                }
+            }
+            review.put(goal.id, goal);
+        }
+        ArrayList<MonthlyGoal> result = new ArrayList<>(review.values());
+        result.sort(Comparator.comparing((MonthlyGoal g) -> g.month == null ? "" : g.month)
+                .thenComparing(g -> g.track == null ? "" : g.track)
+                .thenComparing(g -> g.title == null ? "" : g.title, String.CASE_INSENSITIVE_ORDER));
+        return result;
+    }
+
+    private int unfinishedLeafCountFromEarlierMonths() { return unfinishedGoalsFromEarlierMonths().size(); }
+
+    private void showUnfinishedGoalReview() {
+        ArrayList<MonthlyGoal> items = goalsToReview();
+        if (items.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle("Monthly review")
+                    .setMessage("No unfinished goals from earlier months. Your plan is up to date.")
+                    .setPositiveButton("Done", null).show();
+            return;
+        }
+        String[] labels = new String[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            MonthlyGoal goal = items.get(i);
+            labels[i] = goal.track + " · " + goal.title + " · " + monthLabelForKey(goal.month)
+                    + (MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus) ? " (goal group)" : "");
+        }
+        new AlertDialog.Builder(this).setTitle("Review unfinished goals")
+                .setMessage("Choose a goal to decide what happens next. The original month and activity history are preserved.")
+                .setItems(labels, (dialog, which) -> showUnfinishedGoalActions(items.get(which)))
+                .setNegativeButton("Close", null).show();
+    }
+
+    private void showUnfinishedGoalActions(MonthlyGoal goal) {
+        boolean splitGroup = MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus);
+        ArrayList<String> options = new ArrayList<>();
+        options.add("Carry forward to " + monthLabelForKey(currentMonthKey()));
+        options.add("Reschedule to another month");
+        if (!splitGroup) options.add("Split into two smaller goals");
+        options.add("Defer to a later month");
+        options.add("Retire this goal");
+        options.add("View goal history");
+        new AlertDialog.Builder(this).setTitle(goal.title)
+                .setMessage("Original plan: " + monthLabelForKey(goal.originalMonth == null ? goal.month : goal.originalMonth)
+                        + (splitGroup ? "\nRemaining parts will move together." : "")
+                        + "\nChoose how to handle the unfinished work.")
+                .setItems(options.toArray(new String[0]), (dialog, which) -> {
+                    String action = options.get(which);
+                    if (action.startsWith("Carry forward")) rescheduleMonthlyGoal(goal, currentMonthKey(), "Carried forward");
+                    else if ("Reschedule to another month".equals(action)) chooseMonthlyGoalMonth(goal, "Rescheduled", false);
+                    else if ("Split into two smaller goals".equals(action)) showSplitMonthlyGoalDialog(goal);
+                    else if ("Defer to a later month".equals(action)) chooseMonthlyGoalMonth(goal, "Deferred", true);
+                    else if ("Retire this goal".equals(action)) retireMonthlyGoal(goal);
+                    else if ("View goal history".equals(action)) showMonthlyGoalHistory(goal);
+                }).show();
+    }
+
+    private void chooseMonthlyGoalMonth(MonthlyGoal goal, String action, boolean futureOnly) {
+        Calendar initial = Calendar.getInstance();
+        Date current = parseDateKey(currentMonthKey() + "-01");
+        if (current != null) initial.setTime(current);
+        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar chosen = Calendar.getInstance(); chosen.set(year, month, 1, 0, 0, 0);
+            String newMonth = new SimpleDateFormat("yyyy-MM", Locale.US).format(chosen.getTime());
+            if (futureOnly && newMonth.compareTo(currentMonthKey()) <= 0) {
+                Toast.makeText(this, "Choose a month after " + monthLabelForKey(currentMonthKey()), Toast.LENGTH_LONG).show();
+                return;
+            }
+            rescheduleMonthlyGoal(goal, newMonth, action);
+        }, initial.get(Calendar.YEAR), initial.get(Calendar.MONTH), 1);
+        picker.setTitle(futureOnly ? "Defer until which month?" : "Reschedule goal");
+        picker.show();
+    }
+
+    private void rescheduleMonthlyGoal(MonthlyGoal goal, String newMonth, String action) {
+        if (goal == null || newMonth == null || newMonth.trim().isEmpty()) return;
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        MonthlyGoal stored = null;
+        for (MonthlyGoal item : all) if (item.id == goal.id) stored = item;
+        if (stored == null) return;
+        String oldMonth = stored.month;
+        boolean splitGroup = MonthlyGoalLifecycle.SPLIT_PARENT.equals(stored.lifecycleStatus);
+        if (!splitGroup && stored.parentGoalId > 0L) {
+            stored.parentGoalId = 0L;
+            recordMonthlyGoalEvent(stored, "Detached from split goal before rescheduling");
+        }
+        stored.month = newMonth;
+        stored.lifecycleStatus = splitGroup ? MonthlyGoalLifecycle.SPLIT_PARENT : MonthlyGoalLifecycle.ACTIVE;
+        stored.done = false; stored.completedAt = 0L;
+        recordMonthlyGoalEvent(stored, action + " from " + monthLabelForKey(oldMonth) + " to " + monthLabelForKey(newMonth));
+        if (splitGroup) for (MonthlyGoal child : all) if (isDescendantOf(all, child, goal.id)) {
+            String oldChildMonth = child.month; child.month = newMonth;
+            recordMonthlyGoalEvent(child, action + " with parent goal from "
+                    + monthLabelForKey(oldChildMonth) + " to " + monthLabelForKey(newMonth));
+        }
+        persistMonthlyGoals(all); refreshRoadmapTabContent();
+        Toast.makeText(this, action + " · original plan retained", Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean isDescendantOf(ArrayList<MonthlyGoal> all, MonthlyGoal candidate, long parentId) {
+        long id = candidate.parentGoalId; HashSet<Long> visited = new HashSet<>();
+        while (id > 0L && visited.add(id)) {
+            if (id == parentId) return true;
+            long next = 0L; for (MonthlyGoal item : all) if (item.id == id) next = item.parentGoalId;
+            id = next;
+        }
+        return false;
+    }
+
+    private void retireMonthlyGoal(MonthlyGoal goal) {
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        for (MonthlyGoal item : all) if (item.id == goal.id || isDescendantOf(all, item, goal.id)) {
+            item.done = false; item.completedAt = 0L; item.lifecycleStatus = MonthlyGoalLifecycle.RETIRED;
+            recordMonthlyGoalEvent(item, "Retired");
+        }
+        persistMonthlyGoals(all);
+        Toast.makeText(this, "Goal archived · excluded from active progress", Toast.LENGTH_LONG).show();
+    }
+
+    private void showSplitMonthlyGoalDialog(MonthlyGoal goal) {
+        if (goal == null || MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus)) return;
+        LinearLayout form = vertical(); form.setPadding(dp(20), dp(8), dp(20), dp(4));
+        form.addView(text("Replace this broad target with two smaller, measurable goals. The original target and history remain available.",
+                12, color("#687A70"), false));
+        EditText first = new EditText(this); first.setSingleLine(true); first.setHint("Part 1 · specific outcome");
+        EditText firstTarget = new EditText(this); firstTarget.setSingleLine(true); firstTarget.setHint("Success criteria for part 1 (optional)");
+        EditText second = new EditText(this); second.setSingleLine(true); second.setHint("Part 2 · specific outcome");
+        EditText secondTarget = new EditText(this); secondTarget.setSingleLine(true); secondTarget.setHint("Success criteria for part 2 (optional)");
+        for (EditText input : new EditText[]{first, firstTarget, second, secondTarget}) {
+            input.setTextColor(color("#18372E")); input.setHintTextColor(color("#82948A"));
+            input.setPadding(dp(10), dp(5), dp(10), dp(5)); input.setBackground(bg("#FFFFFF", 10));
+            form.addView(input, new LinearLayout.LayoutParams(-1, dp(44)));
+        }
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Split goal").setView(form)
+                .setPositiveButton("Split goal", null).setNegativeButton("Cancel", null).create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String a = first.getText().toString().trim(), b = second.getText().toString().trim();
+            if (a.isEmpty() || b.isEmpty() || a.equalsIgnoreCase(b)) {
+                Toast.makeText(this, "Enter two different goal titles.", Toast.LENGTH_SHORT).show(); return;
+            }
+            ArrayList<MonthlyGoal> all = readMonthlyGoals();
+            MonthlyGoal parent = null; for (MonthlyGoal item : all) if (item.id == goal.id) parent = item;
+            if (parent == null) return;
+            String oldMonth = parent.month, schedule = currentMonthKey();
+            parent.month = schedule; parent.done = false; parent.completedAt = 0L;
+            parent.lifecycleStatus = MonthlyGoalLifecycle.SPLIT_PARENT;
+            recordMonthlyGoalEvent(parent, "Split from " + monthLabelForKey(oldMonth) + " into two smaller goals");
+            long nextId = System.currentTimeMillis(); for (MonthlyGoal item : all) nextId = Math.max(nextId, item.id + 1L);
+            MonthlyGoal one = new MonthlyGoal(nextId++, schedule, parent.track, a, firstTarget.getText().toString().trim(), false);
+            one.parentGoalId = parent.id; recordMonthlyGoalEvent(one, "Created by splitting " + parent.title);
+            MonthlyGoal two = new MonthlyGoal(nextId, schedule, parent.track, b, secondTarget.getText().toString().trim(), false);
+            two.parentGoalId = parent.id; recordMonthlyGoalEvent(two, "Created by splitting " + parent.title);
+            all.add(one); all.add(two); persistMonthlyGoals(all);
+            selectedGoalMonth = schedule; refreshRoadmapTabContent(); dialog.dismiss();
+            Toast.makeText(this, "Goal split into two smaller tasks.", Toast.LENGTH_SHORT).show();
+        }));
+        dialog.show();
+    }
+
+    private void maybeOfferEarlyCompletion(String completedMonth, String track) {
+        if (track == null || !currentMonthKey().equals(completedMonth)) return;
+        Calendar calendar = Calendar.getInstance();
+        int day = calendar.get(Calendar.DAY_OF_MONTH), days = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
+        int total = 0, unfinished = 0;
+        for (MonthlyGoal goal : readMonthlyGoals()) {
+            if (!completedMonth.equals(goal.month) || !track.equals(goal.track)
+                    || !MonthlyGoalLifecycle.countsAsPlannedGoal(goal.lifecycleStatus)) continue;
+            total++; if (!goal.done && MonthlyGoalLifecycle.ACTIVE.equals(goal.lifecycleStatus)) unfinished++;
+        }
+        if (!MonthlyGoalLifecycle.shouldOfferEarlyCompletion(true, day, days, total, unfinished)) return;
+        String[] actions = {"Start a next-month goal early", "Add a stretch goal",
+                "Add extra revision / practice", "Keep the remaining days as buffer"};
+        new AlertDialog.Builder(this).setTitle("Monthly goals completed early")
+                .setMessage("Everything planned for " + track + " in " + monthLabelForKey(completedMonth)
+                        + " is complete, with " + (days - day) + " day(s) left. Your original plan stays intact.")
+                .setItems(actions, (dialog, which) -> {
+                    if (which == 0) chooseUpcomingGoalToAdvance(completedMonth, track);
+                    else if (which == 1) editMonthlyGoal(null, track, completedMonth);
+                    else if (which == 2) addQuickRevisionGoal(completedMonth, track);
+                    else Toast.makeText(this, "Buffer preserved. No goals were changed.", Toast.LENGTH_SHORT).show();
+                }).show();
+    }
+
+    private void chooseUpcomingGoalToAdvance(String month, String track) {
+        ArrayList<MonthlyGoal> choices = new ArrayList<>();
+        for (MonthlyGoal goal : readMonthlyGoals()) if (goal.month.compareTo(month) > 0 && !goal.done
+                && track.equals(goal.track) && goal.parentGoalId == 0L
+                && MonthlyGoalLifecycle.ACTIVE.equals(goal.lifecycleStatus)) choices.add(goal);
+        choices.sort(Comparator.comparing((MonthlyGoal g) -> g.month).thenComparing(g -> g.title, String.CASE_INSENSITIVE_ORDER));
+        if (choices.isEmpty()) {
+            Toast.makeText(this, "No upcoming goal for this track can be advanced safely.", Toast.LENGTH_LONG).show(); return;
+        }
+        String[] labels = new String[choices.size()];
+        for (int i = 0; i < choices.size(); i++) labels[i] = monthLabelForKey(choices.get(i).month) + " · " + choices.get(i).title;
+        new AlertDialog.Builder(this).setTitle("Choose a goal to start early")
+                .setMessage("Choose manually so prerequisite-dependent work isn't moved automatically.")
+                .setItems(labels, (dialog, which) -> {
+                    MonthlyGoal goal = choices.get(which);
+                    new AlertDialog.Builder(this).setTitle("Start goal early?")
+                            .setMessage("Move “" + goal.title + "” into " + monthLabelForKey(month)
+                                    + " for scheduling. Its original target month stays in history.")
+                            .setPositiveButton("Start early", (d, w) -> rescheduleMonthlyGoal(goal, month, "Started early"))
+                            .setNegativeButton("Cancel", null).show();
+                }).setNegativeButton("Cancel", null).show();
+    }
+
+    private void addQuickRevisionGoal(String month, String track) {
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        long id = System.currentTimeMillis(); for (MonthlyGoal item : all) id = Math.max(id, item.id + 1L);
+        MonthlyGoal extra = new MonthlyGoal(id, month, track, "Extra revision / practice",
+                "Use remaining days for active recall, timed practice, problem-solving and recurring-error review.", false);
+        recordMonthlyGoalEvent(extra, "Added as an early-completion stretch goal");
+        all.add(extra); selectedGoalMonth = month; persistMonthlyGoals(all); refreshRoadmapTabContent();
     }
 
     private void confirmDeleteMonthlyGoal(MonthlyGoal goal) {
-        new AlertDialog.Builder(this)
-                .setTitle("Delete this goal?")
-                .setMessage("“" + goal.title + "” will be removed from " + monthLabelForKey(goal.month) + ".")
+        new AlertDialog.Builder(this).setTitle("Delete this goal?")
+                .setMessage("“" + goal.title + "” will be removed from " + monthLabelForKey(goal.month)
+                        + (MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus) ? ", along with its smaller goals." : "."))
                 .setPositiveButton("Delete", (d, w) -> {
                     ArrayList<MonthlyGoal> all = readMonthlyGoals();
-                    all.removeIf(item -> item.id == goal.id);
+                    all.removeIf(item -> item.id == goal.id || isDescendantOf(all, item, goal.id));
                     persistMonthlyGoals(all);
-                })
-                .setNegativeButton("Keep goal", null)
-                .show();
+                    Toast.makeText(this, "Goal deleted.", Toast.LENGTH_SHORT).show();
+                }).setNegativeButton("Keep goal", null).show();
     }
 
-    private void renderMilestones() {
+    private void renderMilestones() {    private void renderMilestones() {
         if (milestoneList == null) return;
         milestoneList.removeAllViews();
         ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
@@ -3237,18 +3619,26 @@ public class MainActivity extends Activity {
         try {
             JSONArray data = new JSONArray(getPrefs().getString(MONTHLY_GOALS_KEY, "[]"));
             for (int i = 0; i < data.length(); i++) {
-                JSONObject item = data.optJSONObject(i);
-                if (item == null) continue;
-                goals.add(new MonthlyGoal(item.optLong("id", i + 1L),
-                        item.optString("month", monthKeyFromDate(todayKey())),
-                        item.optString("track", "General Studies"),
-                        item.optString("title", ""),
-                        item.optString("target", ""),
-                        item.optBoolean("done", false)));
+                JSONObject item = data.optJSONObject(i); if (item == null) continue;
+                String month = item.optString("month", monthKeyFromDate(todayKey()));
+                boolean done = item.optBoolean("done", false);
+                MonthlyGoal goal = new MonthlyGoal(item.optLong("id", i + 1L), month,
+                        item.optString("track", "General Studies"), item.optString("title", ""),
+                        item.optString("target", ""), done);
+                goal.originalMonth = item.optString("originalMonth", month);
+                goal.completedAt = item.optLong("completedAt", 0L);
+                goal.parentGoalId = item.optLong("parentGoalId", 0L);
+                goal.lifecycleStatus = item.optString("lifecycleStatus",
+                        done ? MonthlyGoalLifecycle.COMPLETED : MonthlyGoalLifecycle.ACTIVE);
+                if (done) goal.lifecycleStatus = MonthlyGoalLifecycle.COMPLETED;
+                else if (MonthlyGoalLifecycle.COMPLETED.equals(goal.lifecycleStatus)) goal.lifecycleStatus = MonthlyGoalLifecycle.ACTIVE;
+                JSONArray history = item.optJSONArray("history");
+                if (history != null) for (int h = 0; h < history.length(); h++) {
+                    String event = history.optString(h, ""); if (!event.isEmpty()) goal.history.add(event);
+                }
+                goals.add(goal);
             }
-        } catch (Exception e) {
-            debugLog("Monthly goals read failed: " + e.getMessage());
-        }
+        } catch (Exception e) { debugLog("Monthly goals read failed: " + e.getMessage()); }
         return goals;
     }
 
@@ -3257,25 +3647,26 @@ public class MainActivity extends Activity {
         try {
             for (MonthlyGoal goal : goals) {
                 JSONObject item = new JSONObject();
-                item.put("id", goal.id);
-                item.put("month", goal.month);
-                item.put("track", goal.track);
-                item.put("title", goal.title);
-                item.put("target", goal.target == null ? "" : goal.target);
+                item.put("id", goal.id); item.put("month", goal.month); item.put("track", goal.track);
+                item.put("title", goal.title); item.put("target", goal.target == null ? "" : goal.target);
                 item.put("done", goal.done);
-                data.put(item);
+                item.put("originalMonth", goal.originalMonth == null ? goal.month : goal.originalMonth);
+                item.put("completedAt", goal.completedAt); item.put("parentGoalId", goal.parentGoalId);
+                item.put("lifecycleStatus", goal.lifecycleStatus == null
+                        ? (goal.done ? MonthlyGoalLifecycle.COMPLETED : MonthlyGoalLifecycle.ACTIVE) : goal.lifecycleStatus);
+                JSONArray history = new JSONArray(); for (String event : goal.history) history.put(event);
+                item.put("history", history); data.put(item);
             }
             getPrefs().edit().putString(MONTHLY_GOALS_KEY, data.toString()).apply();
             debugLog("Monthly roadmap goals saved: " + goals.size());
-            refreshRoadmapSummary();
-            renderMonthlyGoals();
+            refreshRoadmapSummary(); renderMonthlyGoals();
         } catch (Exception e) {
             debugLog("Monthly goals save failed: " + e.getMessage());
             Toast.makeText(this, "Could not save monthly goals.", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private ArrayList<RoadmapMilestone> readRoadmapMilestones() {
+        private ArrayList<RoadmapMilestone> readRoadmapMilestones() {
         ArrayList<RoadmapMilestone> milestones = new ArrayList<>();
         try {
             JSONArray data = new JSONArray(getPrefs().getString(ROADMAP_MILESTONES_KEY, "[]"));
@@ -3567,23 +3958,22 @@ public class MainActivity extends Activity {
         try {
             for (MonthlyGoal goal : goals) {
                 JSONObject item = new JSONObject();
-                item.put("id", goal.id);
-                item.put("month", goal.month);
-                item.put("track", goal.track);
-                item.put("title", goal.title);
-                item.put("target", goal.target == null ? "" : goal.target);
+                item.put("id", goal.id); item.put("month", goal.month); item.put("track", goal.track);
+                item.put("title", goal.title); item.put("target", goal.target == null ? "" : goal.target);
                 item.put("done", goal.done);
-                data.put(item);
+                item.put("originalMonth", goal.originalMonth == null ? goal.month : goal.originalMonth);
+                item.put("completedAt", goal.completedAt); item.put("parentGoalId", goal.parentGoalId);
+                item.put("lifecycleStatus", goal.lifecycleStatus == null
+                        ? (goal.done ? MonthlyGoalLifecycle.COMPLETED : MonthlyGoalLifecycle.ACTIVE) : goal.lifecycleStatus);
+                JSONArray history = new JSONArray(); for (String event : goal.history) history.put(event);
+                item.put("history", history); data.put(item);
             }
             getPrefs().edit().putString(MONTHLY_GOALS_KEY, data.toString()).apply();
             return true;
-        } catch (Exception e) {
-            debugLog("Monthly starter goals save failed: " + e.getMessage());
-            return false;
-        }
+        } catch (Exception e) { debugLog("Monthly starter goals save failed: " + e.getMessage()); return false; }
     }
 
-    private String monthKeyFromDate(String dateKey) {
+        private String monthKeyFromDate(String dateKey) {
         if (dateKey != null && dateKey.length() >= 7) return dateKey.substring(0, 7);
         return new SimpleDateFormat("yyyy-MM", Locale.US).format(new Date());
     }
