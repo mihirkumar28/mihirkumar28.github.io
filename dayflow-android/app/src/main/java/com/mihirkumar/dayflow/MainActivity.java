@@ -1619,23 +1619,6 @@ public class MainActivity extends Activity {
         treeHeadingLp.topMargin = dp(12);
         pageSyllabus.addView(treeHeading, treeHeadingLp);
 
-        LinearLayout monthNav = horizontal();
-        monthNav.setGravity(Gravity.CENTER_VERTICAL);
-        monthNav.setPadding(0, dp(5), 0, dp(5));
-        monthNav.addView(text("FOCUS MONTH", 10, color("#687A70"), true),
-                new LinearLayout.LayoutParams(dp(82), dp(32)));
-        monthNav.addView(secondaryButton("‹", () -> changeSelectedGoalMonth(-1)),
-                new LinearLayout.LayoutParams(dp(32), dp(32)));
-        LinearLayout.LayoutParams monthLabelLp = new LinearLayout.LayoutParams(0, dp(32), 1f);
-        monthLabelLp.leftMargin = dp(6);
-        monthLabelLp.rightMargin = dp(6);
-        monthNav.addView(roadmapFocusMonthLabel, monthLabelLp);
-        monthNav.addView(secondaryButton("›", () -> changeSelectedGoalMonth(1)),
-                new LinearLayout.LayoutParams(dp(32), dp(32)));
-        LinearLayout.LayoutParams monthNavLp = new LinearLayout.LayoutParams(-1, -2);
-        monthNavLp.bottomMargin = dp(3);
-        pageSyllabus.addView(monthNav, monthNavLp);
-
         roadmapTreeSummary = text("", 11, color("#687A70"), false);
         roadmapTreeSummary.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams treeSummaryLp = new LinearLayout.LayoutParams(-1, -2);
