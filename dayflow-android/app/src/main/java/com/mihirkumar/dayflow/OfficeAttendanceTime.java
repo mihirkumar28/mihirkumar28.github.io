@@ -83,6 +83,23 @@ final class OfficeAttendanceTime {
      * Returns {officeMillis, commuteMillis, recordedDays} for inclusive yyyy-MM-dd bounds.
      * Only today's open sessions accrue time; old open sessions are never carried forward.
      */
+    /** True if the day has at least one saved office or commute timestamp. */
+    static boolean hasRecordedData(JSONObject day) {
+        if (day == null) return false;
+        JSONArray sessions = day.optJSONArray("sessions");
+        if (sessions != null) {
+            for (int i = 0; i < sessions.length(); i++) {
+                JSONObject session = sessions.optJSONObject(i);
+                if (session != null && (session.optLong(SESSION_IN, 0L) > 0L
+                        || session.optLong(SESSION_OUT, 0L) > 0L)) return true;
+            }
+        }
+        return day.optLong("commuteInStart", 0L) > 0L
+                || day.optLong("commuteInEnd", 0L) > 0L
+                || day.optLong("commuteOutStart", 0L) > 0L
+                || day.optLong("commuteOutEnd", 0L) > 0L;
+    }
+
     static long[] totalsForDateRange(JSONArray records, String fromDateInclusive,
                                      String throughDateInclusive, String todayKey, long now) {
         long officeTotal = 0L;

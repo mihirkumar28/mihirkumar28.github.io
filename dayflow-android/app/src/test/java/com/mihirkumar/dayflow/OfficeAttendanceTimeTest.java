@@ -98,6 +98,21 @@ public class OfficeAttendanceTimeTest {
         assertEquals(45, actual.get(Calendar.MINUTE));
     }
 
+    @Test public void calendarMarksOfficeAndCommuteRecordsButNotBlankDrafts() throws Exception {
+        JSONObject blankDraft = new JSONObject().put("date", "2026-10-01")
+                .put("sessions", new JSONArray().put(new JSONObject().put("in", 0).put("out", 0)))
+                .put("commuteInStart", 0).put("commuteInEnd", 0)
+                .put("commuteOutStart", 0).put("commuteOutEnd", 0);
+        JSONObject officeDay = new JSONObject().put("sessions", new JSONArray()
+                .put(new JSONObject().put("in", 10 * HOUR).put("out", 0)));
+        JSONObject commuteDay = new JSONObject().put("commuteInStart", 8 * HOUR)
+                .put("commuteInEnd", 9 * HOUR);
+        assertFalse(OfficeAttendanceTime.hasRecordedData(blankDraft));
+        assertTrue(OfficeAttendanceTime.hasRecordedData(officeDay));
+        assertTrue(OfficeAttendanceTime.hasRecordedData(commuteDay));
+        assertFalse(OfficeAttendanceTime.hasRecordedData(null));
+    }
+
     @Test public void cumulativeTotalsIncludeEveryDateInRangeAndRefreshAfterEdits() throws Exception {
         JSONObject monday = new JSONObject().put("date", "2026-10-12")
                 .put("sessions", new JSONArray().put(new JSONObject().put("in",

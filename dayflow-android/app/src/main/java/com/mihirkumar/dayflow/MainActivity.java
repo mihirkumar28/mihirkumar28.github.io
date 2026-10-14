@@ -105,7 +105,7 @@ public class MainActivity extends Activity {
     private String mode = "wfh";
     private String selectedDateKey;
     private String officeSummaryPeriod = "all";
-    private boolean officeHistoryExpanded = false;
+    private Calendar attendanceCalendarMonth = Calendar.getInstance();
     private boolean updateCheckRunning;
 
     private static class Block {
@@ -1004,44 +1004,130 @@ public class MainActivity extends Activity {
         officePageContent.addView(status);
 
         LinearLayout history = surfaceCard();
-        history.addView(text("ATTENDANCE HISTORY", 10, color("#2E8060"), true));
-        history.addView(text("Choose any past date to edit its office and commute times.", 12,
+        history.addView(text("ATTENDANCE CALENDAR", 10, color("#2E8060"), true));
+        history.addView(text("Tap any past date to edit its office and commute times.", 12,
                 color("#687A70"), false));
-        Button chooseDate = primaryButton("Choose date to edit", () -> chooseAttendanceHistoryDate());
-        LinearLayout.LayoutParams chooseDateLp = new LinearLayout.LayoutParams(-1, dp(44));
-        chooseDateLp.topMargin = dp(10);
-        history.addView(chooseDate, chooseDateLp);
-        Button recentToggle = secondaryButton(officeHistoryExpanded ? "Hide recent days" : "Show recent days",
-                () -> {
-                    officeHistoryExpanded = !officeHistoryExpanded;
-                    renderOfficePage();
-                });
-        LinearLayout.LayoutParams recentToggleLp = new LinearLayout.LayoutParams(-1, dp(38));
-        recentToggleLp.topMargin = dp(7);
-        history.addView(recentToggle, recentToggleLp);
 
-        if (officeHistoryExpanded) {
-            Calendar cursor = Calendar.getInstance();
-            for (int i = 0; i < 7; i++) {
-                String key = keyForDate(cursor.getTime());
-                JSONObject log = getOfficeDay(key, false);
-                LinearLayout row = horizontal();
-                row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(dp(9), dp(9), dp(4), dp(9));
-                row.setBackground(bg(i == 0 ? "#DCEBE2" : "#FFFFFF", 10));
-                LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
-                rowLp.topMargin = dp(6);
-                history.addView(row, rowLp);
-                String dateText = new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(cursor.getTime());
-                row.addView(text(dateText, 13, color("#18372E"), true),
-                        new LinearLayout.LayoutParams(0, -2, 1f));
-                row.addView(text(log == null ? "No record" : "Edit  ›", 11,
-                        color(log == null ? "#687A70" : "#2E8060"), true));
-                row.setOnClickListener(v -> editAttendanceDay(key));
-                cursor.add(Calendar.DAY_OF_YEAR, -1);
-            }
+        // Keep the visible month on day one so navigation and grids remain stable.
+        Calendar monthStart = (Calendar) attendanceCalendarMonth.clone();
+        monthStart.set(Calendar.DAY_OF_MONTH, 1);
+        monthStart.set(Calendar.HOUR_OF_DAY, 12);
+        monthStart.set(Calendar.MINUTE, 0);
+        monthStart.set(Calendar.SECOND, 0);
+        monthStart.set(Calendar.MILLISECOND, 0);
+        attendanceCalendarMonth = (Calendar) monthStart.clone();
+
+        Calendar currentMonth = Calendar.getInstance();
+        currentMonth.set(Calendar.DAY_OF_MONTH, 1);
+        currentMonth.set(Calendar.HOUR_OF_DAY, 12);
+        currentMonth.set(Calendar.MINUTE, 0);
+        currentMonth.set(Calendar.SECOND, 0);
+        currentMonth.set(Calendar.MILLISECOND, 0);
+        boolean isCurrentMonth = monthStart.get(Calendar.YEAR) == currentMonth.get(Calendar.YEAR)
+                && monthStart.get(Calendar.MONTH) == currentMonth.get(Calendar.MONTH);
+
+        LinearLayout monthNavigation = horizontal();
+        Button previousMonth = secondaryButton("‹", () -> changeAttendanceCalendarMonth(-1));
+        previousMonth.setTextSize(21);
+        previousMonth.setContentDescription("Previous month");
+        monthNavigation.addView(previousMonth, new LinearLayout.LayoutParams(dp(44), dp(40)));
+        TextView monthLabel = text(new SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+                .format(monthStart.getTime()), 16, color("#18372E"), true);
+        monthLabel.setGravity(Gravity.CENTER);
+        monthNavigation.addView(monthLabel, new LinearLayout.LayoutParams(0, dp(40), 1f));
+        Button nextMonth = secondaryButton("›", () -> changeAttendanceCalendarMonth(1));
+        nextMonth.setTextSize(21);
+        nextMonth.setContentDescription("Next month");
+        nextMonth.setEnabled(!isCurrentMonth);
+        if (isCurrentMonth) nextMonth.setAlpha(0.35f);
+        monthNavigation.addView(nextMonth, new LinearLayout.LayoutParams(dp(44), dp(40)));
+        LinearLayout.LayoutParams monthNavigationLp = new LinearLayout.LayoutParams(-1, dp(40));
+        monthNavigationLp.topMargin = dp(10);
+        monthNavigationLp.bottomMargin = dp(8);
+        history.addView(monthNavigation, monthNavigationLp);
+
+        LinearLayout weekdayHeader = horizontal();
+        String[] weekdays = {"S", "M", "T", "W", "T", "F", "S"};
+        for (String weekday : weekdays) {
+            TextView label = text(weekday, 11, color("#687A70"), true);
+            label.setGravity(Gravity.CENTER);
+            weekdayHeader.addView(label, new LinearLayout.LayoutParams(0, dp(26), 1f));
         }
+        history.addView(weekdayHeader);
+
+        LinearLayout calendarGrid = vertical();
+        Calendar firstDay = (Calendar) monthStart.clone();
+        int firstOffset = firstDay.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY;
+        int daysInMonth = monthStart.getActualMaximum(Calendar.DAY_OF_MONTH);
+        int slotCount = ((firstOffset + daysInMonth + 6) / 7) * 7;
+        String todayKey = todayKey();
+        for (int rowIndex = 0; rowIndex < slotCount / 7; rowIndex++) {
+            LinearLayout weekRow = horizontal();
+            for (int column = 0; column < 7; column++) {
+                int slot = rowIndex * 7 + column;
+                int dayNumber = slot - firstOffset + 1;
+                if (dayNumber < 1 || dayNumber > daysInMonth) {
+                    View blank = new View(this);
+                    weekRow.addView(blank, new LinearLayout.LayoutParams(0, dp(43), 1f));
+                    continue;
+                }
+
+                Calendar dayCalendar = (Calendar) monthStart.clone();
+                dayCalendar.set(Calendar.DAY_OF_MONTH, dayNumber);
+                String dayKey = keyForDate(dayCalendar.getTime());
+                JSONObject record = getOfficeDay(dayKey, false);
+                boolean recorded = OfficeAttendanceTime.hasRecordedData(record);
+                boolean isToday = dayKey.equals(todayKey);
+                boolean futureDate = dayKey.compareTo(todayKey) > 0;
+
+                LinearLayout cell = vertical();
+                cell.setGravity(Gravity.CENTER);
+                cell.setPadding(dp(1), dp(1), dp(1), dp(1));
+                cell.setBackground(bg(recorded ? "#DCEBE2" : "#FFFFFF", 9));
+                LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(0, dp(43), 1f);
+                cellLp.setMargins(dp(1), dp(1), dp(1), dp(1));
+                weekRow.addView(cell, cellLp);
+
+                TextView dayNumberView = text(String.valueOf(dayNumber), 13,
+                        futureDate ? color("#A8BAAE") : recorded ? color("#18372E")
+                                : isToday ? color("#2E8060") : color("#50635A"),
+                        recorded || isToday);
+                dayNumberView.setGravity(Gravity.CENTER);
+                cell.addView(dayNumberView, new LinearLayout.LayoutParams(-1, dp(24)));
+                TextView marker = text(recorded ? "●" : isToday ? "○" : " ",
+                        7, color(recorded ? "#23845F" : "#82948A"), true);
+                marker.setGravity(Gravity.CENTER);
+                cell.addView(marker, new LinearLayout.LayoutParams(-1, dp(10)));
+                cell.setContentDescription(new SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault())
+                        .format(dayCalendar.getTime()) + (recorded ? ", attendance or commute recorded" : ", no record")
+                        + (futureDate ? "" : ", tap to edit"));
+                cell.setEnabled(!futureDate);
+                if (futureDate) cell.setAlpha(0.45f);
+                else cell.setOnClickListener(v -> editAttendanceDay(dayKey));
+            }
+            calendarGrid.addView(weekRow);
+        }
+        history.addView(calendarGrid);
+        LinearLayout legend = horizontal();
+        TextView recordedLegend = text("●  Record saved", 10, color("#23845F"), true);
+        legend.addView(recordedLegend, new LinearLayout.LayoutParams(0, dp(25), 1f));
+        legend.addView(text("○  Today", 10, color("#687A70"), false),
+                new LinearLayout.LayoutParams(0, dp(25), 1f));
+        LinearLayout.LayoutParams legendLp = new LinearLayout.LayoutParams(-1, dp(25));
+        legendLp.topMargin = dp(3);
+        history.addView(legend, legendLp);
         officePageContent.addView(history);
+    }
+
+    private void changeAttendanceCalendarMonth(int offset) {
+        Calendar candidate = (Calendar) attendanceCalendarMonth.clone();
+        candidate.add(Calendar.MONTH, offset);
+        candidate.set(Calendar.DAY_OF_MONTH, 1);
+        Calendar current = Calendar.getInstance();
+        current.set(Calendar.DAY_OF_MONTH, 1);
+        if (candidate.after(current)) return;
+        attendanceCalendarMonth = candidate;
+        renderOfficePage();
     }
 
     private long[] attendanceTotalsForPeriod(String period) {
