@@ -50,8 +50,12 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
+          # A unique name prevents reruns from seeing duplicate artifacts.
+          name: dayflow-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: site
 
       - name: Deploy public download endpoint
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: dayflow-pages-${{ github.run_id }}-${{ github.run_attempt }}
