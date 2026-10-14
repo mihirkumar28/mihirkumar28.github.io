@@ -7,6 +7,12 @@ on:
     types: [completed]
     branches: [main]
 
+# GitHub Pages permits only one active deployment at a time. Serialize this workflow
+# so closely spaced Android builds cannot collide at the deploy step.
+concurrency:
+  group: dayflow-github-pages
+  cancel-in-progress: false
+
 permissions:
   contents: read
   actions: read
