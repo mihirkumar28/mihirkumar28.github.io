@@ -12,6 +12,10 @@ import android.net.Uri;
 import androidx.core.content.FileProvider;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.ExistingWorkPolicy;
+import androidx.work.Data;
+import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -49,6 +53,9 @@ public class MainActivity extends Activity {
     private static final String UPDATE_LAST_CHECK_KEY = "appUpdateLastCheckAt";
     private static final String UPDATE_PROMPTED_VERSION_KEY = "appUpdatePromptedVersion";
     private static final String PENDING_UPDATE_APK_KEY = "pendingUpdateApkPath";
+    private static final String UPDATE_DOWNLOAD_ERROR_KEY = "appUpdateDownloadError";
+    private static final String UPDATE_INSTALL_PERMISSION_PROMPTED_KEY = "appUpdateInstallPermissionPrompted";
+    private static final int UPDATE_NOTIFICATION_PERMISSION_REQUEST = 4203;
     private static final long UPDATE_CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L;
     private static final long MAX_UPDATE_APK_BYTES = 120L * 1024L * 1024L;
     private static final String SYLLABUS_KEY = "syllabusTopics";
@@ -124,6 +131,7 @@ public class MainActivity extends Activity {
     private String officeSummaryPeriod = "all";
     private Calendar attendanceCalendarMonth = Calendar.getInstance();
     private boolean updateCheckRunning;
+    private DayFlowUpdateInfo.ReleaseInfo updatePendingAfterNotificationPermission;
 
     private static class Block {
         long id;
@@ -278,8 +286,36 @@ public class MainActivity extends Activity {
         if (ScreenTimeTracker.refreshRecentDays(this, 7)) DayFlowWidgetProvider.refreshAll(this);
         render();
         DayFlowWidgetProvider.refreshAll(this);
-        if (canRequestPackageInstalls()) maybeInstallPendingUpdate();
+        handlePendingUpdateOnResume();
         checkForAppUpdate(false);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if ("com.mihirkumar.dayflow.ACTION_INSTALL_PENDING_UPDATE".equals(intent.getAction())) {
+            handler.post(this::handlePendingUpdateOnResume);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != UPDATE_NOTIFICATION_PERMISSION_REQUEST) return;
+        DayFlowUpdateInfo.ReleaseInfo release = updatePendingAfterNotificationPermission;
+        updatePendingAfterNotificationPermission = null;
+        if (release == null) return;
+        if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            enqueueBackgroundUpdateDownload(release);
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Notifications are disabled")
+                .setMessage("DayFlow can still download the update in the background, but Android may hide the notification when it's ready. You can continue now and reopen DayFlow to finish installation.")
+                .setPositiveButton("Continue download", (d, w) -> enqueueBackgroundUpdateDownload(release))
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     @Override
@@ -1353,121 +1389,82 @@ public class MainActivity extends Activity {
     }
 
     private void downloadAndInstallUpdate(DayFlowUpdateInfo.ReleaseInfo release) {
-        LinearLayout body = vertical();
-        body.setPadding(dp(20), dp(12), dp(20), dp(12));
-        TextView status = text("Downloading DayFlow…", 13, color("#18372E"), false);
-        body.addView(status);
-        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(100);
-        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(8));
-        progressLp.topMargin = dp(12);
-        body.addView(progress, progressLp);
-        AlertDialog progressDialog = new AlertDialog.Builder(this).setTitle("Downloading update")
-                .setView(body).setCancelable(false).create();
-        progressDialog.show();
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            updatePendingAfterNotificationPermission = release;
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                    UPDATE_NOTIFICATION_PERMISSION_REQUEST);
+            return;
+        }
+        enqueueBackgroundUpdateDownload(release);
+    }
 
-        new Thread(() -> {
-            java.io.File apkFile = null;
-            String failure = null;
-            boolean signatureMatches = false;
-            try {
-                java.io.File folder = new java.io.File(getCacheDir(), "updates");
-                if (!folder.exists() && !folder.mkdirs()) throw new java.io.IOException("Couldn't create update cache.");
-                apkFile = new java.io.File(folder, "dayflow-update.apk");
-                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) new java.net.URL(UPDATE_APK_URL).openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(30000);
-                connection.setInstanceFollowRedirects(true);
-                connection.setRequestProperty("User-Agent", "DayFlow-Android");
-                int response = connection.getResponseCode();
-                if (response < 200 || response >= 300) {
-                    connection.disconnect();
-                    throw new java.io.IOException("Update download returned HTTP " + response);
-                }
-                long expectedBytes = connection.getContentLengthLong();
-                if (expectedBytes > MAX_UPDATE_APK_BYTES) {
-                    connection.disconnect();
-                    throw new java.io.IOException("The update file is unexpectedly large.");
-                }
-                long downloaded = 0L;
-                java.io.InputStream input = connection.getInputStream();
-                try (java.io.FileOutputStream output = new java.io.FileOutputStream(apkFile, false)) {
-                    byte[] buffer = new byte[16 * 1024];
-                    int count;
-                    while ((count = input.read(buffer)) != -1) {
-                        downloaded += count;
-                        if (downloaded > MAX_UPDATE_APK_BYTES) throw new java.io.IOException("The update file exceeded the size limit.");
-                        output.write(buffer, 0, count);
-                        if (expectedBytes > 0 && (downloaded % (256 * 1024) < count)) {
-                            final int percent = (int) Math.min(100L, downloaded * 100L / expectedBytes);
-                            runOnUiThread(() -> {
-                                progress.setProgress(percent);
-                                status.setText("Downloading DayFlow… " + percent + "%");
-                            });
-                        }
-                    }
-                    output.flush();
-                } finally {
-                    input.close();
-                    connection.disconnect();
-                }
-                if (apkFile.length() == 0L) throw new java.io.IOException("The downloaded update was empty.");
+    private void enqueueBackgroundUpdateDownload(DayFlowUpdateInfo.ReleaseInfo release) {
+        getPrefs().edit()
+                .remove(UPDATE_DOWNLOAD_ERROR_KEY)
+                .putBoolean(UPDATE_INSTALL_PERMISSION_PROMPTED_KEY, false)
+                .apply();
 
-                int flags = Build.VERSION.SDK_INT >= 28
-                        ? android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
-                        : android.content.pm.PackageManager.GET_SIGNATURES;
-                android.content.pm.PackageInfo candidate = getPackageManager().getPackageArchiveInfo(apkFile.getAbsolutePath(), flags);
-                if (candidate == null || !getPackageName().equals(candidate.packageName)) {
-                    throw new java.io.IOException("The downloaded APK isn't a valid DayFlow package.");
-                }
-                long downloadedVersion = Build.VERSION.SDK_INT >= 28 ? candidate.getLongVersionCode() : candidate.versionCode;
-                if (downloadedVersion != release.versionCode) {
-                    throw new java.io.IOException("The APK version does not match the published update information.");
-                }
-                if (downloadedVersion <= installedVersionCode()) {
-                    throw new java.io.IOException("This downloaded build is not newer than the installed app.");
-                }
-                signatureMatches = apkMatchesInstalledSigner(apkFile.getAbsolutePath(), flags);
-            } catch (Exception e) {
-                failure = e.getMessage() == null ? "Download failed" : e.getMessage();
+        Data input = new Data.Builder()
+                .putLong(DayFlowUpdateDownloadWorker.INPUT_VERSION_CODE, release.versionCode)
+                .putString(DayFlowUpdateDownloadWorker.INPUT_VERSION_NAME, release.versionName)
+                .build();
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(DayFlowUpdateDownloadWorker.class)
+                .setInputData(input)
+                .addTag(DayFlowUpdateDownloadWorker.WORK_TAG)
+                .build();
+
+        WorkManager workManager = WorkManager.getInstance(getApplicationContext());
+        workManager.enqueueUniqueWork(DayFlowUpdateDownloadWorker.UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.REPLACE, request);
+        workManager.getWorkInfoByIdLiveData(request.getId()).observe(this, info -> {
+            if (info != null && info.getState().isFinished()) {
+                handlePendingUpdateOnResume();
             }
+        });
+        Toast.makeText(this,
+                "The update is downloading in the background. DayFlow will notify you when it's ready.",
+                Toast.LENGTH_LONG).show();
+    }
 
-            final java.io.File resultFile = apkFile;
-            final String error = failure;
-            final boolean sameSigner = signatureMatches;
-            runOnUiThread(() -> {
-                if (progressDialog.isShowing()) progressDialog.dismiss();
-                if (error != null) {
-                    if (resultFile != null && resultFile.exists()) resultFile.delete();
-                    new AlertDialog.Builder(this).setTitle("Update download failed")
-                            .setMessage(error + "\n\nTry again from More → Check for updates.")
-                            .setPositiveButton("OK", null).show();
-                    return;
-                }
-                if (!sameSigner) {
-                    showSigningMigrationHelp();
-                    return;
-                }
-                getPrefs().edit().putString(PENDING_UPDATE_APK_KEY, resultFile.getAbsolutePath()).apply();
-                if (!canRequestPackageInstalls()) {
-                    new AlertDialog.Builder(this)
-                            .setTitle("Allow DayFlow to install updates")
-                            .setMessage("Android requires a one-time permission for apps installed outside the Play Store. Allow installs from DayFlow on the next screen, then return here; installation will resume.")
-                            .setPositiveButton("Open settings", (d, w) -> {
-                                try {
-                                    startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                                            Uri.parse("package:" + getPackageName())));
-                                } catch (Exception e) {
-                                    Toast.makeText(this, "Open Android Settings and allow installs from DayFlow.", Toast.LENGTH_LONG).show();
-                                }
-                            })
-                            .setNegativeButton("Not now", null).show();
-                } else {
-                    maybeInstallPendingUpdate();
-                }
-            });
-        }, "DayFlow-update-download").start();
+    private void handlePendingUpdateOnResume() {
+        String error = getPrefs().getString(UPDATE_DOWNLOAD_ERROR_KEY, "");
+        if (error != null && !error.trim().isEmpty()) {
+            getPrefs().edit().remove(UPDATE_DOWNLOAD_ERROR_KEY).apply();
+            if (error.toLowerCase(Locale.US).contains("signing key")) {
+                showSigningMigrationHelp();
+            } else {
+                new AlertDialog.Builder(this)
+                        .setTitle("Update download failed")
+                        .setMessage(error + "\n\nTry again from More → Check for updates.")
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+            return;
+        }
+
+        String pendingPath = getPrefs().getString(PENDING_UPDATE_APK_KEY, "");
+        if (pendingPath == null || pendingPath.trim().isEmpty()) return;
+        if (canRequestPackageInstalls()) {
+            maybeInstallPendingUpdate();
+            return;
+        }
+        if (getPrefs().getBoolean(UPDATE_INSTALL_PERMISSION_PROMPTED_KEY, false)) return;
+        getPrefs().edit().putBoolean(UPDATE_INSTALL_PERMISSION_PROMPTED_KEY, true).apply();
+        new AlertDialog.Builder(this)
+                .setTitle("Allow DayFlow to install updates")
+                .setMessage("Android requires a one-time permission for apps installed outside the Play Store. Allow installs from DayFlow on the next screen, then return here to finish installation.")
+                .setPositiveButton("Open settings", (d, w) -> {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:" + getPackageName())));
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Open Android Settings and allow installs from DayFlow.", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton("Not now", null)
+                .show();
     }
 
     private boolean apkMatchesInstalledSigner(String apkPath, int packageFlags) {
