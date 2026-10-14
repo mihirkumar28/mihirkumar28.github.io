@@ -132,6 +132,8 @@ public class MainActivity extends Activity {
     private Calendar attendanceCalendarMonth = Calendar.getInstance();
     private boolean updateCheckRunning;
     private DayFlowUpdateInfo.ReleaseInfo updatePendingAfterNotificationPermission;
+    private androidx.lifecycle.LiveData<WorkInfo> updateDownloadLiveData;
+    private androidx.lifecycle.Observer<WorkInfo> updateDownloadObserver;
 
     private static class Block {
         long id;
@@ -321,6 +323,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacks(liveRefresh);
+        if (updateDownloadLiveData != null && updateDownloadObserver != null) {
+            updateDownloadLiveData.removeObserver(updateDownloadObserver);
+            updateDownloadLiveData = null;
+            updateDownloadObserver = null;
+        }
         super.onDestroy();
     }
 
@@ -1418,11 +1425,23 @@ public class MainActivity extends Activity {
         WorkManager workManager = WorkManager.getInstance(getApplicationContext());
         workManager.enqueueUniqueWork(DayFlowUpdateDownloadWorker.UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.REPLACE, request);
-        workManager.getWorkInfoByIdLiveData(request.getId()).observe(this, info -> {
+        if (updateDownloadLiveData != null && updateDownloadObserver != null) {
+            updateDownloadLiveData.removeObserver(updateDownloadObserver);
+        }
+        updateDownloadLiveData = workManager.getWorkInfoByIdLiveData(request.getId());
+        updateDownloadObserver = info -> {
             if (info != null && info.getState().isFinished()) {
-                handlePendingUpdateOnResume();
+                androidx.lifecycle.LiveData<WorkInfo> observedLiveData = updateDownloadLiveData;
+                androidx.lifecycle.Observer<WorkInfo> observer = updateDownloadObserver;
+                if (observedLiveData != null && observer != null) {
+                    observedLiveData.removeObserver(observer);
+                    updateDownloadLiveData = null;
+                    updateDownloadObserver = null;
+                }
+                handler.post(this::handlePendingUpdateOnResume);
             }
-        });
+        };
+        updateDownloadLiveData.observeForever(updateDownloadObserver);
         Toast.makeText(this,
                 "The update is downloading in the background. DayFlow will notify you when it's ready.",
                 Toast.LENGTH_LONG).show();
