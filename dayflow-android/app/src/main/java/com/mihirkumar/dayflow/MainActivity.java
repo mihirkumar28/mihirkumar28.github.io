@@ -2761,8 +2761,9 @@ public class MainActivity extends Activity {
             Button moveEarlier = actionButton("↑", color("#2E8060"), "#F3F7F3");
             moveEarlier.setTextSize(12);
             moveEarlier.setEnabled(canMoveMonthlyGoal(goal, -1));
-            moveEarlier.setContentDescription("Move " + goal.title
-                    + " earlier within this month's " + goal.track + " goal group");
+            moveEarlier.setContentDescription("General Studies".equals(goal.track) && goal.parentGoalId == 0L
+                    ? "Move " + goal.title + " earlier in the General Studies plan and update its month"
+                    : "Move " + goal.title + " earlier within this month's " + goal.track + " goal group");
             LinearLayout.LayoutParams moveLp = new LinearLayout.LayoutParams(dp(26), dp(30));
             moveLp.leftMargin = dp(2);
             row.addView(moveEarlier, moveLp);
@@ -2771,8 +2772,9 @@ public class MainActivity extends Activity {
             Button moveLater = actionButton("↓", color("#2E8060"), "#F3F7F3");
             moveLater.setTextSize(12);
             moveLater.setEnabled(canMoveMonthlyGoal(goal, 1));
-            moveLater.setContentDescription("Move " + goal.title
-                    + " later within this month's " + goal.track + " goal group");
+            moveLater.setContentDescription("General Studies".equals(goal.track) && goal.parentGoalId == 0L
+                    ? "Move " + goal.title + " later in the General Studies plan and update its month"
+                    : "Move " + goal.title + " later within this month's " + goal.track + " goal group");
             LinearLayout.LayoutParams moveLaterLp = new LinearLayout.LayoutParams(dp(26), dp(30));
             moveLaterLp.leftMargin = dp(2);
             row.addView(moveLater, moveLaterLp);
@@ -3057,7 +3059,7 @@ public class MainActivity extends Activity {
                 siblings.add(item);
             }
         }
-        Comparator<MonthlyGoal> comparator = Comparator.comparingInt((MonthlyGoal g) -> g.month == null ? 0 : g.month.hashCode())
+        Comparator<MonthlyGoal> comparator = Comparator.comparing((MonthlyGoal g) -> g.month == null ? "" : g.month)
                 .thenComparingInt(g -> g.sortOrder).thenComparingLong(g -> g.id);
         if (!canChangeMonth) {
             comparator = Comparator.comparingInt((MonthlyGoal g) -> g.sortOrder).thenComparingLong(g -> g.id);
@@ -3228,7 +3230,7 @@ public class MainActivity extends Activity {
                 : existing.month};
         LinearLayout form = vertical();
         form.setPadding(dp(20), dp(4), dp(20), dp(10));
-        TextView help = text("Change the month, track, goal and success criteria. Reordering only changes items within the same month, track and goal group; later-month milestones remain in sequence. These changes are saved on this device.",
+        TextView help = text("Change the month, track, goal and success criteria. Use ↑/↓ to reorder General Studies topics across month slots; Maths Optional and interview-prep month sequences stay in order. These changes are saved on this device.",
                 12, color("#687A70"), false);
         help.setLineSpacing(dp(2), 1f);
         form.addView(help);
