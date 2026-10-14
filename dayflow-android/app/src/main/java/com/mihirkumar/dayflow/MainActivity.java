@@ -2758,12 +2758,15 @@ public class MainActivity extends Activity {
                         9, color("#687A70"), false));
             }
 
-            if (goal.parentGoalId > 0L) {
+            boolean canManuallyReorder = goal.parentGoalId > 0L
+                    || ("General Studies".equals(goal.track) && goal.parentGoalId == 0L);
+            if (canManuallyReorder) {
                 Button moveEarlier = actionButton("↑", color("#2E8060"), "#F3F7F3");
                 moveEarlier.setTextSize(12);
                 moveEarlier.setEnabled(canMoveMonthlyGoal(goal, -1));
-                moveEarlier.setContentDescription("Move " + goal.title
-                        + " earlier within its parent goal");
+                moveEarlier.setContentDescription("General Studies".equals(goal.track) && goal.parentGoalId == 0L
+                        ? "Move " + goal.title + " earlier in the General Studies plan and update its month"
+                        : "Move " + goal.title + " earlier within its parent goal");
                 LinearLayout.LayoutParams moveLp = new LinearLayout.LayoutParams(dp(26), dp(30));
                 moveLp.leftMargin = dp(2);
                 row.addView(moveEarlier, moveLp);
@@ -2772,8 +2775,9 @@ public class MainActivity extends Activity {
                 Button moveLater = actionButton("↓", color("#2E8060"), "#F3F7F3");
                 moveLater.setTextSize(12);
                 moveLater.setEnabled(canMoveMonthlyGoal(goal, 1));
-                moveLater.setContentDescription("Move " + goal.title
-                        + " later within its parent goal");
+                moveLater.setContentDescription("General Studies".equals(goal.track) && goal.parentGoalId == 0L
+                        ? "Move " + goal.title + " later in the General Studies plan and update its month"
+                        : "Move " + goal.title + " later within its parent goal");
                 LinearLayout.LayoutParams moveLaterLp = new LinearLayout.LayoutParams(dp(26), dp(30));
                 moveLaterLp.leftMargin = dp(2);
                 row.addView(moveLater, moveLaterLp);
@@ -2781,7 +2785,7 @@ public class MainActivity extends Activity {
             } else {
                 TextView sequenceLock = text("↕", 13, color("#687A70"), true);
                 sequenceLock.setGravity(Gravity.CENTER);
-                sequenceLock.setContentDescription("Top-level plan order is preserved to protect sequential goals");
+                sequenceLock.setContentDescription("Order is preserved for sequential goals in this track");
                 row.addView(sequenceLock, new LinearLayout.LayoutParams(dp(26), dp(30)));
             }
 
@@ -3029,8 +3033,6 @@ public class MainActivity extends Activity {
                 order = Long.compare(l.id, r.id);
                 if (order != 0) return order;
             }
-            // A parent is shown before its descendants; descendants remain grouped
-            // together instead of being pushed to the end of the month summary.
             if (leftPath.size() != rightPath.size()) return Integer.compare(leftPath.size(), rightPath.size());
             return Long.compare(left.id, right.id);
         };
