@@ -2817,7 +2817,7 @@ public class MainActivity extends Activity {
                 switch (event.getAction()) {
                     case android.view.DragEvent.ACTION_DRAG_STARTED:
                         return event.getClipDescription() != null
-                                && event.getClipDescription().hasLabel("dayflow-monthly-goal-id");
+                                && "dayflow-monthly-goal-id".contentEquals(event.getClipDescription().getLabel());
                     case android.view.DragEvent.ACTION_DRAG_ENTERED:
                         target.setBackground(bg("#EAF4ED", 10));
                         return true;
@@ -3222,7 +3222,7 @@ public class MainActivity extends Activity {
         ArrayList<String> monthSlots = new ArrayList<>();
         if (gsRoots) for (MonthlyGoal sibling : siblings) monthSlots.add(sibling.month);
         siblings.remove(from);
-        siblings.add(from < to ? to - 1 : to, dragged);
+        siblings.add(to, dragged);
         for (int i = 0; i < siblings.size(); i++) {
             MonthlyGoal item = siblings.get(i);
             if (gsRoots) {
