@@ -2359,7 +2359,7 @@ public class MainActivity extends Activity {
             return node.subtitle == null ? "" : node.subtitle;
         }
         if ("group".equals(node.type)) {
-            if ("goal-month".equals(node.groupKind)) return "Expand to see or add this month's goals";
+            if ("goal-month".equals(node.groupKind)) return "Expand to see goals; drop here to add a sub-goal under a goal in this month";
             if ("split-goal".equals(node.groupKind)) {
                 return (node.subtitle == null ? "Split into smaller goals" : node.subtitle)
                         + " · progress counts smaller goals only";
@@ -2471,7 +2471,7 @@ public class MainActivity extends Activity {
         }
         if (next != null) status += " Next deadline: " + next.title + " · " + displayRoadmapDate(next.date) + ".";
         if (roadmapTreeEditMode) {
-            status += " Edit mode: drop a goal onto another goal to swap slots, or onto a month to add it there; continuity rules stay enforced.";
+            status += " Edit mode: drop onto a goal to swap positions, or onto a month to nest the goal under a goal in that month; continuity rules stay enforced.";
         } else if (roadmapSearchText.trim().isEmpty() && roadmapActiveFilter.equals("All")) {
             status += " Expand a branch to explore; tap a leaf to edit it.";
         } else {
@@ -2531,7 +2531,7 @@ public class MainActivity extends Activity {
                     color(canDrag ? "#23845F" : "#9AA79F"), true);
             dragHandle.setGravity(Gravity.CENTER);
             dragHandle.setContentDescription(canDrag
-                    ? "Hold and drag " + goal.title + ". Drop onto another goal to swap slots or onto a month to add it there."
+                    ? "Hold and drag " + goal.title + ". Drop onto another goal to swap slots, or onto a month to add it as a sub-goal."
                     : "Locked: completed work in this goal must stay in sequence");
             row.addView(dragHandle, new LinearLayout.LayoutParams(dp(26), dp(30)));
             if (canDrag) {
@@ -2618,7 +2618,7 @@ public class MainActivity extends Activity {
             addChild.setOnClickListener(v -> childAction.run());
         }
         String editDropHint = roadmapTreeEditMode && isRoadmapMonthDropNode(node)
-                ? ". Drop a goal here to add it to this month."
+                ? ". Drop a goal here to add it as a sub-goal; choose a parent if needed."
                 : (roadmapTreeEditMode && isRoadmapGoalNode(node)
                     ? ". Drop another goal here to swap its slot." : "");
         row.setContentDescription(node.title + ". " + metadata
@@ -2725,11 +2725,12 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "That goal is no longer available.", Toast.LENGTH_SHORT).show();
             return;
         }
+
+        boolean hasCompletedWork = monthlyGoalGroupHasCompletedWork(dragged, all);
         if (!Objects.equals(dragged.track, monthNode.goalTrack)) {
             Toast.makeText(this, "Drop a goal only into the same CSE subject or track.", Toast.LENGTH_LONG).show();
             return;
         }
-        boolean hasCompletedWork = monthlyGoalGroupHasCompletedWork(dragged, all);
         if (!RoadmapTreeRules.canDropGoalOnMonth(dragged.track, dragged.parentGoalId,
                 dragged.month, hasCompletedWork, monthNode.goalTrack, monthNode.month)) {
             if (hasCompletedWork) {
@@ -2737,26 +2738,112 @@ public class MainActivity extends Activity {
             } else if (dragged.parentGoalId > 0L) {
                 Toast.makeText(this, "A sub-goal must stay with its parent; move the parent goal instead.", Toast.LENGTH_LONG).show();
             } else {
-                Toast.makeText(this, "This track's month sequence must stay chronological. Drop within the same month or reorder General Studies root goals.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "This track's month sequence must stay chronological. Only General Studies root goals can move across months.", Toast.LENGTH_LONG).show();
             }
             return;
         }
-        if (Objects.equals(dragged.month, monthNode.month)) {
-            Toast.makeText(this, "That goal is already in " + monthLabelForKey(monthNode.month) + ".", Toast.LENGTH_SHORT).show();
+
+        ArrayList<MonthlyGoal> parentCandidates = new ArrayList<>();
+        for (MonthlyGoal candidate : all) {
+            if (candidate.id == dragged.id || candidate.parentGoalId != 0L
+                    || !Objects.equals(candidate.track, monthNode.goalTrack)
+                    || !Objects.equals(candidate.month, monthNode.month)
+                    || MonthlyGoalLifecycle.RETIRED.equals(candidate.lifecycleStatus)
+                    || monthlyGoalGroupHasCompletedWork(candidate, all)) {
+                continue;
+            }
+            parentCandidates.add(candidate);
+        }
+        parentCandidates.sort(monthlyGoalOrderComparator(all));
+        if (parentCandidates.isEmpty()) {
+            Toast.makeText(this,
+                    "This month has no unfinished goal that can safely contain a sub-goal. Add a goal to this month first.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (parentCandidates.size() == 1) {
+            addRoadmapGoalAsSubgoal(dragged.id, parentCandidates.get(0).id, monthNode.month);
             return;
         }
 
-        int nextSortOrder = nextMonthlyGoalSortOrder(all, monthNode.month, dragged.track, 0L);
+        String[] parentTitles = new String[parentCandidates.size()];
+        for (int i = 0; i < parentCandidates.size(); i++) {
+            MonthlyGoal candidate = parentCandidates.get(i);
+            parentTitles[i] = candidate.title
+                    + (MonthlyGoalLifecycle.SPLIT_PARENT.equals(candidate.lifecycleStatus)
+                        ? " · has sub-goals" : "");
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Choose a parent goal")
+                .setMessage("Add “" + dragged.title + "” as a sub-goal in "
+                        + monthLabelForKey(monthNode.month) + ".")
+                .setItems(parentTitles, (dialog, which) -> {
+                    if (which >= 0 && which < parentCandidates.size()) {
+                        addRoadmapGoalAsSubgoal(dragged.id, parentCandidates.get(which).id, monthNode.month);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void addRoadmapGoalAsSubgoal(long draggedId, long parentId, String targetMonth) {
+        if (!roadmapTreeEditMode) return;
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        MonthlyGoal dragged = null;
+        MonthlyGoal parent = null;
+        for (MonthlyGoal candidate : all) {
+            if (candidate.id == draggedId) dragged = candidate;
+            if (candidate.id == parentId) parent = candidate;
+        }
+        if (dragged == null || parent == null) {
+            Toast.makeText(this, "That goal is no longer available.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (dragged.id == parent.id) {
+            Toast.makeText(this, "A goal cannot be its own parent.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (MonthlyGoalLifecycle.RETIRED.equals(dragged.lifecycleStatus)
+                || MonthlyGoalLifecycle.RETIRED.equals(parent.lifecycleStatus)) {
+            Toast.makeText(this, "Retired goals cannot be used in this move.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        boolean draggedHasCompletedWork = monthlyGoalGroupHasCompletedWork(dragged, all);
+        boolean parentHasCompletedWork = monthlyGoalGroupHasCompletedWork(parent, all);
+        if (!RoadmapTreeRules.canNestGoalUnderParent(
+                dragged.track, dragged.parentGoalId, dragged.month, draggedHasCompletedWork,
+                parent.track, parent.parentGoalId, parent.month, parentHasCompletedWork, targetMonth)) {
+            if (draggedHasCompletedWork || parentHasCompletedWork) {
+                Toast.makeText(this, "Completed work stays in place to preserve logical continuity.", Toast.LENGTH_LONG).show();
+            } else if (!Objects.equals(dragged.track, parent.track)) {
+                Toast.makeText(this, "A sub-goal must stay within the same CSE subject or track.", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "This goal cannot be nested here without breaking its parent or month sequence.", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+
+        int nextSortOrder = nextMonthlyGoalSortOrder(all, targetMonth, parent.track, parent.id);
         String previousMonth = dragged.month;
-        moveMonthlyGoalGroupToMonth(dragged, monthNode.month, all);
+        if (!Objects.equals(dragged.month, targetMonth)) {
+            moveMonthlyGoalGroupToMonth(dragged, targetMonth, all);
+        }
+        dragged.parentGoalId = parent.id;
         dragged.sortOrder = nextSortOrder;
-        recordMonthlyGoalEvent(dragged, "Moved from " + monthLabelForKey(previousMonth)
-                + " to " + monthLabelForKey(monthNode.month) + " by dropping onto the month");
+        if (!MonthlyGoalLifecycle.SPLIT_PARENT.equals(parent.lifecycleStatus)) {
+            parent.lifecycleStatus = MonthlyGoalLifecycle.SPLIT_PARENT;
+            recordMonthlyGoalEvent(parent, "Became a split parent when “" + dragged.title + "” was added beneath it");
+        }
+        recordMonthlyGoalEvent(dragged, "Added as a sub-goal under “" + parent.title + "”"
+                + (Objects.equals(previousMonth, targetMonth) ? "" : "; moved from "
+                    + monthLabelForKey(previousMonth) + " to " + monthLabelForKey(targetMonth)));
         persistMonthlyGoals(all);
-        selectedGoalMonth = monthNode.month;
+        selectedGoalMonth = targetMonth;
         refreshRoadmapTabContent();
-        Toast.makeText(this, "Goal added to " + monthLabelForKey(monthNode.month)
-                + "; month and roadmap summaries updated.", Toast.LENGTH_LONG).show();
+        openMonthlyGoalInRoadmap(parent);
+        Toast.makeText(this, "Sub-goal added under “" + parent.title
+                + "”; month and roadmap summaries updated.", Toast.LENGTH_LONG).show();
     }
 
     private void attachRoadmapGoalDropTarget(LinearLayout row, RoadmapNode node) {
@@ -2867,7 +2954,8 @@ public class MainActivity extends Activity {
 
         String rootKey = "Other".equals(goal.track) ? "other"
                 : "Software Interview Prep".equals(goal.track) ? "software" : "upsc";
-        String targetId = roadmapId("goal", rootKey, goal.track, Long.toString(goal.id));
+        String targetKind = MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus) ? "split-goal" : "goal";
+        String targetId = roadmapId(targetKind, rootKey, goal.track, Long.toString(goal.id));
         ArrayList<String> path = new ArrayList<>();
         if (collectRoadmapPath(buildRoadmapTreeNodes(), targetId, path)) {
             expandedRoadmapNodeIds.addAll(path);

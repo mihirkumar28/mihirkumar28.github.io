@@ -88,6 +88,40 @@ public class RoadmapTreeRulesTest {
                 "Maths Optional", "2026-10"));
     }
 
+
+    @Test public void monthDropCanNestRootGoalsUnderARootGoalInTheSameMonth() {
+        assertTrue(RoadmapTreeRules.canNestGoalUnderParent(
+                "Maths Optional", 0L, "2026-10", false,
+                "Maths Optional", 0L, "2026-10", false, "2026-10"));
+        assertTrue(RoadmapTreeRules.canNestGoalUnderParent(
+                "General Studies", 0L, "2026-11", false,
+                "General Studies", 0L, "2026-10", false, "2026-10"));
+    }
+
+    @Test public void monthDropNestingPreservesContinuityAndCompletedWorkGuards() {
+        assertFalse(RoadmapTreeRules.canNestGoalUnderParent(
+                "Maths Optional", 0L, "2026-11", false,
+                "Maths Optional", 0L, "2026-10", false, "2026-10"));
+        assertFalse(RoadmapTreeRules.canNestGoalUnderParent(
+                "General Studies", 0L, "2026-11", false,
+                "Maths Optional", 0L, "2026-10", false, "2026-10"));
+        assertFalse(RoadmapTreeRules.canNestGoalUnderParent(
+                "General Studies", 42L, "2026-10", false,
+                "General Studies", 0L, "2026-10", false, "2026-10"));
+        assertFalse(RoadmapTreeRules.canNestGoalUnderParent(
+                "General Studies", 0L, "2026-10", false,
+                "General Studies", 42L, "2026-10", false, "2026-10"));
+        assertFalse(RoadmapTreeRules.canNestGoalUnderParent(
+                "General Studies", 0L, "2026-11", true,
+                "General Studies", 0L, "2026-10", false, "2026-10"));
+        assertFalse(RoadmapTreeRules.canNestGoalUnderParent(
+                "General Studies", 0L, "2026-11", false,
+                "General Studies", 0L, "2026-10", true, "2026-10"));
+        assertFalse(RoadmapTreeRules.canNestGoalUnderParent(
+                "General Studies", 0L, "2026-11", false,
+                "General Studies", 0L, "2026-10", false, "2026-09"));
+    }
+
     @Test public void branchProgressCombinesCompletedAndIncompleteLeaves() {
         int[] total = RoadmapTreeRules.combineProgress(
                 RoadmapTreeRules.leafProgress(true),
