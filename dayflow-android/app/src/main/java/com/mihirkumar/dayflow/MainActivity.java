@@ -3264,10 +3264,13 @@ public class MainActivity extends Activity {
                     monthlyGoalFingerprint(goal.track, goal.title, goal.target))) continue;
             String[] planned = RoadmapMonthlyPlan.findGoal(goal.month, goal.track);
             if (planned == null) continue;
+            // A completed old goal proves completion of its old scope, not the new source-plan scope.
+            // Keep that completed record intact; the missing source-plan goal is added below.
+            if (goal.done) continue;
             if (!planned[1].equals(goal.title) || !planned[2].equals(goal.target == null ? "" : goal.target)) {
                 goal.title = planned[1];
                 goal.target = planned[2];
-                // Keep goal.id, goal.month, track and goal.done to preserve history.
+                // Preserve its ID and date; it remains open under the revised target.
                 changed = true;
             }
         }
