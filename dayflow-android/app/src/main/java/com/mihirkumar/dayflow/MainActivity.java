@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
     private static final String MONTHLY_GOALS_KEY = "monthlyGoals";
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
+    private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v1";
     private static final String CSE_CHECKPOINT_KEY = "cseCheckpointDate";
     private static final String INTERVIEW_TIER34_KEY = "softwareTier34Target";
     private static final String CAREER_TARGET_KEY = "careerTargetMonthlyTakeHome";
@@ -90,6 +91,14 @@ public class MainActivity extends Activity {
     private LinearLayout monthlyGoalsSection, monthlyGoalList, milestonesSection, milestoneList, syllabusTopicsSection;
     private LinearLayout roadmapDetailsSection;
     private TextView goalMonthLabel, careerGoalSummary;
+    private LinearLayout roadmapFocusGoalList, roadmapFilterChips, roadmapTreeContainer;
+    private TextView roadmapFocusMonthLabel, roadmapFocusCount, roadmapTreeSummary;
+    private EditText roadmapSearchInput;
+    private final Map<String, Button> roadmapFilterButtons = new LinkedHashMap<>();
+    private final Set<String> expandedRoadmapNodeIds = new HashSet<>();
+    private String roadmapSearchText = "";
+    private String roadmapActiveFilter = "All";
+    private boolean roadmapExpansionStateLoaded = false;
     private Button syllabusProgressToggle, roadmapDetailsToggle;
     private boolean syllabusDetailsExpanded = false;
     private boolean roadmapDetailsExpanded = false;
@@ -189,6 +198,19 @@ public class MainActivity extends Activity {
             this.detail = detail;
             this.done = done;
         }
+    }
+
+    /**
+     * A view-model node assembled from existing local goals, syllabus topics and
+     * milestones. It deliberately does not duplicate/persist those records.
+     */
+    private static class RoadmapNode {
+        String id, title, type, subtitle;
+        String rootKey, subjectKey, goalTrack, milestoneTrack;
+        String month, statusPeriod, groupKind;
+        Object item;
+        boolean done;
+        final ArrayList<RoadmapNode> children = new ArrayList<>();
     }
 
     private long lastRenderedMinute = -1;
@@ -1502,44 +1524,106 @@ public class MainActivity extends Activity {
     private void buildSyllabusPage() {
         if (selectedGoalMonth == null) selectedGoalMonth = monthKeyFromDate(todayKey());
         pageHeading(pageSyllabus, "YOUR PLAN", "Roadmap",
-                "One month at a time. Check off goals as you complete them.");
+                "One connected map for syllabus, monthly goals and deadlines.");
 
-        monthlyGoalsSection = vertical();
-        pageSyllabus.addView(monthlyGoalsSection, new LinearLayout.LayoutParams(-1, -2));
-        buildMonthlyGoalsSection();
+        // Current focus stays visible; historical and future plans live in the tree below.
+        LinearLayout focusCard = surfaceCard();
+        LinearLayout focusHeading = horizontal();
+        focusHeading.setGravity(Gravity.CENTER_VERTICAL);
+        focusHeading.addView(text("CURRENT FOCUS", 11, color("#2E8060"), true),
+                new LinearLayout.LayoutParams(0, -2, 1f));
+        focusHeading.addView(secondaryButton("+ Goal", () -> editMonthlyGoal(null)),
+                new LinearLayout.LayoutParams(dp(92), dp(36)));
+        focusCard.addView(focusHeading);
 
-        roadmapDetailsToggle = secondaryButton("Later milestones & syllabus  ↓", () -> {
-            roadmapDetailsExpanded = !roadmapDetailsExpanded;
-            if (roadmapDetailsSection != null) {
-                roadmapDetailsSection.setVisibility(roadmapDetailsExpanded ? View.VISIBLE : View.GONE);
+        LinearLayout monthNav = horizontal();
+        monthNav.setGravity(Gravity.CENTER_VERTICAL);
+        monthNav.setPadding(0, dp(8), 0, dp(5));
+        monthNav.addView(secondaryButton("‹", () -> changeSelectedGoalMonth(-1)),
+                new LinearLayout.LayoutParams(dp(40), dp(36)));
+        roadmapFocusMonthLabel = text("", 14, color("#18372E"), true);
+        roadmapFocusMonthLabel.setGravity(Gravity.CENTER);
+        roadmapFocusMonthLabel.setOnClickListener(v -> chooseGoalMonth());
+        roadmapFocusMonthLabel.setContentDescription("Choose roadmap focus month");
+        LinearLayout.LayoutParams monthLabelLp = new LinearLayout.LayoutParams(0, dp(36), 1f);
+        monthLabelLp.leftMargin = dp(6);
+        monthLabelLp.rightMargin = dp(6);
+        monthNav.addView(roadmapFocusMonthLabel, monthLabelLp);
+        monthNav.addView(secondaryButton("›", () -> changeSelectedGoalMonth(1)),
+                new LinearLayout.LayoutParams(dp(40), dp(36)));
+        focusCard.addView(monthNav);
+        roadmapFocusCount = text("", 11, color("#687A70"), false);
+        focusCard.addView(roadmapFocusCount);
+        roadmapFocusGoalList = vertical();
+        LinearLayout.LayoutParams focusListLp = new LinearLayout.LayoutParams(-1, -2);
+        focusListLp.topMargin = dp(5);
+        focusCard.addView(roadmapFocusGoalList, focusListLp);
+        pageSyllabus.addView(focusCard, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout treeHeading = horizontal();
+        treeHeading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView treeHeadingLabel = text("ROADMAP TREE", 14, color("#18372E"), true);
+        treeHeading.addView(treeHeadingLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        treeHeading.addView(secondaryButton("+ Add item", () -> showRoadmapAddMenu()),
+                new LinearLayout.LayoutParams(dp(112), dp(36)));
+        LinearLayout.LayoutParams treeHeadingLp = new LinearLayout.LayoutParams(-1, -2);
+        treeHeadingLp.topMargin = dp(18);
+        pageSyllabus.addView(treeHeading, treeHeadingLp);
+
+        roadmapTreeSummary = text("", 11, color("#687A70"), false);
+        roadmapTreeSummary.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams treeSummaryLp = new LinearLayout.LayoutParams(-1, -2);
+        treeSummaryLp.topMargin = dp(5);
+        treeSummaryLp.bottomMargin = dp(8);
+        pageSyllabus.addView(roadmapTreeSummary, treeSummaryLp);
+
+        roadmapSearchInput = new EditText(this);
+        roadmapSearchInput.setSingleLine(true);
+        roadmapSearchInput.setTextColor(color("#18372E"));
+        roadmapSearchInput.setHintTextColor(color("#82948A"));
+        roadmapSearchInput.setHint("Search goals, topics or milestones");
+        roadmapSearchInput.setPadding(dp(12), 0, dp(12), 0);
+        roadmapSearchInput.setBackground(bg("#FFFFFF", 11));
+        roadmapSearchInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(-1, dp(42));
+        searchLp.bottomMargin = dp(7);
+        pageSyllabus.addView(roadmapSearchInput, searchLp);
+        roadmapSearchInput.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int st, int count, int after) {}
+            public void onTextChanged(CharSequence s, int st, int before, int count) {
+                roadmapSearchText = s == null ? "" : s.toString().trim();
+                renderRoadmapTreeBody();
             }
-            if (roadmapDetailsToggle != null) {
-                roadmapDetailsToggle.setText(roadmapDetailsExpanded
-                        ? "Hide milestones & syllabus  ↑" : "Later milestones & syllabus  ↓");
-            }
-            if (roadmapDetailsExpanded) {
-                renderMilestones();
-                refreshSyllabusRows();
-            }
+            public void afterTextChanged(Editable e) {}
         });
-        LinearLayout.LayoutParams detailsToggleLp = new LinearLayout.LayoutParams(-1, dp(44));
-        detailsToggleLp.topMargin = dp(18);
-        detailsToggleLp.bottomMargin = dp(10);
-        pageSyllabus.addView(roadmapDetailsToggle, detailsToggleLp);
 
-        roadmapDetailsSection = vertical();
-        roadmapDetailsSection.setVisibility(View.GONE);
-        pageSyllabus.addView(roadmapDetailsSection, new LinearLayout.LayoutParams(-1, -2));
+        HorizontalScrollView filterScroll = new HorizontalScrollView(this);
+        filterScroll.setHorizontalScrollBarEnabled(false);
+        filterScroll.setFillViewport(false);
+        roadmapFilterChips = horizontal();
+        String[] filters = {"All", "Open", "Done", "Overdue"};
+        for (String filter : filters) {
+            Button chip = secondaryButton(filter, () -> {
+                roadmapActiveFilter = filter;
+                refreshRoadmapFilterStyles();
+                renderRoadmapTreeBody();
+            });
+            chip.setMinHeight(dp(32));
+            chip.setTextSize(11);
+            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(-2, dp(34));
+            chipLp.rightMargin = dp(6);
+            roadmapFilterChips.addView(chip, chipLp);
+            roadmapFilterButtons.put(filter, chip);
+        }
+        filterScroll.addView(roadmapFilterChips);
+        LinearLayout.LayoutParams filterScrollLp = new LinearLayout.LayoutParams(-1, dp(36));
+        filterScrollLp.bottomMargin = dp(8);
+        pageSyllabus.addView(filterScroll, filterScrollLp);
 
-        milestonesSection = vertical();
-        roadmapDetailsSection.addView(milestonesSection, new LinearLayout.LayoutParams(-1, -2));
-        addSectionDivider(roadmapDetailsSection);
-
-        syllabusTopicsSection = vertical();
-        roadmapDetailsSection.addView(syllabusTopicsSection, new LinearLayout.LayoutParams(-1, -2));
-
-        buildMilestonesSection();
-        buildSyllabusTopicsSection();
+        roadmapTreeContainer = vertical();
+        pageSyllabus.addView(roadmapTreeContainer, new LinearLayout.LayoutParams(-1, -2));
+        refreshRoadmapFilterStyles();
         refreshRoadmapTabContent();
     }
 
@@ -1710,22 +1794,697 @@ public class MainActivity extends Activity {
     }
 
     private void refreshRoadmapTabContent() {
-        if (monthlyGoalsSection == null || milestonesSection == null || syllabusTopicsSection == null) return;
-        // Keep the current month's goals as the only default focus. Deadlines
-        // and the full syllabus are available together on demand.
-        monthlyGoalsSection.setVisibility(View.VISIBLE);
+        if (roadmapTreeContainer == null) return;
         refreshRoadmapSummary();
-        renderMonthlyGoals();
-        renderMilestones();
-        refreshSyllabusRows();
-        if (roadmapDetailsSection != null) {
-            roadmapDetailsSection.setVisibility(roadmapDetailsExpanded ? View.VISIBLE : View.GONE);
+    }
+
+    private String roadmapId(String... parts) {
+        StringBuilder id = new StringBuilder();
+        for (String part : parts) {
+            if (id.length() > 0) id.append(':');
+            String safe = part == null ? "" : part.trim().replaceAll("[^A-Za-z0-9_-]", "_");
+            id.append(safe);
         }
-        if (roadmapDetailsToggle != null) {
-            roadmapDetailsToggle.setText(roadmapDetailsExpanded
-                    ? "Hide milestones & syllabus  ↑" : "Later milestones & syllabus  ↓");
+        return id.toString();
+    }
+
+    private RoadmapNode newRoadmapNode(String id, String title, String type) {
+        RoadmapNode node = new RoadmapNode();
+        node.id = id;
+        node.title = title == null ? "" : title;
+        node.type = type == null ? "group" : type;
+        node.subtitle = "";
+        node.rootKey = "";
+        node.subjectKey = null;
+        node.goalTrack = null;
+        node.milestoneTrack = null;
+        node.month = null;
+        node.statusPeriod = null;
+        node.groupKind = null;
+        node.item = null;
+        node.done = false;
+        return node;
+    }
+
+    private void ensureRoadmapExpansionState(List<RoadmapNode> roots) {
+        if (roadmapExpansionStateLoaded) return;
+        if (getPrefs().contains(ROADMAP_EXPANSION_KEY)) {
+            Set<String> saved = getPrefs().getStringSet(ROADMAP_EXPANSION_KEY, Collections.emptySet());
+            if (saved != null) expandedRoadmapNodeIds.addAll(new HashSet<>(saved));
+        } else {
+            expandedRoadmapNodeIds.add(roadmapId("track", "upsc"));
+            expandedRoadmapNodeIds.add(roadmapId("track", "software"));
+            expandedRoadmapNodeIds.add(roadmapId("subject", "upsc", "General Studies"));
+            expandedRoadmapNodeIds.add(roadmapId("subject", "upsc", "Maths Optional"));
+            expandedRoadmapNodeIds.add(roadmapId("subject", "software", "Software Interview Prep"));
+            expandedRoadmapNodeIds.add(roadmapId("group", "current-goals", "upsc", "General Studies"));
+            expandedRoadmapNodeIds.add(roadmapId("group", "current-goals", "upsc", "Maths Optional"));
+            expandedRoadmapNodeIds.add(roadmapId("group", "current-goals", "software", "Software Interview Prep"));
+        }
+        roadmapExpansionStateLoaded = true;
+        persistRoadmapExpansionState();
+    }
+
+    private void persistRoadmapExpansionState() {
+        getPrefs().edit().putStringSet(ROADMAP_EXPANSION_KEY,
+                new HashSet<>(expandedRoadmapNodeIds)).apply();
+    }
+
+    private void changeRoadmapExpansion(RoadmapNode node) {
+        if (node == null || node.children.isEmpty()) return;
+        if (!expandedRoadmapNodeIds.add(node.id)) expandedRoadmapNodeIds.remove(node.id);
+        persistRoadmapExpansionState();
+        renderRoadmapTreeBody();
+    }
+
+    private void refreshRoadmapFilterStyles() {
+        for (Map.Entry<String, Button> entry : roadmapFilterButtons.entrySet()) {
+            boolean selected = entry.getKey().equals(roadmapActiveFilter);
+            Button button = entry.getValue();
+            button.setTextColor(color(selected ? "#F5FBF7" : "#50635A"));
+            button.setBackground(bg(selected ? "#23845F" : "#FFFFFF", 10));
         }
     }
+
+    private void showRoadmapAddMenu() {
+        final String[] options = {"Monthly goal", "Syllabus topic", "Milestone / deadline",
+                "Import topic list", "Career target"};
+        new AlertDialog.Builder(this)
+                .setTitle("Add to roadmap")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) editMonthlyGoal(null);
+                    else if (which == 1) editSyllabusTopic(null);
+                    else if (which == 2) editRoadmapMilestone(null);
+                    else if (which == 3) importSyllabusTopics();
+                    else editCareerGoal();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showRoadmapSubjectAddMenu(RoadmapNode node) {
+        if (node == null) return;
+        boolean canAddGoal = node.goalTrack != null && !node.goalTrack.isEmpty();
+        boolean canAddTopic = node.subjectKey != null && !node.subjectKey.isEmpty();
+        if (canAddGoal && canAddTopic) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Add to " + node.title)
+                    .setItems(new String[]{"Syllabus topic", "Monthly goal"}, (dialog, which) -> {
+                        if (which == 0) editSyllabusTopic(null, node.subjectKey);
+                        else editMonthlyGoal(null, node.goalTrack);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        } else if (canAddTopic) {
+            editSyllabusTopic(null, node.subjectKey);
+        } else if (canAddGoal) {
+            editMonthlyGoal(null, node.goalTrack);
+        }
+    }
+
+    private ArrayList<RoadmapNode> buildRoadmapTreeNodes() {
+        ArrayList<SyllabusTopic> topics = readSyllabusTopics();
+        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+        ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
+        String selectedMonth = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
+        ArrayList<RoadmapNode> roots = new ArrayList<>();
+
+        RoadmapNode upsc = newRoadmapNode(roadmapId("track", "upsc"), "UPSC CSE", "track");
+        upsc.rootKey = "upsc";
+        upsc.subtitle = "Syllabus, monthly goals, revision and exam checkpoints";
+        String[][] upscSubjects = {
+                {"General Studies", "General Studies", "General Studies"},
+                {"Maths Optional", "Maths Optional", "Maths Optional"},
+                {"CSAT", "CSAT", ""},
+                {"Qualifying English", "Qualifying English", ""},
+                {"Indian Language", "Indian Language", ""},
+                {"Essay", "Essay", ""},
+                {"Interview", "Interview", ""},
+                {"Revision & Tests", "", "CSE Revision & Tests"}
+        };
+        for (String[] spec : upscSubjects) {
+            addRoadmapSubjectNode(upsc, "upsc", spec[0],
+                    spec[1].isEmpty() ? null : spec[1],
+                    spec[2].isEmpty() ? null : spec[2], topics, goals, selectedMonth);
+        }
+        addRoadmapMilestoneGroup(upsc, "upsc", "UPSC CSE", milestones);
+        if (!upsc.children.isEmpty()) roots.add(upsc);
+
+        RoadmapNode software = newRoadmapNode(roadmapId("track", "software"),
+                "Software Interview Preparation", "track");
+        software.rootKey = "software";
+        software.subtitle = "Coding, Java, system design and readiness checkpoints";
+        addRoadmapSubjectNode(software, "software", "Interview skills & topics",
+                "Software Interview Prep", "Software Interview Prep", topics, goals, selectedMonth);
+        addRoadmapMilestoneGroup(software, "software", "Software interviews", milestones);
+        RoadmapNode career = newRoadmapNode(roadmapId("career", "software"), "Career target", "career");
+        career.rootKey = "software";
+        career.subtitle = getPrefs().getString(CAREER_TARGET_KEY,
+                "₹2.5–2.75L/month after taxes and deductions");
+        software.children.add(career);
+        roots.add(software);
+
+        RoadmapNode other = newRoadmapNode(roadmapId("track", "other"),
+                "Personal & other", "track");
+        other.rootKey = "other";
+        other.subtitle = "Goals and checkpoints outside the two main tracks";
+        addRoadmapGoalGroups(other, "other", "Other", goals, selectedMonth);
+        addRoadmapMilestoneGroup(other, "other", "Personal / other", milestones);
+        if (!other.children.isEmpty()) roots.add(other);
+        return roots;
+    }
+
+    private void addRoadmapSubjectNode(RoadmapNode parent, String rootKey, String displayTitle,
+                                       String subjectKey, String goalTrack,
+                                       ArrayList<SyllabusTopic> allTopics,
+                                       ArrayList<MonthlyGoal> allGoals, String selectedMonth) {
+        ArrayList<SyllabusTopic> subjectTopics = new ArrayList<>();
+        if (subjectKey != null) {
+            for (SyllabusTopic topic : allTopics) {
+                if (subjectKey.equals(topic.subject)) subjectTopics.add(topic);
+            }
+        }
+        ArrayList<MonthlyGoal> subjectGoals = new ArrayList<>();
+        if (goalTrack != null) {
+            for (MonthlyGoal goal : allGoals) if (goalTrack.equals(goal.track)) subjectGoals.add(goal);
+        }
+        if (subjectTopics.isEmpty() && subjectGoals.isEmpty()) return;
+
+        RoadmapNode subject = newRoadmapNode(
+                roadmapId("subject", rootKey, subjectKey == null ? goalTrack : subjectKey),
+                displayTitle, "subject");
+        subject.rootKey = rootKey;
+        subject.subjectKey = subjectKey;
+        subject.goalTrack = goalTrack;
+        subject.subtitle = subjectTopics.size() + " topic" + (subjectTopics.size() == 1 ? "" : "s")
+                + (subjectGoals.isEmpty() ? "" : " · " + subjectGoals.size() + " monthly goal" + (subjectGoals.size() == 1 ? "" : "s"));
+        addRoadmapGoalGroups(subject, rootKey, goalTrack, subjectGoals, selectedMonth);
+
+        if (!subjectTopics.isEmpty()) {
+            RoadmapNode topicGroup = newRoadmapNode(
+                    roadmapId("group", "topics", rootKey, subjectKey), "Syllabus & skills", "group");
+            topicGroup.rootKey = rootKey;
+            topicGroup.subjectKey = subjectKey;
+            topicGroup.groupKind = "topics";
+            topicGroup.subtitle = subjectTopics.size() + " syllabus item" + (subjectTopics.size() == 1 ? "" : "s");
+            subjectTopics.sort(Comparator.comparing(t -> t.title == null ? "" : t.title,
+                    String.CASE_INSENSITIVE_ORDER));
+            for (SyllabusTopic topic : subjectTopics) {
+                RoadmapNode leaf = newRoadmapNode(roadmapId("topic", rootKey, subjectKey,
+                        Long.toString(topic.id)), topic.title, "topic");
+                leaf.rootKey = rootKey;
+                leaf.subjectKey = topic.subject;
+                leaf.item = topic;
+                leaf.done = topic.done;
+                topicGroup.children.add(leaf);
+            }
+            // Goals stay at the top of each branch; large syllabus lists remain collapsed.
+            subject.children.add(topicGroup);
+        }
+        parent.children.add(subject);
+    }
+
+    private void addRoadmapGoalGroups(RoadmapNode parent, String rootKey, String goalTrack,
+                                      ArrayList<MonthlyGoal> goals, String selectedMonth) {
+        if (goalTrack == null) return;
+        ArrayList<MonthlyGoal> currentGoals = new ArrayList<>();
+        ArrayList<MonthlyGoal> futureGoals = new ArrayList<>();
+        ArrayList<MonthlyGoal> pastGoals = new ArrayList<>();
+        for (MonthlyGoal goal : goals) {
+            if (!goalTrack.equals(goal.track)) continue;
+            if (selectedMonth.equals(goal.month)) currentGoals.add(goal);
+            else if (goal.month.compareTo(selectedMonth) > 0) futureGoals.add(goal);
+            else pastGoals.add(goal);
+        }
+        Comparator<MonthlyGoal> byTitle = Comparator.comparing(g -> g.title == null ? "" : g.title,
+                String.CASE_INSENSITIVE_ORDER);
+        currentGoals.sort(byTitle);
+        if (!currentGoals.isEmpty()) {
+            RoadmapNode current = newRoadmapNode(
+                    roadmapId("group", "current-goals", rootKey, goalTrack),
+                    monthLabelForKey(selectedMonth) + " · " + currentGoals.size() + " goal"
+                            + (currentGoals.size() == 1 ? "" : "s"), "group");
+            current.rootKey = rootKey;
+            current.goalTrack = goalTrack;
+            current.month = selectedMonth;
+            current.groupKind = "current-goals";
+            current.subtitle = "Current focus";
+            for (MonthlyGoal goal : currentGoals) current.children.add(roadmapGoalLeaf(rootKey, goal));
+            parent.children.add(current);
+        }
+        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, futureGoals,
+                "Upcoming goals", "upcoming-goals", true);
+        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, pastGoals,
+                "Past goals", "past-goals", false);
+    }
+
+    private void addRoadmapMonthGoalGroup(RoadmapNode parent, String rootKey, String goalTrack,
+                                           ArrayList<MonthlyGoal> goals, String title,
+                                           String groupKind, boolean ascending) {
+        if (goals.isEmpty()) return;
+        TreeSet<String> monthKeys = new TreeSet<>();
+        for (MonthlyGoal goal : goals) if (goal.month != null) monthKeys.add(goal.month);
+        ArrayList<String> orderedMonths = new ArrayList<>(monthKeys);
+        if (!ascending) Collections.reverse(orderedMonths);
+
+        RoadmapNode group = newRoadmapNode(roadmapId("group", groupKind, rootKey, goalTrack),
+                title + " · " + goals.size(), "group");
+        group.rootKey = rootKey;
+        group.goalTrack = goalTrack;
+        group.groupKind = groupKind;
+        group.subtitle = "Expand a month to see its goals";
+        for (String monthKey : orderedMonths) {
+            ArrayList<MonthlyGoal> inMonth = new ArrayList<>();
+            for (MonthlyGoal goal : goals) if (monthKey.equals(goal.month)) inMonth.add(goal);
+            inMonth.sort(Comparator.comparing(g -> g.title == null ? "" : g.title,
+                    String.CASE_INSENSITIVE_ORDER));
+            RoadmapNode month = newRoadmapNode(roadmapId("group", "goal-month", rootKey, goalTrack, monthKey),
+                    monthLabelForKey(monthKey) + " · " + inMonth.size() + " goal"
+                            + (inMonth.size() == 1 ? "" : "s"), "group");
+            month.rootKey = rootKey;
+            month.goalTrack = goalTrack;
+            month.month = monthKey;
+            month.groupKind = "goal-month";
+            for (MonthlyGoal goal : inMonth) month.children.add(roadmapGoalLeaf(rootKey, goal));
+            group.children.add(month);
+        }
+        parent.children.add(group);
+    }
+
+    private RoadmapNode roadmapGoalLeaf(String rootKey, MonthlyGoal goal) {
+        RoadmapNode leaf = newRoadmapNode(roadmapId("goal", rootKey, goal.track,
+                Long.toString(goal.id)), goal.title, "goal");
+        leaf.rootKey = rootKey;
+        leaf.goalTrack = goal.track;
+        leaf.month = goal.month;
+        leaf.statusPeriod = goal.month;
+        leaf.subtitle = goal.target == null ? "" : goal.target;
+        leaf.item = goal;
+        leaf.done = goal.done;
+        return leaf;
+    }
+
+    private void addRoadmapMilestoneGroup(RoadmapNode parent, String rootKey, String milestoneTrack,
+                                          ArrayList<RoadmapMilestone> allMilestones) {
+        ArrayList<RoadmapMilestone> milestones = new ArrayList<>();
+        for (RoadmapMilestone milestone : allMilestones) {
+            if (milestoneTrack.equals(milestone.track)) milestones.add(milestone);
+        }
+        if (milestones.isEmpty()) return;
+        milestones.sort((a, b) -> {
+            if (a.done != b.done) return a.done ? 1 : -1;
+            return (a.date == null ? "9999-12-31" : a.date)
+                    .compareTo(b.date == null ? "9999-12-31" : b.date);
+        });
+        RoadmapNode group = newRoadmapNode(roadmapId("group", "milestones", rootKey),
+                "Milestones & deadlines · " + milestones.size(), "group");
+        group.rootKey = rootKey;
+        group.milestoneTrack = milestoneTrack;
+        group.groupKind = "milestones";
+        group.subtitle = "Readiness checkpoints and target dates";
+        for (RoadmapMilestone milestone : milestones) {
+            RoadmapNode leaf = newRoadmapNode(roadmapId("milestone", rootKey,
+                    Long.toString(milestone.id)), milestone.title, "milestone");
+            leaf.rootKey = rootKey;
+            leaf.milestoneTrack = milestone.track;
+            leaf.statusPeriod = milestone.date;
+            leaf.subtitle = milestone.detail == null ? "" : milestone.detail;
+            leaf.item = milestone;
+            leaf.done = milestone.done;
+            group.children.add(leaf);
+        }
+        parent.children.add(group);
+    }
+
+    private boolean isRoadmapActionNode(RoadmapNode node) {
+        return node != null && RoadmapTreeRules.isActionableType(node.type);
+    }
+
+    private int[] roadmapNodeProgress(RoadmapNode node) {
+        if (node == null) return new int[]{0, 0};
+        if (isRoadmapActionNode(node)) return RoadmapTreeRules.leafProgress(node.done);
+        int[] progress = new int[]{0, 0};
+        for (RoadmapNode child : node.children) {
+            progress = RoadmapTreeRules.combineProgress(progress, roadmapNodeProgress(child));
+        }
+        return progress;
+    }
+
+    private String roadmapNodeMetadata(RoadmapNode node) {
+        if (node == null) return "";
+        String today = todayKey();
+        boolean overdue = RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, today);
+        if ("track".equals(node.type) || "subject".equals(node.type)) {
+            int[] progress = roadmapNodeProgress(node);
+            String line = progress[0] + "/" + progress[1] + " items complete";
+            if ("track".equals(node.type) && node.subtitle != null && !node.subtitle.isEmpty()) {
+                line += " · " + node.subtitle;
+            } else if ("subject".equals(node.type) && node.subtitle != null && !node.subtitle.isEmpty()) {
+                line = node.subtitle + " · " + line;
+            }
+            return line;
+        }
+        if ("group".equals(node.type)) {
+            if (node.groupKind != null && node.groupKind.equals("goal-month")) return node.title;
+            return node.subtitle == null ? "" : node.subtitle;
+        }
+        if ("topic".equals(node.type)) {
+            SyllabusTopic topic = (SyllabusTopic) node.item;
+            return topic.subject + (topic.done ? " · Complete" : " · Open");
+        }
+        if ("goal".equals(node.type)) {
+            String line = monthLabelForKey(node.month);
+            if (node.subtitle != null && !node.subtitle.trim().isEmpty()) line += " · " + node.subtitle.trim();
+            if (overdue) line += " · Overdue";
+            return line;
+        }
+        if ("milestone".equals(node.type)) {
+            String line = "Due " + displayRoadmapDate(node.statusPeriod);
+            if (overdue) line += " · Overdue";
+            else if (node.done) line += " · Complete";
+            if (node.subtitle != null && !node.subtitle.trim().isEmpty()) line += " · " + node.subtitle.trim();
+            return line;
+        }
+        if ("career".equals(node.type)) return node.subtitle;
+        return node.subtitle == null ? "" : node.subtitle;
+    }
+
+    private String roadmapNodeSearchText(RoadmapNode node) {
+        return ((node.title == null ? "" : node.title) + " "
+                + (node.subtitle == null ? "" : node.subtitle) + " "
+                + (node.subjectKey == null ? "" : node.subjectKey) + " "
+                + (node.goalTrack == null ? "" : node.goalTrack) + " "
+                + (node.milestoneTrack == null ? "" : node.milestoneTrack) + " "
+                + (node.month == null ? "" : monthLabelForKey(node.month)) + " "
+                + roadmapNodeMetadata(node)).toLowerCase(Locale.US);
+    }
+
+    private boolean roadmapNodeOwnMatchesQuery(RoadmapNode node, String query) {
+        if (query == null || query.trim().isEmpty()) return false;
+        String ownText = ((node.title == null ? "" : node.title) + " "
+                + (node.subjectKey == null ? "" : node.subjectKey) + " "
+                + (node.goalTrack == null ? "" : node.goalTrack) + " "
+                + (node.milestoneTrack == null ? "" : node.milestoneTrack) + " "
+                + (node.month == null ? "" : monthLabelForKey(node.month)) + " "
+                + (node.subtitle == null ? "" : node.subtitle)).toLowerCase(Locale.US);
+        return ownText.contains(query.toLowerCase(Locale.US));
+    }
+
+    private boolean roadmapNodeVisible(RoadmapNode node, String query, boolean forceInclude) {
+        if (node == null) return false;
+        if (forceInclude) return true;
+        if (node.children.isEmpty()) {
+            if (!roadmapActiveFilter.equals("All")
+                    && !RoadmapTreeRules.matchesFilter(roadmapActiveFilter, node.type,
+                    node.done, node.statusPeriod, todayKey())) return false;
+            return query == null || query.trim().isEmpty()
+                    || roadmapNodeSearchText(node).contains(query.toLowerCase(Locale.US));
+        }
+        if (query != null && !query.trim().isEmpty()
+                && roadmapActiveFilter.equals("All")
+                && roadmapNodeOwnMatchesQuery(node, query)) return true;
+        if (query == null || query.trim().isEmpty()) {
+            if (roadmapActiveFilter.equals("All")) return true;
+        }
+        for (RoadmapNode child : node.children) {
+            if (roadmapNodeVisible(child, query, false)) return true;
+        }
+        return false;
+    }
+
+    private boolean roadmapHasVisibleChild(RoadmapNode node, String query) {
+        if (node == null) return false;
+        for (RoadmapNode child : node.children) {
+            if (roadmapNodeVisible(child, query, false)) return true;
+        }
+        return false;
+    }
+
+    private void renderRoadmapTreeBody() {
+        if (roadmapTreeContainer == null) return;
+        ArrayList<RoadmapNode> roots = buildRoadmapTreeNodes();
+        ensureRoadmapExpansionState(roots);
+        roadmapTreeContainer.removeAllViews();
+        int[] overall = new int[]{0, 0};
+        for (RoadmapNode rootNode : roots) {
+            overall = RoadmapTreeRules.combineProgress(overall, roadmapNodeProgress(rootNode));
+        }
+        String status = overall[0] + " of " + overall[1] + " roadmap items complete.";
+        RoadmapMilestone next = null;
+        for (RoadmapMilestone milestone : readRoadmapMilestones()) {
+            if (milestone.done) continue;
+            if (next == null || (milestone.date != null
+                    && milestone.date.compareTo(next.date == null ? "9999-12-31" : next.date) < 0)) next = milestone;
+        }
+        if (next != null) status += " Next deadline: " + next.title + " · " + displayRoadmapDate(next.date) + ".";
+        if (roadmapSearchText.trim().isEmpty() && roadmapActiveFilter.equals("All")) {
+            status += " Expand a branch to explore; tap a leaf to edit it.";
+        } else {
+            status += " Showing matches in their parent branches.";
+        }
+        roadmapTreeSummary.setText(status);
+
+        int rendered = 0;
+        for (RoadmapNode rootNode : roots) {
+            if (!roadmapNodeVisible(rootNode, roadmapSearchText, false)) continue;
+            renderRoadmapNode(rootNode, 0, false);
+            rendered++;
+            View divider = new View(this);
+            divider.setBackgroundColor(color("#DDE6DE"));
+            LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
+            dividerLp.topMargin = dp(5);
+            dividerLp.bottomMargin = dp(5);
+            roadmapTreeContainer.addView(divider, dividerLp);
+        }
+        if (rendered == 0) {
+            LinearLayout empty = vertical();
+            empty.setPadding(dp(12), dp(18), dp(12), dp(18));
+            empty.addView(text("No roadmap items match.", 14, color("#18372E"), true));
+            empty.addView(text("Try All, clear the search, or add a goal, topic or milestone.",
+                    12, color("#687A70"), false));
+            roadmapTreeContainer.addView(empty);
+        }
+    }
+
+    private void renderRoadmapNode(RoadmapNode node, int depth, boolean forceInclude) {
+        String query = roadmapSearchText.trim();
+        if (!roadmapNodeVisible(node, query, forceInclude)) return;
+        boolean hasChildren = !node.children.isEmpty();
+        boolean ownMatch = !query.isEmpty() && roadmapActiveFilter.equals("All")
+                && roadmapNodeOwnMatchesQuery(node, query);
+        boolean autoExpand = hasChildren && (roadmapActiveFilter.equals("Overdue")
+                || roadmapActiveFilter.equals("Open") || roadmapActiveFilter.equals("Done")
+                || (!query.isEmpty() && (ownMatch || roadmapHasVisibleChild(node, query))));
+        boolean expanded = hasChildren && (expandedRoadmapNodeIds.contains(node.id) || autoExpand);
+
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int left = 4 + Math.min(depth, 5) * 13;
+        row.setPadding(dp(left), dp(7), dp(4), dp(7));
+        if ("track".equals(node.type)) row.setBackground(bg("#EAF3EC", 11));
+        else if ("subject".equals(node.type)) row.setBackground(bg("#F7F9F6", 9));
+        else row.setBackgroundColor(Color.TRANSPARENT);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+        rowLp.bottomMargin = dp("track".equals(node.type) ? 5 : 1);
+        roadmapTreeContainer.addView(row, rowLp);
+
+        if (isRoadmapActionNode(node)) {
+            Button mark = actionButton(node.done ? "✓" : "○",
+                    color(node.done ? "#F5FBF7" : "#50635A"),
+                    node.done ? "#23845F" : "#FFFFFF");
+            mark.setTextSize(12);
+            mark.setContentDescription(node.done ? "Mark pending" : "Mark complete");
+            row.addView(mark, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            mark.setOnClickListener(v -> toggleRoadmapLeaf(node));
+        } else if (hasChildren) {
+            TextView disclosure = text(expanded ? "⌄" : "›", 19, color("#2E8060"), true);
+            disclosure.setGravity(Gravity.CENTER);
+            row.addView(disclosure, new LinearLayout.LayoutParams(dp(28), dp(30)));
+        } else {
+            TextView symbol = text("↗", 15, color("#82948A"), true);
+            symbol.setGravity(Gravity.CENTER);
+            row.addView(symbol, new LinearLayout.LayoutParams(dp(28), dp(30)));
+        }
+
+        LinearLayout detail = vertical();
+        LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        detailLp.leftMargin = dp(7);
+        detailLp.rightMargin = dp(4);
+        row.addView(detail, detailLp);
+        float titleSize = "track".equals(node.type) ? 14f : "subject".equals(node.type) ? 13f : 12f;
+        TextView title = text(node.title, titleSize,
+                node.done && isRoadmapActionNode(node) ? color("#687A70") : color("#18372E"),
+                !"group".equals(node.type) && !"topic".equals(node.type));
+        title.setMaxLines("track".equals(node.type) || "subject".equals(node.type) ? 2 : 3);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        if (node.done && isRoadmapActionNode(node)) {
+            title.setPaintFlags(title.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+        }
+        detail.addView(title);
+        String metadata = roadmapNodeMetadata(node);
+        if (metadata != null && !metadata.trim().isEmpty()) {
+            TextView meta = text(metadata, 10,
+                    RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, todayKey())
+                            ? color("#A76821") : color("#687A70"),
+                    "track".equals(node.type));
+            meta.setMaxLines("goal".equals(node.type) || "milestone".equals(node.type) ? 3 : 2);
+            meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
+            metaLp.topMargin = dp(2);
+            detail.addView(meta, metaLp);
+        }
+
+        int[] progress = roadmapNodeProgress(node);
+        if (progress[1] > 0 && hasChildren) {
+            TextView count = text(progress[0] + "/" + progress[1], 10, color("#2E8060"), true);
+            count.setGravity(Gravity.CENTER);
+            row.addView(count, new LinearLayout.LayoutParams(dp(42), dp(30)));
+        }
+
+        Runnable childAction = roadmapNodeChildAction(node);
+        if (childAction != null) {
+            Button addChild = actionButton("+", color("#2E8060"), "#FFFFFF");
+            addChild.setTextSize(17);
+            addChild.setContentDescription("Add item under " + node.title);
+            row.addView(addChild, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            addChild.setOnClickListener(v -> childAction.run());
+        }
+        row.setContentDescription(node.title + ". " + metadata
+                + (hasChildren ? (expanded ? ". Tap to collapse." : ". Tap to expand.")
+                : ". Tap to edit."));
+        row.setOnClickListener(v -> {
+            if (hasChildren) {
+                changeRoadmapExpansion(node);
+            } else {
+                openRoadmapLeaf(node);
+            }
+        });
+        row.setOnLongClickListener(v -> {
+            if (node.item instanceof MonthlyGoal) {
+                confirmDeleteMonthlyGoal((MonthlyGoal) node.item);
+                return true;
+            }
+            if (node.item instanceof SyllabusTopic) {
+                showSyllabusTopicActions((SyllabusTopic) node.item);
+                return true;
+            }
+            if (node.item instanceof RoadmapMilestone) {
+                confirmDeleteRoadmapMilestone((RoadmapMilestone) node.item);
+                return true;
+            }
+            return false;
+        });
+
+        if (expanded) {
+            boolean forceChildren = forceInclude || ownMatch;
+            for (RoadmapNode child : node.children) {
+                if (roadmapNodeVisible(child, query, forceChildren)) {
+                    renderRoadmapNode(child, depth + 1, forceChildren);
+                }
+            }
+        }
+    }
+
+    private Runnable roadmapNodeChildAction(RoadmapNode node) {
+        if (node == null) return null;
+        if ("subject".equals(node.type)) {
+            if ((node.goalTrack != null && !node.goalTrack.isEmpty())
+                    || (node.subjectKey != null && !node.subjectKey.isEmpty())) {
+                return () -> showRoadmapSubjectAddMenu(node);
+            }
+        }
+        if (!"group".equals(node.type)) return null;
+        if ("current-goals".equals(node.groupKind)
+                || "upcoming-goals".equals(node.groupKind)
+                || "past-goals".equals(node.groupKind)) {
+            return () -> editMonthlyGoal(null, node.goalTrack);
+        }
+        if ("topics".equals(node.groupKind)) return () -> editSyllabusTopic(null, node.subjectKey);
+        if ("milestones".equals(node.groupKind)) return () -> editRoadmapMilestone(null, node.milestoneTrack);
+        return null;
+    }
+
+    private void toggleRoadmapLeaf(RoadmapNode node) {
+        if (node == null) return;
+        if (node.item instanceof MonthlyGoal) {
+            toggleMonthlyGoal((MonthlyGoal) node.item);
+        } else if (node.item instanceof SyllabusTopic) {
+            SyllabusTopic topic = (SyllabusTopic) node.item;
+            topic.done = !topic.done;
+            topic.completedAt = topic.done ? System.currentTimeMillis() : 0L;
+            persistSyllabusTopics(readSyllabusTopicsWith(topic));
+        } else if (node.item instanceof RoadmapMilestone) {
+            toggleRoadmapMilestone((RoadmapMilestone) node.item);
+        }
+    }
+
+    private void openRoadmapLeaf(RoadmapNode node) {
+        if (node == null) return;
+        if (node.item instanceof MonthlyGoal) editMonthlyGoal((MonthlyGoal) node.item);
+        else if (node.item instanceof SyllabusTopic) editSyllabusTopic((SyllabusTopic) node.item);
+        else if (node.item instanceof RoadmapMilestone) editRoadmapMilestone((RoadmapMilestone) node.item);
+        else if ("career".equals(node.type)) editCareerGoal();
+    }
+
+    private void renderRoadmapFocus() {
+        if (roadmapFocusGoalList == null || roadmapFocusMonthLabel == null || roadmapFocusCount == null) return;
+        String month = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
+        roadmapFocusMonthLabel.setText(monthLabelForKey(month));
+        roadmapFocusGoalList.removeAllViews();
+        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+        ArrayList<MonthlyGoal> focus = new ArrayList<>();
+        for (MonthlyGoal goal : goals) if (month.equals(goal.month)) focus.add(goal);
+        focus.sort(Comparator.comparingInt(g -> monthlyGoalTrackOrder(g.track)));
+        int done = 0;
+        for (MonthlyGoal goal : focus) if (goal.done) done++;
+        roadmapFocusCount.setText(done + "/" + focus.size() + " goals complete · tracked in the tree below");
+        if (focus.isEmpty()) {
+            TextView empty = text("No goals for this month yet. Add a priority with + Goal.",
+                    12, color("#687A70"), false);
+            empty.setPadding(dp(2), dp(8), dp(2), dp(5));
+            roadmapFocusGoalList.addView(empty);
+            return;
+        }
+        int shown = Math.min(3, focus.size());
+        for (int i = 0; i < shown; i++) {
+            MonthlyGoal goal = focus.get(i);
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(1), dp(5), dp(1), dp(5));
+            Button mark = actionButton(goal.done ? "✓" : "○",
+                    color(goal.done ? "#F5FBF7" : "#50635A"),
+                    goal.done ? "#23845F" : "#FFFFFF");
+            row.addView(mark, new LinearLayout.LayoutParams(dp(28), dp(28)));
+            LinearLayout details = vertical();
+            LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(0, -2, 1f);
+            detailsLp.leftMargin = dp(8);
+            row.addView(details, detailsLp);
+            details.addView(text(goal.track.toUpperCase(Locale.US), 9,
+                    color("Software Interview Prep".equals(goal.track) ? "#A76821" : "#2E8060"), true));
+            TextView goalTitle = text(goal.title, 12,
+                    color(goal.done ? "#687A70" : "#18372E"), true);
+            goalTitle.setMaxLines(2);
+            goalTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            if (goal.done) goalTitle.setPaintFlags(goalTitle.getPaintFlags()
+                    | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+            details.addView(goalTitle);
+            row.setContentDescription(goal.track + ": " + goal.title + ". Tap to edit.");
+            row.setOnClickListener(v -> editMonthlyGoal(goal));
+            row.setOnLongClickListener(v -> {
+                confirmDeleteMonthlyGoal(goal);
+                return true;
+            });
+            mark.setContentDescription(goal.done ? "Reopen monthly goal" : "Mark monthly goal complete");
+            mark.setOnClickListener(v -> toggleMonthlyGoal(goal));
+            roadmapFocusGoalList.addView(row);
+        }
+        if (focus.size() > shown) {
+            roadmapFocusGoalList.addView(text("+" + (focus.size() - shown)
+                    + " more goals in the expanded roadmap branches.", 10, color("#687A70"), false));
+        }
+    }
+
+
 
     private void refreshRoadmapSummary() {
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
@@ -1768,6 +2527,10 @@ public class MainActivity extends Activity {
             String target = getPrefs().getString(CAREER_TARGET_KEY, "₹2.5–2.75L/month after taxes and deductions");
             careerGoalSummary.setText("Career target  ·  " + target + "    Edit");
         }
+
+        // Keep the new tree and focus shortcuts synchronised with the existing source-of-truth stores.
+        if (roadmapFocusGoalList != null) renderRoadmapFocus();
+        if (roadmapTreeContainer != null) renderRoadmapTreeBody();
     }
 
     private void refreshSyllabusRows() {
@@ -1948,6 +2711,10 @@ public class MainActivity extends Activity {
     }
 
     private void editMonthlyGoal(MonthlyGoal existing) {
+        editMonthlyGoal(existing, null);
+    }
+
+    private void editMonthlyGoal(MonthlyGoal existing, String preferredTrack) {
         final String[] draftMonth = {existing == null
                 ? (selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth)
                 : existing.month};
@@ -1983,6 +2750,10 @@ public class MainActivity extends Activity {
         if (existing != null) {
             for (int i = 0; i < MONTHLY_GOAL_TRACKS.length; i++) {
                 if (MONTHLY_GOAL_TRACKS[i].equals(existing.track)) track.setSelection(i);
+            }
+        } else if (preferredTrack != null) {
+            for (int i = 0; i < MONTHLY_GOAL_TRACKS.length; i++) {
+                if (MONTHLY_GOAL_TRACKS[i].equals(preferredTrack)) track.setSelection(i);
             }
         }
         form.addView(track, new LinearLayout.LayoutParams(-1, dp(48)));
@@ -2136,6 +2907,10 @@ public class MainActivity extends Activity {
     }
 
     private void editRoadmapMilestone(RoadmapMilestone existing) {
+        editRoadmapMilestone(existing, null);
+    }
+
+    private void editRoadmapMilestone(RoadmapMilestone existing, String preferredTrack) {
         final String[] draftDate = {existing == null ? todayKey() : existing.date};
         LinearLayout form = vertical();
         form.setPadding(dp(20), dp(4), dp(20), dp(10));
@@ -2154,7 +2929,14 @@ public class MainActivity extends Activity {
             for (int i = 0; i < MILESTONE_TRACKS.length; i++) {
                 if (MILESTONE_TRACKS[i].equals(existing.track)) track.setSelection(i);
             }
-        } else track.setSelection(0);
+        } else {
+            track.setSelection(0);
+            if (preferredTrack != null) {
+                for (int i = 0; i < MILESTONE_TRACKS.length; i++) {
+                    if (MILESTONE_TRACKS[i].equals(preferredTrack)) track.setSelection(i);
+                }
+            }
+        }
         form.addView(track, new LinearLayout.LayoutParams(-1, dp(48)));
 
         TextView titleLabel = text("MILESTONE", 10, color("#687A70"), true);
@@ -4588,6 +5370,10 @@ public class MainActivity extends Activity {
     }
 
         private void editSyllabusTopic(SyllabusTopic existing) {
+        editSyllabusTopic(existing, null);
+    }
+
+    private void editSyllabusTopic(SyllabusTopic existing, String preferredSubject) {
         LinearLayout form = vertical();
         form.setPadding(dp(20), dp(4), dp(20), dp(4));
         EditText title = new EditText(this);
@@ -4609,6 +5395,10 @@ public class MainActivity extends Activity {
         if (existing != null) {
             for (int i = 0; i < SYLLABUS_SUBJECTS.length; i++) {
                 if (SYLLABUS_SUBJECTS[i].equals(existing.subject)) subject.setSelection(i);
+            }
+        } else if (preferredSubject != null) {
+            for (int i = 0; i < SYLLABUS_SUBJECTS.length; i++) {
+                if (SYLLABUS_SUBJECTS[i].equals(preferredSubject)) subject.setSelection(i);
             }
         }
         form.addView(subject, new LinearLayout.LayoutParams(-1, dp(48)));
@@ -4666,6 +5456,7 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Could not save syllabus changes.", Toast.LENGTH_SHORT).show();
         }
         if (syllabusList != null) refreshSyllabusRows();
+        refreshRoadmapSummary();
         render();
     }
 
