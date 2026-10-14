@@ -44,8 +44,8 @@ public class MainActivity extends Activity {
     private static final String OFFICE_LOG_KEY = "officeLog";
     private static final String DEBUG_LOG_KEY = "debugLog";
     private static final String DEBUG_TAG = "DayFlow";
-    private static final String UPDATE_METADATA_URL = "https://github.com/mihirkumar28/mihirkumar28.github.io/releases/download/latest/update.json";
-    private static final String UPDATE_APK_URL = "https://github.com/mihirkumar28/mihirkumar28.github.io/releases/download/latest/app-release.apk";
+    private static final String UPDATE_METADATA_URL = "https://mihirkumar28.github.io/update.json";
+    private static final String UPDATE_APK_URL = "https://mihirkumar28.github.io/app-release.apk";
     private static final String UPDATE_LAST_CHECK_KEY = "appUpdateLastCheckAt";
     private static final String UPDATE_PROMPTED_VERSION_KEY = "appUpdatePromptedVersion";
     private static final String PENDING_UPDATE_APK_KEY = "pendingUpdateApkPath";
