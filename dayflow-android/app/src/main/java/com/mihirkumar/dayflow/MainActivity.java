@@ -2747,7 +2747,7 @@ public class MainActivity extends Activity {
                     | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
             details.addView(goalTitle);
             if (goal.parentGoalId > 0L) {
-                TextView subgoalLabel = text("SUBGOAL · smaller part of a larger target", 9,
+                TextView subgoalLabel = text("SUBGOAL OF · " + monthlyGoalParentTitle(goals, goal), 9,
                         color("#687A70"), false);
                 LinearLayout.LayoutParams subgoalLp = new LinearLayout.LayoutParams(-1, -2);
                 subgoalLp.topMargin = dp(1);
@@ -3058,6 +3058,15 @@ public class MainActivity extends Activity {
         }
         Collections.reverse(path);
         return path;
+    }
+
+    private String monthlyGoalParentTitle(List<MonthlyGoal> all, MonthlyGoal goal) {
+        if (goal == null || goal.parentGoalId <= 0L) return "larger goal";
+        for (MonthlyGoal candidate : all) {
+            if (candidate.id == goal.parentGoalId) return candidate.title == null || candidate.title.trim().isEmpty()
+                    ? "larger goal" : candidate.title;
+        }
+        return "larger goal";
     }
 
     private MonthlyGoal monthlyGoalRoot(List<MonthlyGoal> all, MonthlyGoal goal) {
