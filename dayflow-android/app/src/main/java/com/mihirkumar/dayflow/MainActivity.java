@@ -2183,7 +2183,17 @@ public class MainActivity extends Activity {
         }
         Comparator<MonthlyGoal> byOrder = monthlyGoalOrderComparator(goals);
         current.sort(byOrder);
-        if (!current.isEmpty()) {
+        boolean selectedMonthIsPlanned = false;
+        if (!"Other".equals(goalTrack)) {
+            for (int i = 0; i < RoadmapMonthlyPlan.monthCount(); i++) {
+                if (selectedMonth.equals(RoadmapMonthlyPlan.monthKeyAt(i))) {
+                    selectedMonthIsPlanned = true;
+                    break;
+                }
+            }
+        }
+        // Keep the selected month available as a drop target even after its final goal moves out.
+        if (!current.isEmpty() || selectedMonthIsPlanned) {
             int count = 0;
             for (MonthlyGoal goal : current) count += countScheduledGoalLeaves(goal, goals);
             RoadmapNode group = newRoadmapNode(roadmapId("group", "current-goals", rootKey, goalTrack),
@@ -2193,8 +2203,8 @@ public class MainActivity extends Activity {
             for (MonthlyGoal goal : current) group.children.add(roadmapGoalTreeNode(rootKey, goal, goals));
             parent.children.add(group);
         }
-        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, future, "Upcoming goals", "upcoming-goals", true, goals);
-        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, past, "Past goals", "past-goals", false, goals);
+        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, future, "Upcoming goals", "upcoming-goals", true, goals, selectedMonth);
+        addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, past, "Past goals", "past-goals", false, goals, selectedMonth);
         if (!retired.isEmpty()) {
             retired.sort(byOrder);
             RoadmapNode archive = newRoadmapNode(roadmapId("group", "retired-goals", rootKey, goalTrack),
@@ -2220,12 +2230,19 @@ public class MainActivity extends Activity {
 
     private void addRoadmapMonthGoalGroup(RoadmapNode parent, String rootKey, String goalTrack,
                                            ArrayList<MonthlyGoal> goals, String title,
-                                           String groupKind, boolean ascending, ArrayList<MonthlyGoal> allGoals) {
-        if (goals.isEmpty()) return;
-        TreeSet<String> monthKeys = new TreeSet<>();
-        for (MonthlyGoal goal : goals) if (goal.month != null) monthKeys.add(goal.month);
-        ArrayList<String> orderedMonths = new ArrayList<>(monthKeys);
-        if (!ascending) Collections.reverse(orderedMonths);
+                                           String groupKind, boolean ascending, ArrayList<MonthlyGoal> allGoals,
+                                           String selectedMonth) {
+        ArrayList<String> goalMonthKeys = new ArrayList<>();
+        for (MonthlyGoal goal : goals) if (goal.month != null) goalMonthKeys.add(goal.month);
+        ArrayList<String> plannedMonthKeys = new ArrayList<>();
+        for (int i = 0; i < RoadmapMonthlyPlan.monthCount(); i++) {
+            plannedMonthKeys.add(RoadmapMonthlyPlan.monthKeyAt(i));
+        }
+        // Planned months are slots in the roadmap, not just labels inferred from populated goals.
+        // This preserves empty source months after a move so users can still see the slot.
+        ArrayList<String> orderedMonths = RoadmapTreeRules.monthKeysForPeriod(
+                selectedMonth, ascending, goalMonthKeys, plannedMonthKeys);
+        if (orderedMonths.isEmpty()) return;
         RoadmapNode group = newRoadmapNode(roadmapId("group", groupKind, rootKey, goalTrack),
                 title + " · " + goals.size(), "group");
         group.rootKey = rootKey; group.goalTrack = goalTrack; group.groupKind = groupKind;
