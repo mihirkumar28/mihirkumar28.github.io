@@ -3475,7 +3475,7 @@ public class MainActivity extends Activity {
                 }).setNegativeButton("Keep goal", null).show();
     }
 
-    private void renderMilestones() {    private void renderMilestones() {
+    private void renderMilestones() {
         if (milestoneList == null) return;
         milestoneList.removeAllViews();
         ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
