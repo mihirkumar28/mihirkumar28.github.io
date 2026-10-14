@@ -2531,6 +2531,15 @@ public class MainActivity extends Activity {
     private void openMonthlyGoalInRoadmap(MonthlyGoal goal) {
         if (goal == null) return;
         selectedGoalMonth = goal.month;
+
+        // A selected filter/search could hide this goal, so clear both before revealing its path.
+        roadmapActiveFilter = "All";
+        roadmapSearchText = "";
+        refreshRoadmapFilterStyles();
+        if (roadmapSearchInput != null && roadmapSearchInput.length() > 0) {
+            roadmapSearchInput.setText("");
+        }
+
         String rootKey = "Other".equals(goal.track) ? "other"
                 : "Software Interview Prep".equals(goal.track) ? "software" : "upsc";
         String targetId = roadmapId("goal", rootKey, goal.track, Long.toString(goal.id));
