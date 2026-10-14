@@ -33,6 +33,25 @@ public class RoadmapTreeRulesTest {
         assertFalse(RoadmapTreeRules.matchesFilter("Overdue", "topic", false, "", "2026-10-14"));
     }
 
+    @Test public void goalReorderingPreservesLogicalContinuity() {
+        assertTrue(RoadmapTreeRules.canReorderGoals("General Studies", 0L, "2026-10", false,
+                "General Studies", 0L, "2026-11", false));
+        assertTrue(RoadmapTreeRules.canReorderGoals("Maths Optional", 0L, "2026-10", false,
+                "Maths Optional", 0L, "2026-10", false));
+        assertTrue(RoadmapTreeRules.canReorderGoals("General Studies", 42L, "2026-10", false,
+                "General Studies", 42L, "2026-10", false));
+        assertFalse(RoadmapTreeRules.canReorderGoals("Maths Optional", 0L, "2026-10", false,
+                "Maths Optional", 0L, "2026-11", false));
+        assertFalse(RoadmapTreeRules.canReorderGoals("Software Interview Prep", 0L, "2026-10", false,
+                "Software Interview Prep", 0L, "2026-11", false));
+        assertFalse(RoadmapTreeRules.canReorderGoals("General Studies", 0L, "2026-10", false,
+                "Maths Optional", 0L, "2026-10", false));
+        assertFalse(RoadmapTreeRules.canReorderGoals("General Studies", 1L, "2026-10", false,
+                "General Studies", 2L, "2026-10", false));
+        assertFalse(RoadmapTreeRules.canReorderGoals("General Studies", 0L, "2026-10", true,
+                "General Studies", 0L, "2026-11", false));
+    }
+
     @Test public void branchProgressCombinesCompletedAndIncompleteLeaves() {
         int[] total = RoadmapTreeRules.combineProgress(
                 RoadmapTreeRules.leafProgress(true),
