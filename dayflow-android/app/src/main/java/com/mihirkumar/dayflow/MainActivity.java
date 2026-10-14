@@ -974,14 +974,19 @@ public class MainActivity extends Activity {
         }
         week.addView(text(fmtMillis(totalWeek), 22, color("#18372E"), true));
         week.addView(text("Across " + activeDays + " recorded office days this week", 12, color("#687A70"), false));
-        week.addView(secondaryButton("Correct a day's attendance", () -> editAttendanceDay(todayKey())));
+        week.addView(secondaryButton("Correct a day's attendance", () -> chooseAttendanceHistoryDate()));
         officePageContent.addView(week);
 
         LinearLayout history = surfaceCard();
         history.setTag("officeHistory");
         history.addView(text("DAILY ATTENDANCE LEDGER", 10, color("#2E8060"), true));
-        history.addView(text("Last 31 days · tap a recorded day to inspect sessions or correct times.",
+        history.addView(text("Recent 31 days below. Use the date selector for any past date, including older or commute-only records.",
                 12, color("#687A70"), false));
+        Button chooseHistoryDate = secondaryButton("Choose date to view or edit", () -> chooseAttendanceHistoryDate());
+        LinearLayout.LayoutParams chooseHistoryDateLp = new LinearLayout.LayoutParams(-1, dp(42));
+        chooseHistoryDateLp.topMargin = dp(10);
+        chooseHistoryDateLp.bottomMargin = dp(10);
+        history.addView(chooseHistoryDate, chooseHistoryDateLp);
         Calendar cursor = Calendar.getInstance();
         for (int i = 0; i < 31; i++) {
             String key = keyForDate(cursor.getTime());
@@ -1004,13 +1009,16 @@ public class MainActivity extends Activity {
             row.addView(info, infoLp);
             String dateText = new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(cursor.getTime());
             info.addView(text(dateText, 13, color("#18372E"), true));
-            String detail = log == null || office <= 0 ? "No office record"
-                    : fmtMillis(office) + " in office" + (commute > 0 ? "  •  " + fmtMillis(commute) + " commute" : "")
+            String detail = log == null || (office <= 0 && commute <= 0) ? "No attendance or commute record"
+                    : (office > 0 ? fmtMillis(office) + " in office" : "")
+                    + (office > 0 && commute > 0 ? "  •  " : "")
+                    + (commute > 0 ? fmtMillis(commute) + " commute" : "")
                     + (hasOpenOfficeSession(log) ? "  •  active" : "");
             info.addView(text(detail, 10, color("#687A70"), false));
 
-            TextView marker = text(log != null && office > 0 ? "●" : "○", 16,
-                    log != null && office > 0 ? color("#2E8060") : color("#A8BAAE"), true);
+            boolean hasRecordedTime = office > 0 || commute > 0;
+            TextView marker = text(log != null && hasRecordedTime ? "●" : "○", 16,
+                    log != null && hasRecordedTime ? color("#2E8060") : color("#A8BAAE"), true);
             row.addView(marker, new LinearLayout.LayoutParams(dp(24), -2));
             if (log != null) {
                 String detailDate = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(cursor.getTime());
@@ -5301,6 +5309,32 @@ public class MainActivity extends Activity {
 
     private void showAttendanceHistory() {
         switchPage("office");
+    }
+
+    /**
+     * Opens any historical date, not just the rolling 31-day ledger. A date with
+     * no existing entry opens a blank editor so a missed record can be entered.
+     */
+    private void chooseAttendanceHistoryDate() {
+        Calendar initial = Calendar.getInstance();
+        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar chosen = Calendar.getInstance();
+            chosen.clear();
+            chosen.set(year, month, day, 12, 0, 0);
+            String dayKey = keyForDate(chosen.getTime());
+            Date parsed = parseDateKey(dayKey);
+            String label = parsed == null ? dayKey
+                    : new SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(parsed);
+            JSONObject record = getOfficeDay(dayKey, false);
+            if (record == null) {
+                editAttendanceDay(dayKey);
+            } else {
+                showAttendanceDayDetail(label, dayKey, record);
+            }
+        }, initial.get(Calendar.YEAR), initial.get(Calendar.MONTH), initial.get(Calendar.DAY_OF_MONTH));
+        picker.setTitle("Choose attendance date");
+        picker.getDatePicker().setMaxDate(System.currentTimeMillis());
+        picker.show();
     }
 
     private void showAttendanceDayDetail(String date, String dayKey, JSONObject day) {

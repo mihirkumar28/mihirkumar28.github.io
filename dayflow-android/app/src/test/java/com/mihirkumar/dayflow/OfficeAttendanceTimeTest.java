@@ -4,7 +4,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Locale;
 
 import static org.junit.Assert.*;
 
@@ -60,6 +62,22 @@ public class OfficeAttendanceTimeTest {
         assertEquals(35, c.get(Calendar.MINUTE));
         assertEquals(0, c.get(Calendar.SECOND));
         assertEquals(0, c.get(Calendar.MILLISECOND));
+    }
+
+    @Test public void editingDateOlderThanTheVisibleLedgerPreservesThatHistoricalDate() throws Exception {
+        Calendar selected = Calendar.getInstance();
+        selected.add(Calendar.DAY_OF_YEAR, -90);
+        String oldDayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(selected.getTime());
+
+        long timestamp = OfficeAttendanceTime.timestampForDayAndTime(oldDayKey, 7, 45);
+        Calendar actual = Calendar.getInstance();
+        actual.setTimeInMillis(timestamp);
+
+        assertEquals(selected.get(Calendar.YEAR), actual.get(Calendar.YEAR));
+        assertEquals(selected.get(Calendar.MONTH), actual.get(Calendar.MONTH));
+        assertEquals(selected.get(Calendar.DAY_OF_MONTH), actual.get(Calendar.DAY_OF_MONTH));
+        assertEquals(7, actual.get(Calendar.HOUR_OF_DAY));
+        assertEquals(45, actual.get(Calendar.MINUTE));
     }
 
     @Test public void sessionUpdaterRejectsWrongFieldNames() throws Exception {
