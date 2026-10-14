@@ -79,6 +79,33 @@ final class OfficeAttendanceTime {
                 + intervalDuration(day.optLong("commuteOutStart", 0L), day.optLong("commuteOutEnd", 0L), now);
     }
 
+    /**
+     * Returns {officeMillis, commuteMillis, recordedDays} for inclusive yyyy-MM-dd bounds.
+     * Only today's open sessions accrue time; old open sessions are never carried forward.
+     */
+    static long[] totalsForDateRange(JSONArray records, String fromDateInclusive,
+                                     String throughDateInclusive, String todayKey, long now) {
+        long officeTotal = 0L;
+        long commuteTotal = 0L;
+        long recordedDays = 0L;
+        if (records == null || fromDateInclusive == null || throughDateInclusive == null) {
+            return new long[]{0L, 0L, 0L};
+        }
+        for (int i = 0; i < records.length(); i++) {
+            JSONObject day = records.optJSONObject(i);
+            if (day == null) continue;
+            String key = day.optString("date", "");
+            if (key.compareTo(fromDateInclusive) < 0 || key.compareTo(throughDateInclusive) > 0) continue;
+            long referenceTime = key.equals(todayKey) ? now : 0L;
+            long office = officeDuration(day.optJSONArray("sessions"), referenceTime);
+            long commute = commuteDuration(day, referenceTime);
+            officeTotal += office;
+            commuteTotal += commute;
+            if (office > 0L || commute > 0L) recordedDays++;
+        }
+        return new long[]{officeTotal, commuteTotal, recordedDays};
+    }
+
     static long timestampForDayAndTime(String dayKey, int hour, int minute) {
         Calendar calendar = Calendar.getInstance();
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.US);

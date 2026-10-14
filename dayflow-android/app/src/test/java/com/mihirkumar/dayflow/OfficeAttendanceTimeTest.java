@@ -98,6 +98,36 @@ public class OfficeAttendanceTimeTest {
         assertEquals(45, actual.get(Calendar.MINUTE));
     }
 
+    @Test public void cumulativeTotalsIncludeEveryDateInRangeAndRefreshAfterEdits() throws Exception {
+        JSONObject monday = new JSONObject().put("date", "2026-10-12")
+                .put("sessions", new JSONArray().put(new JSONObject().put("in",
+                        OfficeAttendanceTime.timestampForDayAndTime("2026-10-12", 9, 0))
+                        .put("out", OfficeAttendanceTime.timestampForDayAndTime("2026-10-12", 17, 0))))
+                .put("commuteInStart", OfficeAttendanceTime.timestampForDayAndTime("2026-10-12", 8, 0))
+                .put("commuteInEnd", OfficeAttendanceTime.timestampForDayAndTime("2026-10-12", 9, 0));
+        JSONObject tuesday = new JSONObject().put("date", "2026-10-13")
+                .put("sessions", new JSONArray().put(new JSONObject().put("in",
+                        OfficeAttendanceTime.timestampForDayAndTime("2026-10-13", 10, 0))
+                        .put("out", OfficeAttendanceTime.timestampForDayAndTime("2026-10-13", 15, 0))))
+                .put("commuteOutStart", OfficeAttendanceTime.timestampForDayAndTime("2026-10-13", 17, 0))
+                .put("commuteOutEnd", OfficeAttendanceTime.timestampForDayAndTime("2026-10-13", 18, 0));
+        JSONArray records = new JSONArray().put(monday).put(tuesday);
+
+        long[] all = OfficeAttendanceTime.totalsForDateRange(records, "0000-01-01",
+                "2026-10-14", "2026-10-14", 0L);
+        assertEquals(13L * HOUR, all[0]);
+        assertEquals(2L * HOUR, all[1]);
+        assertEquals(2L, all[2]);
+
+        tuesday.getJSONArray("sessions").getJSONObject(0).put("out",
+                OfficeAttendanceTime.timestampForDayAndTime("2026-10-13", 16, 0));
+        long[] updatedWeek = OfficeAttendanceTime.totalsForDateRange(records, "2026-10-12",
+                "2026-10-14", "2026-10-14", 0L);
+        assertEquals(14L * HOUR, updatedWeek[0]);
+        assertEquals(2L * HOUR, updatedWeek[1]);
+        assertEquals(2L, updatedWeek[2]);
+    }
+
     @Test public void sessionUpdaterRejectsWrongFieldNames() throws Exception {
         try {
             OfficeAttendanceTime.setSessionTimestamp(new JSONObject(), "officeIn", 123L);
