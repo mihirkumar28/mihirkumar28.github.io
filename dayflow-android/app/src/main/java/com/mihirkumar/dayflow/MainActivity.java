@@ -2135,17 +2135,10 @@ public class MainActivity extends Activity {
         String today = todayKey();
         boolean overdue = RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, today);
         if ("track".equals(node.type) || "subject".equals(node.type)) {
-            int[] progress = roadmapNodeProgress(node);
-            String line = progress[0] + "/" + progress[1] + " items complete";
-            if ("track".equals(node.type) && node.subtitle != null && !node.subtitle.isEmpty()) {
-                line += " · " + node.subtitle;
-            } else if ("subject".equals(node.type) && node.subtitle != null && !node.subtitle.isEmpty()) {
-                line = node.subtitle + " · " + line;
-            }
-            return line;
+            return node.subtitle == null ? "" : node.subtitle;
         }
         if ("group".equals(node.type)) {
-            if (node.groupKind != null && node.groupKind.equals("goal-month")) return node.title;
+            if ("goal-month".equals(node.groupKind)) return "Expand to see or add this month's goals";
             return node.subtitle == null ? "" : node.subtitle;
         }
         if ("topic".equals(node.type)) {
@@ -2394,10 +2387,18 @@ public class MainActivity extends Activity {
             }
         }
         if (!"group".equals(node.type)) return null;
-        if ("current-goals".equals(node.groupKind)
-                || "upcoming-goals".equals(node.groupKind)
-                || "past-goals".equals(node.groupKind)) {
-            return () -> editMonthlyGoal(null, node.goalTrack);
+        if ("current-goals".equals(node.groupKind)) {
+            return () -> editMonthlyGoal(null, node.goalTrack, node.month);
+        }
+        if ("upcoming-goals".equals(node.groupKind) || "past-goals".equals(node.groupKind)) {
+            return () -> {
+                String targetMonth = node.children.isEmpty()
+                        ? selectedGoalMonth : node.children.get(0).month;
+                editMonthlyGoal(null, node.goalTrack, targetMonth);
+            };
+        }
+        if ("goal-month".equals(node.groupKind)) {
+            return () -> editMonthlyGoal(null, node.goalTrack, node.month);
         }
         if ("topics".equals(node.groupKind)) return () -> editSyllabusTopic(null, node.subjectKey);
         if ("milestones".equals(node.groupKind)) return () -> editRoadmapMilestone(null, node.milestoneTrack);
@@ -2711,12 +2712,17 @@ public class MainActivity extends Activity {
     }
 
     private void editMonthlyGoal(MonthlyGoal existing) {
-        editMonthlyGoal(existing, null);
+        editMonthlyGoal(existing, null, null);
     }
 
     private void editMonthlyGoal(MonthlyGoal existing, String preferredTrack) {
+        editMonthlyGoal(existing, preferredTrack, null);
+    }
+
+    private void editMonthlyGoal(MonthlyGoal existing, String preferredTrack, String preferredMonth) {
         final String[] draftMonth = {existing == null
-                ? (selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth)
+                ? (preferredMonth != null ? preferredMonth
+                    : (selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth))
                 : existing.month};
         LinearLayout form = vertical();
         form.setPadding(dp(20), dp(4), dp(20), dp(10));
