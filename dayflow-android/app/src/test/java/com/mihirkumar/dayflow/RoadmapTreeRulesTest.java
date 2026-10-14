@@ -122,6 +122,27 @@ public class RoadmapTreeRulesTest {
                 "General Studies", 0L, "2026-10", false, "2026-09"));
     }
 
+    @Test public void emptyPlannedSourceMonthRemainsInUpcomingRoadmap() {
+        // November has no remaining goal after its last goal moves, but it remains a planned slot.
+        assertEquals(java.util.Arrays.asList("2026-11", "2026-12", "2027-01"),
+                RoadmapTreeRules.monthKeysForPeriod("2026-10", true,
+                        java.util.Arrays.asList("2026-12"),
+                        java.util.Arrays.asList("2026-10", "2026-11", "2026-12", "2027-01")));
+    }
+
+    @Test public void emptyPlannedSourceMonthRemainsInPastRoadmap() {
+        assertEquals(java.util.Arrays.asList("2026-11", "2026-10"),
+                RoadmapTreeRules.monthKeysForPeriod("2026-12", false,
+                        java.util.Arrays.asList("2026-10"),
+                        java.util.Arrays.asList("2026-10", "2026-11", "2026-12", "2027-01")));
+    }
+
+    @Test public void malformedSelectedMonthHasNoDerivedPeriodSlots() {
+        assertTrue(RoadmapTreeRules.monthKeysForPeriod("bad-month", true,
+                java.util.Arrays.asList("2026-11"),
+                java.util.Arrays.asList("2026-12")).isEmpty());
+    }
+
     @Test public void branchProgressCombinesCompletedAndIncompleteLeaves() {
         int[] total = RoadmapTreeRules.combineProgress(
                 RoadmapTreeRules.leafProgress(true),
