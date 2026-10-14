@@ -2208,22 +2208,28 @@ public class MainActivity extends Activity {
     }
 
     private RoadmapNode roadmapGoalTreeNode(String rootKey, MonthlyGoal goal, ArrayList<MonthlyGoal> all) {
-        if (MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus)) {
-            RoadmapNode group = newRoadmapNode(roadmapId("split-goal", rootKey, goal.track,
+        boolean archived = MonthlyGoalLifecycle.RETIRED.equals(goal.lifecycleStatus);
+        boolean hasChildren = false;
+        for (MonthlyGoal child : all) if (child.parentGoalId == goal.id
+                && Objects.equals(goal.month, child.month)) { hasChildren = true; break; }
+        if (MonthlyGoalLifecycle.SPLIT_PARENT.equals(goal.lifecycleStatus) || (archived && hasChildren)) {
+            RoadmapNode group = newRoadmapNode(roadmapId(
+                    archived ? "retired-split-goal" : "split-goal", rootKey, goal.track,
                     Long.toString(goal.id)), goal.title, "group");
             group.rootKey = rootKey; group.goalTrack = goal.track; group.month = goal.month;
-            group.groupKind = "split-goal"; group.item = goal;
-            group.subtitle = "Smaller goals · originally planned "
+            group.groupKind = archived ? "retired-split-goal" : "split-goal"; group.item = goal;
+            group.subtitle = (archived ? "Archived split goal" : "Smaller goals")
+                    + " · originally planned "
                     + monthLabelForKey(goal.originalMonth == null ? goal.month : goal.originalMonth);
             for (MonthlyGoal child : all) {
                 if (child.parentGoalId == goal.id && Objects.equals(goal.month, child.month)
-                        && !MonthlyGoalLifecycle.RETIRED.equals(child.lifecycleStatus)) {
+                        && (archived || !MonthlyGoalLifecycle.RETIRED.equals(child.lifecycleStatus))) {
                     group.children.add(roadmapGoalTreeNode(rootKey, child, all));
                 }
             }
             return group;
         }
-        if (MonthlyGoalLifecycle.RETIRED.equals(goal.lifecycleStatus)) return roadmapArchivedGoalLeaf(rootKey, goal);
+        if (archived) return roadmapArchivedGoalLeaf(rootKey, goal);
         return roadmapGoalLeaf(rootKey, goal);
     }
 
@@ -2316,6 +2322,10 @@ public class MainActivity extends Activity {
             if ("split-goal".equals(node.groupKind)) {
                 return (node.subtitle == null ? "Split into smaller goals" : node.subtitle)
                         + " · progress counts smaller goals only";
+            }
+            if ("retired-split-goal".equals(node.groupKind)) {
+                return (node.subtitle == null ? "Archived split goal" : node.subtitle)
+                        + " · excluded from active progress";
             }
             return node.subtitle == null ? "" : node.subtitle;
         }
@@ -3220,12 +3230,20 @@ public class MainActivity extends Activity {
 
     private void restoreMonthlyGoal(MonthlyGoal goal) {
         ArrayList<MonthlyGoal> all = readMonthlyGoals();
-        for (MonthlyGoal item : all) if (item.id == goal.id) {
-            item.lifecycleStatus = MonthlyGoalLifecycle.ACTIVE; item.done = false; item.completedAt = 0L;
+        boolean hasDescendants = false;
+        for (MonthlyGoal item : all) if (isDescendantOf(all, item, goal.id)) { hasDescendants = true; break; }
+        for (MonthlyGoal item : all) {
+            if (item.id != goal.id && !isDescendantOf(all, item, goal.id)) continue;
+            boolean hasChildren = false;
+            for (MonthlyGoal child : all) if (child.parentGoalId == item.id) { hasChildren = true; break; }
+            item.lifecycleStatus = hasChildren ? MonthlyGoalLifecycle.SPLIT_PARENT : MonthlyGoalLifecycle.ACTIVE;
+            item.done = false;
+            item.completedAt = 0L;
             recordMonthlyGoalEvent(item, "Restored to active plan");
         }
         persistMonthlyGoals(all);
-        Toast.makeText(this, "Goal restored.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, hasDescendants
+                ? "Goal group and its smaller goals restored." : "Goal restored.", Toast.LENGTH_SHORT).show();
     }
 
     private String currentMonthKey() { return monthKeyFromDate(todayKey()); }
