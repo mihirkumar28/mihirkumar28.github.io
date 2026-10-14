@@ -33,6 +33,24 @@ public class OfficeAttendanceTimeTest {
         assertEquals(16 * HOUR, session.optLong("out"));
     }
 
+    @Test public void invalidHistoricalIntervalsAreFlaggedForCorrection() throws Exception {
+        JSONObject day = new JSONObject().put("sessions", new JSONArray()
+                .put(new JSONObject().put("in", 9 * HOUR).put("out", 5 * HOUR)))
+                .put("commuteInStart", 8 * HOUR)
+                .put("commuteInEnd", 9 * HOUR)
+                .put("commuteOutStart", 18 * HOUR)
+                .put("commuteOutEnd", 17 * HOUR);
+
+        assertTrue(OfficeAttendanceTime.hasInvalidRecordedTimes(day));
+        assertTrue(OfficeAttendanceTime.hasInvalidClosedInterval(9 * HOUR, 5 * HOUR));
+        assertFalse(OfficeAttendanceTime.hasInvalidClosedInterval(9 * HOUR, 0));
+        assertFalse(OfficeAttendanceTime.hasInvalidClosedInterval(9 * HOUR, 10 * HOUR));
+
+        day.getJSONArray("sessions").getJSONObject(0).put("out", 17 * HOUR);
+        day.put("commuteOutEnd", 19 * HOUR);
+        assertFalse(OfficeAttendanceTime.hasInvalidRecordedTimes(day));
+    }
+
     @Test public void openSessionRunsUntilNowButClosedInvalidSessionDoesNot() throws Exception {
         JSONObject open = new JSONObject().put("in", 9 * HOUR).put("out", 0);
         JSONObject invalidClosed = new JSONObject().put("in", 17 * HOUR).put("out", 16 * HOUR);

@@ -5337,6 +5337,29 @@ public class MainActivity extends Activity {
         picker.show();
     }
 
+    private long[] attendanceTotalsForWeek(String mondayKey) {
+        long officeTotal = 0L;
+        long commuteTotal = 0L;
+        Date startDate = parseDateKey(mondayKey);
+        if (startDate == null) return new long[]{officeTotal, commuteTotal};
+        Calendar cursor = Calendar.getInstance();
+        cursor.setTime(startDate);
+        cursor.set(Calendar.HOUR_OF_DAY, 12);
+        cursor.set(Calendar.MINUTE, 0);
+        cursor.set(Calendar.SECOND, 0);
+        cursor.set(Calendar.MILLISECOND, 0);
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < 7; i++) {
+            String key = keyForDate(cursor.getTime());
+            JSONObject record = getOfficeDay(key, false);
+            long referenceTime = key.equals(todayKey()) ? now : 0L;
+            officeTotal += officeDuration(record, referenceTime);
+            commuteTotal += commuteDuration(record, referenceTime);
+            cursor.add(Calendar.DAY_OF_YEAR, 1);
+        }
+        return new long[]{officeTotal, commuteTotal};
+    }
+
     private void showAttendanceDayDetail(String date, String dayKey, JSONObject day) {
         try {
             if (day == null) {
@@ -5354,6 +5377,39 @@ public class MainActivity extends Activity {
             summary.addView(text("Office  " + fmtMillis(office), 21, color("#18372E"), true));
             summary.addView(text("Commute  " + fmtMillis(commute), 13, color("#687A70"), false));
             content.addView(summary);
+
+            if (OfficeAttendanceTime.hasInvalidRecordedTimes(day)) {
+                LinearLayout warning = surfaceCard();
+                warning.addView(text("CHECK RECORDED TIMES", 10, color("#A76821"), true));
+                warning.addView(text("At least one end time is earlier than its start time, so that interval currently contributes 0m. For example, 5:05 PM is 17:05 in a 24-hour clock. Edit the affected time before saving.",
+                        12, color("#687A70"), false));
+                LinearLayout.LayoutParams warningLp = new LinearLayout.LayoutParams(-1, -2);
+                warningLp.topMargin = dp(10);
+                content.addView(warning, warningLp);
+            }
+
+            Calendar weekStart = Calendar.getInstance();
+            Date selectedHistoryDate = parseDateKey(dayKey);
+            if (selectedHistoryDate != null) weekStart.setTime(selectedHistoryDate);
+            weekStart.set(Calendar.HOUR_OF_DAY, 12);
+            weekStart.set(Calendar.MINUTE, 0);
+            weekStart.set(Calendar.SECOND, 0);
+            weekStart.set(Calendar.MILLISECOND, 0);
+            int weekday = weekStart.get(Calendar.DAY_OF_WEEK);
+            weekStart.add(Calendar.DAY_OF_YEAR, -(weekday == Calendar.SUNDAY ? 6 : weekday - Calendar.MONDAY));
+            Calendar weekEnd = (Calendar) weekStart.clone();
+            weekEnd.add(Calendar.DAY_OF_YEAR, 6);
+            long[] weekTotals = attendanceTotalsForWeek(keyForDate(weekStart.getTime()));
+            String weekRange = new SimpleDateFormat("d MMM", Locale.getDefault()).format(weekStart.getTime())
+                    + " – " + new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(weekEnd.getTime());
+            LinearLayout weekly = surfaceCard();
+            weekly.addView(text("WEEKLY CUMULATIVE  ·  " + weekRange.toUpperCase(Locale.getDefault()),
+                    10, color("#2E8060"), true));
+            weekly.addView(text("Office  " + fmtMillis(weekTotals[0]), 18, color("#18372E"), true));
+            weekly.addView(text("Commute  " + fmtMillis(weekTotals[1]), 12, color("#687A70"), false));
+            LinearLayout.LayoutParams weeklyLp = new LinearLayout.LayoutParams(-1, -2);
+            weeklyLp.topMargin = dp(10);
+            content.addView(weekly, weeklyLp);
 
             TextView sessionsTitle = text("OFFICE SESSIONS", 10, color("#2E8060"), true);
             LinearLayout.LayoutParams stp = new LinearLayout.LayoutParams(-1, -2);
@@ -5456,6 +5512,17 @@ public class MainActivity extends Activity {
 
             showFullScreenEditor("OFFICE RECORD", "Edit attendance",
                     "Correct the exact timestamps. Totals are recalculated from these saved times.", content, () -> {
+                        if (OfficeAttendanceTime.hasInvalidClosedInterval(
+                                sessionForEdit.optLong(OfficeAttendanceTime.SESSION_IN, 0L),
+                                sessionForEdit.optLong(OfficeAttendanceTime.SESSION_OUT, 0L))
+                                || OfficeAttendanceTime.hasInvalidCommuteIntervals(day)) {
+                            new AlertDialog.Builder(this)
+                                    .setTitle("Check the recorded times")
+                                    .setMessage("An end time is earlier than its start time. Correct it before saving; use the PM option for an afternoon checkout such as 5:05 PM.")
+                                    .setPositiveButton("Review times", null)
+                                    .show();
+                            return false;
+                        }
                         saveOfficeDay(day);
                         render();
                         renderOfficePage();
@@ -5510,7 +5577,7 @@ public class MainActivity extends Activity {
                 debugLog("Attendance time edit failed: " + e.getMessage());
                 Toast.makeText(this, "Couldn't update that time.", Toast.LENGTH_SHORT).show();
             }
-        }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true);
+        }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), false);
         picker.show();
     }
 

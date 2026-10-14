@@ -31,6 +31,34 @@ final class OfficeAttendanceTime {
         return effectiveEnd > start ? effectiveEnd - start : 0L;
     }
 
+    /** Returns true when a completed interval has an end at or before its start. */
+    static boolean hasInvalidClosedInterval(long start, long end) {
+        return start > 0L && end > 0L && end <= start;
+    }
+
+    static boolean hasInvalidOfficeSessions(JSONArray sessions) {
+        if (sessions == null) return false;
+        for (int i = 0; i < sessions.length(); i++) {
+            JSONObject session = sessions.optJSONObject(i);
+            if (session != null && hasInvalidClosedInterval(
+                    session.optLong(SESSION_IN, 0L), session.optLong(SESSION_OUT, 0L))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean hasInvalidCommuteIntervals(JSONObject day) {
+        if (day == null) return false;
+        return hasInvalidClosedInterval(day.optLong("commuteInStart", 0L), day.optLong("commuteInEnd", 0L))
+                || hasInvalidClosedInterval(day.optLong("commuteOutStart", 0L), day.optLong("commuteOutEnd", 0L));
+    }
+
+    static boolean hasInvalidRecordedTimes(JSONObject day) {
+        return day != null && (hasInvalidOfficeSessions(day.optJSONArray("sessions"))
+                || hasInvalidCommuteIntervals(day));
+    }
+
     static long officeDuration(JSONArray sessions, long now) {
         if (sessions == null) return 0L;
         long total = 0L;
