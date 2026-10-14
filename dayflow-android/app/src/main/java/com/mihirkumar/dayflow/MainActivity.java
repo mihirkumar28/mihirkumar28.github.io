@@ -60,6 +60,7 @@ public class MainActivity extends Activity {
     private static final String INTERVIEW_PLAN_START_KEY = "softwareInterviewPlanStart";
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
     private static final String MONTHLY_GOALS_KEY = "monthlyGoals";
+    private static final String MONTHLY_PLAN_MIGRATION_KEY = "monthlyGoalsSourcePlanMigration_v1";
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
     private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v1";
     private static final String CSE_CHECKPOINT_KEY = "cseCheckpointDate";
@@ -3239,6 +3240,71 @@ public class MainActivity extends Activity {
         if (!prefs.contains(MONTHLY_GOALS_KEY)) {
             persistMonthlyGoals(seedDefaultMonthlyGoals());
         }
+        reconcileMonthlyGoalsWithSourcePlans();
+    }
+
+    /**
+     * One-time, non-destructive migration from the older generic starter rows to the
+     * saved source-aligned monthly plan. Only exact old starter fingerprints are
+     * renamed; completed state and IDs are retained. User-edited/custom goals stay intact.
+     */
+    private void reconcileMonthlyGoalsWithSourcePlans() {
+        SharedPreferences prefs = getPrefs();
+        if (prefs.getBoolean(MONTHLY_PLAN_MIGRATION_KEY, false)) return;
+
+        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+        HashSet<String> legacyStarterFingerprints = new HashSet<>();
+        for (MonthlyGoal legacy : seedDefaultMonthlyGoals()) {
+            legacyStarterFingerprints.add(monthlyGoalFingerprint(legacy.track, legacy.title, legacy.target));
+        }
+
+        boolean changed = false;
+        for (MonthlyGoal goal : goals) {
+            if (!legacyStarterFingerprints.contains(
+                    monthlyGoalFingerprint(goal.track, goal.title, goal.target))) continue;
+            String[] planned = RoadmapMonthlyPlan.findGoal(goal.month, goal.track);
+            if (planned == null) continue;
+            if (!planned[1].equals(goal.title) || !planned[2].equals(goal.target == null ? "" : goal.target)) {
+                goal.title = planned[1];
+                goal.target = planned[2];
+                // Keep goal.id, goal.month, track and goal.done to preserve history.
+                changed = true;
+            }
+        }
+
+        long nextId = System.currentTimeMillis();
+        for (MonthlyGoal goal : goals) nextId = Math.max(nextId, goal.id + 1L);
+        for (int i = 0; i < RoadmapMonthlyPlan.monthCount(); i++) {
+            String monthKey = RoadmapMonthlyPlan.monthKeyAt(i);
+            for (String[] row : RoadmapMonthlyPlan.rowsForMonth(monthKey)) {
+                boolean plannedGoalExists = false;
+                for (MonthlyGoal existing : goals) {
+                    if (monthKey.equals(existing.month)
+                            && row[0].equals(existing.track)
+                            && row[1].equals(existing.title)) {
+                        plannedGoalExists = true;
+                        break;
+                    }
+                }
+                if (!plannedGoalExists) {
+                    goals.add(new MonthlyGoal(nextId++, monthKey, row[0], row[1], row[2], false));
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed && !persistMonthlyGoalsRaw(goals)) {
+            debugLog("Monthly roadmap plan migration failed; will retry at next launch.");
+            return;
+        }
+        prefs.edit().putBoolean(MONTHLY_PLAN_MIGRATION_KEY, true).apply();
+        debugLog("Monthly roadmap plans reconciled without deleting existing goal history.");
+    }
+
+    private String monthlyGoalFingerprint(String track, String title, String target) {
+        return (track == null ? "" : track) + "|"
+                + (title == null ? "" : title) + "|"
+                + (target == null ? "" : target);
     }
 
     private ArrayList<RoadmapMilestone> defaultRoadmapMilestones(boolean tier34Done, boolean tier12Done) {
@@ -3371,7 +3437,7 @@ public class MainActivity extends Activity {
         return goals;
     }
 
-    private void persistMonthlyGoalsRaw(ArrayList<MonthlyGoal> goals) {
+    private boolean persistMonthlyGoalsRaw(ArrayList<MonthlyGoal> goals) {
         JSONArray data = new JSONArray();
         try {
             for (MonthlyGoal goal : goals) {
@@ -3385,8 +3451,10 @@ public class MainActivity extends Activity {
                 data.put(item);
             }
             getPrefs().edit().putString(MONTHLY_GOALS_KEY, data.toString()).apply();
+            return true;
         } catch (Exception e) {
             debugLog("Monthly starter goals save failed: " + e.getMessage());
+            return false;
         }
     }
 
