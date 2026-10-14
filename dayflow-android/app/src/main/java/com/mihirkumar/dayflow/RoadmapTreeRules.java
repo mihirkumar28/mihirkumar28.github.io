@@ -65,6 +65,10 @@ final class RoadmapTreeRules {
         return "General Studies".equals(draggedTrack);
     }
 
+    /** Empty target months receive a root goal; populated months use the parent-selection flow. */
+    static boolean shouldMoveDroppedGoalAsRoot(boolean hasOtherActiveGoalsInTargetMonth) {
+        return !hasOtherActiveGoalsInTargetMonth;
+    }
 
     /**
      * Whether an eligible root goal can be nested under a root goal in the destination month.
