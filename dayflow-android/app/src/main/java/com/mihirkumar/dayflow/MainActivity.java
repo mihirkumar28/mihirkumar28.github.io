@@ -169,12 +169,14 @@ public class MainActivity extends Activity {
         String subject, title;
         boolean done;
         long completedAt;
+        int sortOrder;
         SyllabusTopic(long id, String subject, String title, boolean done, long completedAt) {
             this.id = id;
             this.subject = subject;
             this.title = title;
             this.done = done;
             this.completedAt = completedAt;
+            this.sortOrder = 0;
         }
     }
 
@@ -183,6 +185,7 @@ public class MainActivity extends Activity {
         String month, track, title, target;
         String originalMonth, lifecycleStatus;
         long completedAt, parentGoalId;
+        int sortOrder;
         boolean done;
         final ArrayList<String> history = new ArrayList<>();
 
@@ -2112,8 +2115,7 @@ public class MainActivity extends Activity {
             topicGroup.subjectKey = subjectKey;
             topicGroup.groupKind = "topics";
             topicGroup.subtitle = subjectTopics.size() + " syllabus item" + (subjectTopics.size() == 1 ? "" : "s");
-            subjectTopics.sort(Comparator.comparing(t -> t.title == null ? "" : t.title,
-                    String.CASE_INSENSITIVE_ORDER));
+            subjectTopics.sort(syllabusTopicOrderComparator());
             for (SyllabusTopic topic : subjectTopics) {
                 RoadmapNode leaf = newRoadmapNode(roadmapId("topic", rootKey, subjectKey,
                         Long.toString(topic.id)), topic.title, "topic");
@@ -2141,9 +2143,8 @@ public class MainActivity extends Activity {
             else if (goal.month.compareTo(selectedMonth) > 0) future.add(goal);
             else past.add(goal);
         }
-        Comparator<MonthlyGoal> byTitle = Comparator.comparing(g -> g.title == null ? "" : g.title,
-                String.CASE_INSENSITIVE_ORDER);
-        current.sort(byTitle);
+        Comparator<MonthlyGoal> byOrder = monthlyGoalOrderComparator(goals);
+        current.sort(byOrder);
         if (!current.isEmpty()) {
             int count = 0;
             for (MonthlyGoal goal : current) count += countScheduledGoalLeaves(goal, goals);
@@ -2157,7 +2158,7 @@ public class MainActivity extends Activity {
         addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, future, "Upcoming goals", "upcoming-goals", true, goals);
         addRoadmapMonthGoalGroup(parent, rootKey, goalTrack, past, "Past goals", "past-goals", false, goals);
         if (!retired.isEmpty()) {
-            retired.sort(byTitle);
+            retired.sort(byOrder);
             RoadmapNode archive = newRoadmapNode(roadmapId("group", "retired-goals", rootKey, goalTrack),
                     "Retired goals · " + retired.size(), "group");
             archive.rootKey = rootKey; archive.goalTrack = goalTrack; archive.groupKind = "retired-goals";
@@ -2194,8 +2195,7 @@ public class MainActivity extends Activity {
         for (String monthKey : orderedMonths) {
             ArrayList<MonthlyGoal> inMonth = new ArrayList<>();
             for (MonthlyGoal goal : goals) if (monthKey.equals(goal.month)) inMonth.add(goal);
-            inMonth.sort(Comparator.comparing(g -> g.title == null ? "" : g.title,
-                    String.CASE_INSENSITIVE_ORDER));
+            inMonth.sort(monthlyGoalOrderComparator(allGoals));
             int count = 0;
             for (MonthlyGoal goal : inMonth) count += countScheduledGoalLeaves(goal, allGoals);
             RoadmapNode month = newRoadmapNode(roadmapId("group", "goal-month", rootKey, goalTrack, monthKey),
@@ -2221,12 +2221,15 @@ public class MainActivity extends Activity {
             group.subtitle = (archived ? "Archived split goal" : "Smaller goals")
                     + " · originally planned "
                     + monthLabelForKey(goal.originalMonth == null ? goal.month : goal.originalMonth);
+            ArrayList<MonthlyGoal> children = new ArrayList<>();
             for (MonthlyGoal child : all) {
                 if (child.parentGoalId == goal.id && Objects.equals(goal.month, child.month)
                         && (archived || !MonthlyGoalLifecycle.RETIRED.equals(child.lifecycleStatus))) {
-                    group.children.add(roadmapGoalTreeNode(rootKey, child, all));
+                    children.add(child);
                 }
             }
+            children.sort(monthlyGoalOrderComparator(all));
+            for (MonthlyGoal child : children) group.children.add(roadmapGoalTreeNode(rootKey, child, all));
             return group;
         }
         if (archived) return roadmapArchivedGoalLeaf(rootKey, goal);
@@ -2690,8 +2693,7 @@ public class MainActivity extends Activity {
                 focus.add(goal);
             }
         }
-        focus.sort(Comparator.comparingInt((MonthlyGoal g) -> monthlyGoalTrackOrder(g.track))
-                .thenComparing(g -> g.title == null ? "" : g.title, String.CASE_INSENSITIVE_ORDER));
+        focus.sort(monthlyGoalOrderComparator(goals));
 
         int done = 0;
         for (MonthlyGoal goal : focus) if (goal.done) done++;
@@ -2756,10 +2758,32 @@ public class MainActivity extends Activity {
                         9, color("#687A70"), false));
             }
 
+            Button moveEarlier = actionButton("↑", color("#2E8060"), "#F3F7F3");
+            moveEarlier.setTextSize(12);
+            moveEarlier.setEnabled(canMoveMonthlyGoal(goal, -1));
+            moveEarlier.setContentDescription("Move " + goal.title
+                    + " earlier within this month's " + goal.track + " goal group");
+            LinearLayout.LayoutParams moveLp = new LinearLayout.LayoutParams(dp(26), dp(30));
+            moveLp.leftMargin = dp(2);
+            row.addView(moveEarlier, moveLp);
+            moveEarlier.setOnClickListener(v -> moveMonthlyGoal(goal, -1));
+
+            Button moveLater = actionButton("↓", color("#2E8060"), "#F3F7F3");
+            moveLater.setTextSize(12);
+            moveLater.setEnabled(canMoveMonthlyGoal(goal, 1));
+            moveLater.setContentDescription("Move " + goal.title
+                    + " later within this month's " + goal.track + " goal group");
+            LinearLayout.LayoutParams moveLaterLp = new LinearLayout.LayoutParams(dp(26), dp(30));
+            moveLaterLp.leftMargin = dp(2);
+            row.addView(moveLater, moveLaterLp);
+            moveLater.setOnClickListener(v -> moveMonthlyGoal(goal, 1));
+
             Button viewInTree = actionButton("↗", color("#2E8060"), "#F3F7F3");
             viewInTree.setTextSize(13);
             viewInTree.setContentDescription("View " + goal.title + " in roadmap tree");
-            row.addView(viewInTree, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            LinearLayout.LayoutParams treeLp = new LinearLayout.LayoutParams(dp(30), dp(30));
+            treeLp.leftMargin = dp(2);
+            row.addView(viewInTree, treeLp);
             viewInTree.setOnClickListener(v -> openMonthlyGoalInRoadmap(goal));
 
             row.setContentDescription(goal.track + ": " + goal.title
@@ -2833,6 +2857,7 @@ public class MainActivity extends Activity {
     private void refreshSyllabusRows() {
         if (syllabusList == null) return;
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
+        topics.sort(syllabusTopicOrderComparator());
         syllabusList.removeAllViews();
         String query = syllabusQuery.trim().toLowerCase(Locale.US);
         int shown = 0;
@@ -2910,7 +2935,7 @@ public class MainActivity extends Activity {
         for (MonthlyGoal goal : goals) {
             if (selectedGoalMonth.equals(goal.month)) monthGoals.add(goal);
         }
-        Collections.sort(monthGoals, Comparator.comparingInt(g -> monthlyGoalTrackOrder(g.track)));
+        monthGoals.sort(monthlyGoalOrderComparator(goals));
         int done = 0;
         for (MonthlyGoal goal : monthGoals) if (goal.done) done++;
         if (goalMonthLabel != null) {
@@ -2980,6 +3005,138 @@ public class MainActivity extends Activity {
         return 4;
     }
 
+    private Comparator<MonthlyGoal> monthlyGoalOrderComparator(List<MonthlyGoal> source) {
+        final ArrayList<MonthlyGoal> all = new ArrayList<>(source);
+        return Comparator.comparingInt((MonthlyGoal g) -> monthlyGoalTrackOrder(g.track))
+                .thenComparingLong(g -> monthlyGoalRoot(all, g).sortOrder)
+                .thenComparingLong(g -> monthlyGoalRoot(all, g).id)
+                .thenComparingInt(g -> g.parentGoalId > 0L ? 1 : 0)
+                .thenComparingInt(g -> g.sortOrder)
+                .thenComparing(g -> g.title == null ? "" : g.title, String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private MonthlyGoal monthlyGoalRoot(List<MonthlyGoal> all, MonthlyGoal goal) {
+        MonthlyGoal current = goal;
+        HashSet<Long> visited = new HashSet<>();
+        while (current.parentGoalId > 0L && visited.add(current.id)) {
+            MonthlyGoal parent = null;
+            for (MonthlyGoal candidate : all) if (candidate.id == current.parentGoalId) {
+                parent = candidate; break;
+            }
+            if (parent == null) break;
+            current = parent;
+        }
+        return current;
+    }
+
+    private int nextMonthlyGoalSortOrder(List<MonthlyGoal> all, String month, String track, long parentId) {
+        int maximum = -100;
+        for (MonthlyGoal item : all) {
+            if (Objects.equals(month, item.month) && Objects.equals(track, item.track)
+                    && item.parentGoalId == parentId
+                    && !MonthlyGoalLifecycle.RETIRED.equals(item.lifecycleStatus)) {
+                maximum = Math.max(maximum, item.sortOrder);
+            }
+        }
+        return maximum + 100;
+    }
+
+    private ArrayList<MonthlyGoal> reorderableMonthlyGoalSiblings(MonthlyGoal target,
+                                                                    ArrayList<MonthlyGoal> all) {
+        ArrayList<MonthlyGoal> siblings = new ArrayList<>();
+        for (MonthlyGoal item : all) {
+            if (Objects.equals(target.month, item.month) && Objects.equals(target.track, item.track)
+                    && target.parentGoalId == item.parentGoalId
+                    && MonthlyGoalLifecycle.showInMonthlyPanel(item.lifecycleStatus)) {
+                siblings.add(item);
+            }
+        }
+        siblings.sort(Comparator.comparingInt((MonthlyGoal g) -> g.sortOrder)
+                .thenComparingLong(g -> g.id));
+        return siblings;
+    }
+
+    private boolean canMoveMonthlyGoal(MonthlyGoal target, int delta) {
+        if (target == null || delta == 0) return false;
+        ArrayList<MonthlyGoal> siblings = reorderableMonthlyGoalSiblings(target, readMonthlyGoals());
+        for (int i = 0; i < siblings.size(); i++) {
+            if (siblings.get(i).id == target.id) return i + delta >= 0 && i + delta < siblings.size();
+        }
+        return false;
+    }
+
+    private void moveMonthlyGoal(MonthlyGoal target, int delta) {
+        if (target == null || delta == 0) return;
+        ArrayList<MonthlyGoal> all = readMonthlyGoals();
+        MonthlyGoal stored = null;
+        for (MonthlyGoal item : all) if (item.id == target.id) { stored = item; break; }
+        if (stored == null) return;
+        ArrayList<MonthlyGoal> siblings = reorderableMonthlyGoalSiblings(stored, all);
+        int at = -1;
+        for (int i = 0; i < siblings.size(); i++) if (siblings.get(i).id == stored.id) { at = i; break; }
+        int next = at + delta;
+        if (at < 0 || next < 0 || next >= siblings.size()) {
+            Toast.makeText(this, "This goal is already at the edge of its group.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        MonthlyGoal other = siblings.get(next);
+        int order = stored.sortOrder;
+        stored.sortOrder = other.sortOrder;
+        other.sortOrder = order;
+        recordMonthlyGoalEvent(stored, delta < 0 ? "Moved earlier in group" : "Moved later in group");
+        recordMonthlyGoalEvent(other, delta < 0 ? "Moved later in group" : "Moved earlier in group");
+        persistMonthlyGoals(all);
+        refreshRoadmapTabContent();
+        Toast.makeText(this, "Order saved for this month and goal group.", Toast.LENGTH_SHORT).show();
+    }
+
+    private Comparator<SyllabusTopic> syllabusTopicOrderComparator() {
+        return Comparator.comparingInt((SyllabusTopic t) -> syllabusSubjectOrder(t.subject))
+                .thenComparingInt(t -> t.sortOrder)
+                .thenComparing(t -> t.title == null ? "" : t.title, String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private int syllabusSubjectOrder(String subject) {
+        for (int i = 0; i < SYLLABUS_SUBJECTS.length; i++) {
+            if (Objects.equals(SYLLABUS_SUBJECTS[i], subject)) return i;
+        }
+        return SYLLABUS_SUBJECTS.length;
+    }
+
+    private int nextSyllabusTopicSortOrder(List<SyllabusTopic> topics, String subject) {
+        int maximum = -100;
+        for (SyllabusTopic topic : topics) if (Objects.equals(subject, topic.subject)) {
+            maximum = Math.max(maximum, topic.sortOrder);
+        }
+        return maximum + 100;
+    }
+
+    private void moveSyllabusTopic(SyllabusTopic target, int delta) {
+        if (target == null || delta == 0) return;
+        ArrayList<SyllabusTopic> all = readSyllabusTopics();
+        SyllabusTopic stored = null;
+        for (SyllabusTopic topic : all) if (topic.id == target.id) { stored = topic; break; }
+        if (stored == null) return;
+        ArrayList<SyllabusTopic> siblings = new ArrayList<>();
+        for (SyllabusTopic topic : all) if (Objects.equals(stored.subject, topic.subject)) siblings.add(topic);
+        siblings.sort(Comparator.comparingInt((SyllabusTopic t) -> t.sortOrder)
+                .thenComparing(t -> t.title == null ? "" : t.title, String.CASE_INSENSITIVE_ORDER)
+                .thenComparingLong(t -> t.id));
+        int at = -1;
+        for (int i = 0; i < siblings.size(); i++) if (siblings.get(i).id == stored.id) { at = i; break; }
+        int next = at + delta;
+        if (at < 0 || next < 0 || next >= siblings.size()) {
+            Toast.makeText(this, "This topic is already at the edge of its subject.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        SyllabusTopic other = siblings.get(next);
+        int order = stored.sortOrder;
+        stored.sortOrder = other.sortOrder;
+        other.sortOrder = order;
+        persistSyllabusTopics(all);
+        Toast.makeText(this, "Topic order saved within " + stored.subject + ".", Toast.LENGTH_SHORT).show();
+    }
+
     private void changeSelectedGoalMonth(int offset) {
         if (selectedGoalMonth == null) selectedGoalMonth = monthKeyFromDate(todayKey());
         Date date = parseDateKey(selectedGoalMonth + "-01");
@@ -3022,7 +3179,7 @@ public class MainActivity extends Activity {
                 : existing.month};
         LinearLayout form = vertical();
         form.setPadding(dp(20), dp(4), dp(20), dp(10));
-        TextView help = text("Change the month, track, goal and success criteria. These changes are saved on this device.",
+        TextView help = text("Change the month, track, goal and success criteria. Reordering only changes items within the same month, track and goal group; later-month milestones remain in sequence. These changes are saved on this device.",
                 12, color("#687A70"), false);
         help.setLineSpacing(dp(2), 1f);
         form.addView(help);
@@ -3712,6 +3869,7 @@ public class MainActivity extends Activity {
                         item.optString("track", "General Studies"), item.optString("title", ""),
                         item.optString("target", ""), done);
                 goal.originalMonth = item.optString("originalMonth", month);
+                goal.sortOrder = item.optInt("sortOrder", i * 100);
                 goal.completedAt = item.optLong("completedAt", 0L);
                 goal.parentGoalId = item.optLong("parentGoalId", 0L);
                 goal.lifecycleStatus = item.optString("lifecycleStatus",
@@ -3736,6 +3894,7 @@ public class MainActivity extends Activity {
                 item.put("id", goal.id); item.put("month", goal.month); item.put("track", goal.track);
                 item.put("title", goal.title); item.put("target", goal.target == null ? "" : goal.target);
                 item.put("done", goal.done);
+                item.put("sortOrder", goal.sortOrder);
                 item.put("originalMonth", goal.originalMonth == null ? goal.month : goal.originalMonth);
                 item.put("completedAt", goal.completedAt); item.put("parentGoalId", goal.parentGoalId);
                 item.put("lifecycleStatus", goal.lifecycleStatus == null
@@ -4047,6 +4206,7 @@ public class MainActivity extends Activity {
                 item.put("id", goal.id); item.put("month", goal.month); item.put("track", goal.track);
                 item.put("title", goal.title); item.put("target", goal.target == null ? "" : goal.target);
                 item.put("done", goal.done);
+                item.put("sortOrder", goal.sortOrder);
                 item.put("originalMonth", goal.originalMonth == null ? goal.month : goal.originalMonth);
                 item.put("completedAt", goal.completedAt); item.put("parentGoalId", goal.parentGoalId);
                 item.put("lifecycleStatus", goal.lifecycleStatus == null
@@ -5684,12 +5844,14 @@ public class MainActivity extends Activity {
             for (int i = 0; i < data.length(); i++) {
                 JSONObject item = data.optJSONObject(i);
                 if (item == null) continue;
-                topics.add(new SyllabusTopic(
+                SyllabusTopic topic = new SyllabusTopic(
                         item.optLong("id", i + 1L),
                         item.optString("subject", "General Studies"),
                         item.optString("title", ""),
                         item.optBoolean("done", false),
-                        item.optLong("completedAt", 0L)));
+                        item.optLong("completedAt", 0L));
+                topic.sortOrder = item.optInt("sortOrder", i * 100);
+                topics.add(topic);
             }
         } catch (Exception e) {
             debugLog("Syllabus read failed: " + e.getMessage());
@@ -5790,7 +5952,10 @@ public class MainActivity extends Activity {
                     for (String raw : lines.getText().toString().split("\\r?\\n")) {
                         String name = raw.trim();
                         if (name.isEmpty() || !existing.add((selectedSubject + "|" + name).toLowerCase(Locale.US))) continue;
-                        all.add(new SyllabusTopic(System.currentTimeMillis() + added, selectedSubject, name, false, 0L));
+                        SyllabusTopic topic = new SyllabusTopic(System.currentTimeMillis() + added,
+                                selectedSubject, name, false, 0L);
+                        topic.sortOrder = nextSyllabusTopicSortOrder(all, selectedSubject);
+                        all.add(topic);
                         added++;
                     }
                     if (added > 0 && !getPrefs().contains(SYLLABUS_START_KEY)) {
@@ -6022,7 +6187,9 @@ public class MainActivity extends Activity {
             if (row.length < 2) continue;
             String key = (row[0] + "|" + row[1]).toLowerCase(Locale.US);
             if (!known.add(key)) continue;
-            all.add(new SyllabusTopic(System.currentTimeMillis() + added, row[0], row[1], false, 0L));
+            SyllabusTopic topic = new SyllabusTopic(System.currentTimeMillis() + added, row[0], row[1], false, 0L);
+            topic.sortOrder = nextSyllabusTopicSortOrder(all, row[0]);
+            all.add(topic);
             added++;
         }
         if (added > 0 && !getPrefs().contains(SYLLABUS_START_KEY)) {
@@ -6070,6 +6237,23 @@ public class MainActivity extends Activity {
             switchPage("syllabus");
         });
         actions.addView(toggle, new LinearLayout.LayoutParams(-1, dp(44)));
+
+        LinearLayout reorderRow = horizontal();
+        LinearLayout.LayoutParams reorderRowLp = new LinearLayout.LayoutParams(-1, dp(42));
+        reorderRowLp.topMargin = dp(8);
+        Button moveEarlier = secondaryButton("↑ Move earlier", () -> {
+            if (detailDialog[0] != null) detailDialog[0].dismiss();
+            moveSyllabusTopic(topic, -1);
+        });
+        Button moveLater = secondaryButton("↓ Move later", () -> {
+            if (detailDialog[0] != null) detailDialog[0].dismiss();
+            moveSyllabusTopic(topic, 1);
+        });
+        reorderRow.addView(moveEarlier, new LinearLayout.LayoutParams(0, -1, 1f));
+        LinearLayout.LayoutParams moveLaterLp = new LinearLayout.LayoutParams(0, -1, 1f);
+        moveLaterLp.leftMargin = dp(7);
+        reorderRow.addView(moveLater, moveLaterLp);
+        actions.addView(reorderRow, reorderRowLp);
 
         Button delete = actionButton("Delete topic", color("#B44248"), "#F8E8E6");
         delete.setTextSize(12);
@@ -6144,11 +6328,18 @@ public class MainActivity extends Activity {
                         if (!getPrefs().contains(SYLLABUS_START_KEY)) {
                             getPrefs().edit().putString(SYLLABUS_START_KEY, todayKey()).apply();
                         }
-                        all.add(new SyllabusTopic(System.currentTimeMillis(), subject.getSelectedItem().toString(), name, false, 0L));
+                        String selectedSubject = subject.getSelectedItem().toString();
+                        SyllabusTopic topic = new SyllabusTopic(System.currentTimeMillis(), selectedSubject, name, false, 0L);
+                        topic.sortOrder = nextSyllabusTopicSortOrder(all, selectedSubject);
+                        all.add(topic);
                     } else {
                         for (SyllabusTopic item : all) {
                             if (item.id == existing.id) {
-                                item.subject = subject.getSelectedItem().toString();
+                                String newSubject = subject.getSelectedItem().toString();
+                                if (!Objects.equals(item.subject, newSubject)) {
+                                    item.sortOrder = nextSyllabusTopicSortOrder(all, newSubject);
+                                }
+                                item.subject = newSubject;
                                 item.title = name;
                             }
                         }
@@ -6174,6 +6365,7 @@ public class MainActivity extends Activity {
                 item.put("title", topic.title);
                 item.put("done", topic.done);
                 item.put("completedAt", topic.completedAt);
+                item.put("sortOrder", topic.sortOrder);
                 data.put(item);
             }
             getPrefs().edit().putString(SYLLABUS_KEY, data.toString()).apply();
