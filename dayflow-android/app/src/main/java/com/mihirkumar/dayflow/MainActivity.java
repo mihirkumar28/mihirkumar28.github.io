@@ -2884,10 +2884,6 @@ public class MainActivity extends Activity {
                     + (goal.done ? ". Complete." : ". Open.")
                     + ". Tap to open this goal in the Roadmap tree.");
             row.setOnClickListener(v -> openMonthlyGoalInRoadmap(goal));
-            row.setOnLongClickListener(v -> {
-                showMonthlyGoalActions(goal);
-                return true;
-            });
             mark.setOnClickListener(v -> toggleMonthlyGoal(goal));
             roadmapFocusGoalList.addView(row);
 
