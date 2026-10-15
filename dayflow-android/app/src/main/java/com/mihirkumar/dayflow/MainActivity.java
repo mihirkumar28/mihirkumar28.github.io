@@ -2474,15 +2474,13 @@ public class MainActivity extends Activity {
             return node.subtitle == null ? "" : node.subtitle;
         }
         if ("group".equals(node.type)) {
-            if ("goal-month".equals(node.groupKind)) {
+            if ("goal-month".equals(node.groupKind) || "current-goals".equals(node.groupKind)) {
+                // Drag-and-drop instructions only belong in Edit mode; in browse mode the
+                // month title and goal count already provide the needed context.
+                if (!roadmapTreeEditMode) return "";
                 return node.children.isEmpty()
-                        ? "Empty month · drop a goal here to move it into this month"
-                        : "Drop a goal here to add it as a sub-goal; choose a parent if needed";
-            }
-            if ("current-goals".equals(node.groupKind)) {
-                return node.children.isEmpty()
-                        ? "Empty month · drop a goal here to move it into this month"
-                        : "Drop a goal here to add it as a sub-goal; choose a parent if needed";
+                        ? "Drop a goal here to move it into this month"
+                        : "Drop a goal here to nest it under a parent";
             }
             if ("split-goal".equals(node.groupKind)) {
                 return (node.subtitle == null ? "Split into smaller goals" : node.subtitle)
@@ -2501,11 +2499,10 @@ public class MainActivity extends Activity {
         }
         if ("goal".equals(node.type)) {
             String line = monthLabelForKey(node.month);
-            if (node.subtitle != null && !node.subtitle.trim().isEmpty()) line += " · " + node.subtitle.trim();
             if (node.item instanceof MonthlyGoal) {
                 MonthlyGoal goal = (MonthlyGoal) node.item;
                 if (goal.originalMonth != null && !goal.originalMonth.equals(goal.month)) {
-                    line += " · Originally " + monthLabelForKey(goal.originalMonth);
+                    line += " · Moved from " + monthLabelForKey(goal.originalMonth);
                 }
                 if (goal.done && goal.completedAt > 0L) {
                     line += " · Completed " + new SimpleDateFormat("d MMM", Locale.getDefault())
@@ -2513,17 +2510,53 @@ public class MainActivity extends Activity {
                 }
             }
             if (overdue) line += " · Overdue";
+            String preview = roadmapTreeDetailPreview(node.subtitle);
+            if (!preview.isEmpty()) line += " · " + preview;
             return line;
         }
         if ("milestone".equals(node.type)) {
             String line = "Due " + displayRoadmapDate(node.statusPeriod);
             if (overdue) line += " · Overdue";
             else if (node.done) line += " · Complete";
-            if (node.subtitle != null && !node.subtitle.trim().isEmpty()) line += " · " + node.subtitle.trim();
+            String preview = roadmapTreeDetailPreview(node.subtitle);
+            if (!preview.isEmpty()) line += " · " + preview;
             return line;
         }
         if ("career".equals(node.type)) return node.subtitle;
         return node.subtitle == null ? "" : node.subtitle;
+    }
+
+    /**
+     * Keeps the tree scannable by showing a short summary rather than a whole target paragraph.
+     * The full description remains available when the user opens the roadmap item.
+     */
+    private String roadmapTreeDetailPreview(String detail) {
+        if (detail == null || detail.trim().isEmpty()) return "";
+        String cleaned = detail.replace('\n', ' ').replace('\r', ' ').replaceAll("\\s+", " ").trim();
+
+        // Month-by-month source descriptions often repeat the scheduled month.
+        int separator = cleaned.indexOf(" · ");
+        if (separator > 0 && separator <= 20
+                && cleaned.substring(0, separator).matches(
+                        "(January|February|March|April|May|June|July|August|September|October|November|December) \\d{4}")) {
+            cleaned = cleaned.substring(separator + 3).trim();
+        }
+
+        int sentenceEnd = -1;
+        int scanLimit = Math.min(cleaned.length() - 1, 68);
+        for (int i = 0; i < scanLimit; i++) {
+            char ch = cleaned.charAt(i);
+            if ((ch == '.' || ch == '!' || ch == '?') && Character.isWhitespace(cleaned.charAt(i + 1))) {
+                sentenceEnd = i;
+                break;
+            }
+        }
+        if (sentenceEnd >= 0) return cleaned.substring(0, sentenceEnd + 1).trim();
+        if (cleaned.length() <= 70) return cleaned;
+
+        int cut = cleaned.lastIndexOf(' ', 67);
+        if (cut < 48) cut = 67;
+        return cleaned.substring(0, cut).trim() + "…";
     }
 
     private String roadmapNodeSearchText(RoadmapNode node) {
@@ -2715,14 +2748,15 @@ public class MainActivity extends Activity {
         detail.addView(title);
         String metadata = roadmapNodeMetadata(node);
         if (metadata != null && !metadata.trim().isEmpty()) {
-            TextView meta = text(metadata, 12,
+            boolean trackDescription = "track".equals(node.type) || "subject".equals(node.type);
+            TextView meta = text(metadata, trackDescription ? 12 : 11,
                     RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, todayKey())
                             ? color("#A76821") : color("#52675C"),
                     false);
-            // Keep supporting copy easy to scan without competing with item titles.
-            meta.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            // Darker neutral copy stays readable; regular weight preserves title hierarchy.
+            meta.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
             meta.setLineSpacing(dp(2), 1f);
-            meta.setMaxLines(3);
+            meta.setMaxLines(2);
             meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
             LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
             metaLp.topMargin = dp(3);
