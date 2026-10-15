@@ -764,6 +764,7 @@ public class MainActivity extends Activity {
         else if("more".equals(page))renderMorePage();
         else if("syllabus".equals(page))refreshRoadmapTabContent();
         else if("screenTime".equals(page))renderScreenTimePage();
+        else if("home".equals(page))refreshTodaySummaryProgress();
     }
 
     private void buildPlanPage() {
@@ -3333,6 +3334,8 @@ public class MainActivity extends Activity {
         // Keep the selected month and roadmap tree synchronised with the source-of-truth stores.
         if (roadmapFocusMonthLabel != null) renderRoadmapFocus();
         if (roadmapTreeContainer != null) renderRoadmapTreeBody();
+        // Roadmap edits also change the Today screen's connected progress label.
+        refreshTodaySummaryProgress();
     }
 
     private void refreshSyllabusRows() {
@@ -6489,6 +6492,17 @@ public class MainActivity extends Activity {
             debugLog("Syllabus read failed: " + e.getMessage());
         }
         return topics;
+    }
+
+    private void refreshTodaySummaryProgress() {
+        if (progressPercent == null) return;
+        int done = 0;
+        for (Block block : blocks) {
+            if ("done".equals(block.status)) done++;
+        }
+        int total = blocks.size();
+        int planPercent = total == 0 ? 0 : Math.round(done * 100f / total);
+        progressPercent.setText(planPercent + "% of plan • " + syllabusProgressLabel());
     }
 
     private String syllabusProgressLabel() {
