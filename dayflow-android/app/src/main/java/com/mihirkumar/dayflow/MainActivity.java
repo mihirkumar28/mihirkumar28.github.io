@@ -2782,63 +2782,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void addRoadmapGoalDetails(LinearLayout parent, MonthlyGoal goal) {
-        if (parent == null || goal == null) return;
-
-        String source = goalInfoValue(goal.source, inferGoalSource(goal.target, goal.track));
-        String pages = goalInfoValue(goal.pages, inferGoalPages(goal.target, goal.track));
-        String effort = goalInfoValue(goal.estimatedTime, inferGoalEstimatedTime(goal.target, goal.track));
-
-        LinearLayout panel = vertical();
-        panel.setPadding(dp(10), dp(8), dp(10), dp(8));
-        panel.setBackground(bg("#F1F6F1", 9));
-        LinearLayout.LayoutParams panelLp = new LinearLayout.LayoutParams(-1, -2);
-        panelLp.topMargin = dp(7);
-        parent.addView(panel, panelLp);
-
-        TextView sourceLabel = text("SOURCE", 9, color("#34775F"), true);
-        sourceLabel.setLetterSpacing(0.06f);
-        panel.addView(sourceLabel);
-        TextView sourceValue = text(source.isEmpty() ? "Not specified" : source,
-                12, color("#263F34"), false);
-        sourceValue.setLineSpacing(dp(1), 1f);
-        sourceValue.setMaxLines(2);
-        sourceValue.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams sourceLp = new LinearLayout.LayoutParams(-1, -2);
-        sourceLp.topMargin = dp(1);
-        panel.addView(sourceValue, sourceLp);
-
-        LinearLayout facts = horizontal();
-        facts.setGravity(Gravity.TOP);
-        LinearLayout.LayoutParams factsLp = new LinearLayout.LayoutParams(-1, -2);
-        factsLp.topMargin = dp(7);
-        panel.addView(facts, factsLp);
-
-        addRoadmapGoalFact(facts, "PAGES / SCOPE", pages, 1f);
-        View spacer = new View(this);
-        facts.addView(spacer, new LinearLayout.LayoutParams(dp(12), dp(1)));
-        addRoadmapGoalFact(facts, "EST. EFFORT", effort, 1f);
-    }
-
-    private void addRoadmapGoalFact(LinearLayout parent, String label, String value, float weight) {
-        LinearLayout fact = vertical();
-        LinearLayout.LayoutParams factLp = new LinearLayout.LayoutParams(0, -2, weight);
-        parent.addView(fact, factLp);
-
-        TextView labelView = text(label, 9, color("#687A70"), true);
-        labelView.setLetterSpacing(0.03f);
-        fact.addView(labelView);
-
-        TextView valueView = text(value == null || value.trim().isEmpty() ? "Not specified" : value.trim(),
-                12, color("#263F34"), true);
-        valueView.setLineSpacing(dp(1), 1f);
-        valueView.setMaxLines(2);
-        valueView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams valueLp = new LinearLayout.LayoutParams(-1, -2);
-        valueLp.topMargin = dp(1);
-        fact.addView(valueView, valueLp);
-    }
-
     private void renderRoadmapNode(RoadmapNode node, int depth, boolean forceInclude) {
         String query = roadmapSearchText.trim();
         if (!roadmapNodeVisible(node, query, forceInclude)) return;
@@ -2947,10 +2890,6 @@ public class MainActivity extends Activity {
         // Monthly goal execution facts live in a visibly nested panel, not in a truncated paragraph.
         if ("goal".equals(node.type) && node.item instanceof MonthlyGoal) {
             addRoadmapGoalDetailPanel(detail, (MonthlyGoal) node.item);
-        }
-
-        if ("goal".equals(node.type) && node.item instanceof MonthlyGoal) {
-            addRoadmapGoalDetails(detail, (MonthlyGoal) node.item);
         }
 
         int[] progress = roadmapNodeProgress(node);
