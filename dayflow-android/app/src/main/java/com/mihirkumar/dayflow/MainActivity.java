@@ -195,6 +195,8 @@ public class MainActivity extends Activity {
     private static class MonthlyGoal {
         long id;
         String month, track, title, target;
+        // Structured execution metadata shown directly beneath each roadmap goal.
+        String source, pages, estimatedTime;
         String originalMonth, lifecycleStatus;
         long completedAt, parentGoalId;
         int sortOrder;
@@ -207,6 +209,9 @@ public class MainActivity extends Activity {
             this.track = track;
             this.title = title;
             this.target = target;
+            this.source = "";
+            this.pages = "";
+            this.estimatedTime = "";
             this.done = done;
             this.originalMonth = month;
             this.lifecycleStatus = done ? MonthlyGoalLifecycle.COMPLETED : MonthlyGoalLifecycle.ACTIVE;
@@ -2510,8 +2515,6 @@ public class MainActivity extends Activity {
                 }
             }
             if (overdue) line += " · Overdue";
-            String preview = roadmapTreeDetailPreview(node.subtitle);
-            if (!preview.isEmpty()) line += " · " + preview;
             return line;
         }
         if ("milestone".equals(node.type)) {
@@ -2557,6 +2560,127 @@ public class MainActivity extends Activity {
         int cut = cleaned.lastIndexOf(' ', 67);
         if (cut < 48) cut = 67;
         return cleaned.substring(0, cut).trim() + "…";
+    }
+
+    private String inferGoalSource(String target, String track) {
+        String text = target == null ? "" : target.replace('\n', ' ').replace('\r', ' ').trim();
+        java.util.regex.Matcher primary = java.util.regex.Pattern
+                .compile("(?i)primary sources?:\\s*(.*?)(?:\\.|$)")
+                .matcher(text);
+        if (primary.find()) {
+            String source = primary.group(1);
+            source = source.replaceAll("(?i)\\s*\\((?:about|approximately|approx\\.?|~)?\\s*\\d+\\s*(?:pages?)?\\)", "");
+            source = source.replaceAll("(?i),?\\s*(?:approximately|approx\\.?|about|~)\\s*\\d+\\s*pages?(?:\\s+combined)?", "");
+            source = source.replaceAll("\\s+", " ").replaceAll("\\s+,", ",").trim();
+            while (source.endsWith(",") || source.endsWith(";")) {
+                source = source.substring(0, source.length() - 1).trim();
+            }
+            if (!source.isEmpty()) return source;
+        }
+        if (text.toLowerCase(Locale.US).contains("ims notes")) {
+            return "December 2022 IMS notes";
+        }
+        if ("Software Interview Prep".equals(track)) {
+            return "Interview syllabus and coding/design practice plan";
+        }
+        if ("CSE Revision & Tests".equals(track)) {
+            return "UPSC PYQs, GS mocks and CSAT practice";
+        }
+        return "";
+    }
+
+    private String inferGoalPages(String target, String track) {
+        String text = target == null ? "" : target;
+        java.util.regex.Matcher combined = java.util.regex.Pattern
+                .compile("(?i)(?:about|approximately|approx\\.?|~)?\\s*(\\d+)\\s*pages?\\s+combined")
+                .matcher(text);
+        String count = null;
+        while (combined.find()) count = combined.group(1);
+        if (count == null) {
+            java.util.regex.Matcher pages = java.util.regex.Pattern
+                    .compile("(?i)(?:about|approximately|approx\\.?|~)\\s*(\\d+)\\s*pages?")
+                    .matcher(text);
+            while (pages.find()) count = pages.group(1);
+        }
+        if (count != null) return "≈" + count + " pages";
+        if ("Software Interview Prep".equals(track) || "CSE Revision & Tests".equals(track)) {
+            return "Not page-based";
+        }
+        return "Not listed in the plan";
+    }
+
+    private String inferGoalEstimatedTime(String target, String track) {
+        String text = target == null ? "" : target;
+        java.util.regex.Matcher weekly = java.util.regex.Pattern
+                .compile("(?i)(\\d+)\\s*[–-]\\s*(\\d+)\\s*(?:hours?|hrs?|h)\\s*(?:/\\s*week|per\\s+week)")
+                .matcher(text);
+        int lowPerWeek = 0;
+        int highPerWeek = 0;
+        int ranges = 0;
+        while (weekly.find()) {
+            lowPerWeek += Integer.parseInt(weekly.group(1));
+            highPerWeek += Integer.parseInt(weekly.group(2));
+            ranges++;
+        }
+        if (ranges > 0) {
+            return "≈" + (lowPerWeek * 4) + "–" + (highPerWeek * 4)
+                    + " study hours (4-week plan)";
+        }
+        if ("General Studies".equals(track) || "Maths Optional".equals(track)) {
+            return "≈64 study hours (16 h/week × 4 weeks)";
+        }
+        return "";
+    }
+
+    private String goalInfoValue(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
+    }
+
+    private void addRoadmapGoalDetailPanel(LinearLayout parent, MonthlyGoal goal) {
+        LinearLayout panel = vertical();
+        panel.setPadding(dp(8), dp(7), dp(8), dp(7));
+        GradientDrawable panelBackground = bg("#F3F7F3", 8);
+        panelBackground.setStroke(dp(1), color("#E0E9E1"));
+        panel.setBackground(panelBackground);
+
+        TextView heading = text("PLAN DETAILS", 9, color("#2E8060"), true);
+        heading.setLetterSpacing(0.08f);
+        LinearLayout.LayoutParams headingLp = new LinearLayout.LayoutParams(-1, -2);
+        headingLp.bottomMargin = dp(3);
+        panel.addView(heading, headingLp);
+
+        addRoadmapGoalDetailRow(panel, "SOURCE",
+                goalInfoValue(goal.source, "Not specified — edit goal"), 2);
+        addRoadmapGoalDetailRow(panel, "PAGES",
+                goalInfoValue(goal.pages, "Not listed"), 1);
+        addRoadmapGoalDetailRow(panel, "EST. TIME",
+                goalInfoValue(goal.estimatedTime, "Not estimated — edit goal"), 2);
+
+        LinearLayout.LayoutParams panelLp = new LinearLayout.LayoutParams(-1, -2);
+        panelLp.topMargin = dp(5);
+        panelLp.leftMargin = dp(2);
+        panelLp.rightMargin = dp(2);
+        parent.addView(panel, panelLp);
+    }
+
+    private void addRoadmapGoalDetailRow(LinearLayout parent, String label, String value, int maxLines) {
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.TOP);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+        rowLp.topMargin = dp(2);
+        parent.addView(row, rowLp);
+
+        TextView labelView = text(label, 9, color("#687F72"), true);
+        labelView.setLetterSpacing(0.02f);
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(dp(76), -2);
+        labelLp.topMargin = dp(1);
+        row.addView(labelView, labelLp);
+
+        TextView valueView = text(value, 11, color("#344A40"), false);
+        valueView.setLineSpacing(dp(1), 1f);
+        valueView.setMaxLines(maxLines);
+        valueView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        row.addView(valueView, new LinearLayout.LayoutParams(0, -2, 1f));
     }
 
     private String roadmapNodeSearchText(RoadmapNode node) {
@@ -2761,6 +2885,11 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
             metaLp.topMargin = dp(3);
             detail.addView(meta, metaLp);
+        }
+
+        // Monthly goal execution facts live in a visibly nested panel, not in a truncated paragraph.
+        if ("goal".equals(node.type) && node.item instanceof MonthlyGoal) {
+            addRoadmapGoalDetailPanel(detail, (MonthlyGoal) node.item);
         }
 
         int[] progress = roadmapNodeProgress(node);
@@ -3912,6 +4041,60 @@ public class MainActivity extends Activity {
         targetLp.topMargin = dp(4);
         form.addView(target, targetLp);
 
+        TextView detailFieldsHeading = text("SOURCE, PAGES & ESTIMATED EFFORT", 11, color("#2E8060"), true);
+        LinearLayout.LayoutParams detailFieldsHeadingLp = new LinearLayout.LayoutParams(-1, -2);
+        detailFieldsHeadingLp.topMargin = dp(14);
+        detailFieldsHeadingLp.bottomMargin = dp(4);
+        form.addView(detailFieldsHeading, detailFieldsHeadingLp);
+        TextView detailFieldsHelp = text("These fields appear directly beneath the goal in the Roadmap Tree. Estimates are study effort, not a guaranteed finish date.", 11, color("#687A70"), false);
+        detailFieldsHelp.setLineSpacing(dp(1), 1f);
+        form.addView(detailFieldsHelp);
+
+        TextView sourceLabel = text("SOURCE", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams sourceLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        sourceLabelLp.topMargin = dp(10);
+        form.addView(sourceLabel, sourceLabelLp);
+        EditText source = new EditText(this);
+        source.setSingleLine(true);
+        source.setHint("e.g. Vajiram Yellow Books Polity I + II");
+        source.setTextColor(color("#18372E"));
+        source.setHintTextColor(color("#82948A"));
+        source.setPadding(dp(12), dp(5), dp(12), dp(5));
+        source.setBackground(bg("#FFFFFF", 12));
+        String initialSource = existing == null ? "" : goalInfoValue(existing.source, inferGoalSource(existing.target, existing.track));
+        if (!initialSource.isEmpty()) source.setText(initialSource);
+        form.addView(source, new LinearLayout.LayoutParams(-1, dp(46)));
+
+        TextView pagesLabel = text("PAGES / SCOPE", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams pagesLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        pagesLabelLp.topMargin = dp(8);
+        form.addView(pagesLabel, pagesLabelLp);
+        EditText pages = new EditText(this);
+        pages.setSingleLine(true);
+        pages.setHint("e.g. ≈584 pages or Not page-based");
+        pages.setTextColor(color("#18372E"));
+        pages.setHintTextColor(color("#82948A"));
+        pages.setPadding(dp(12), dp(5), dp(12), dp(5));
+        pages.setBackground(bg("#FFFFFF", 12));
+        String initialPages = existing == null ? "" : goalInfoValue(existing.pages, inferGoalPages(existing.target, existing.track));
+        if (!initialPages.isEmpty()) pages.setText(initialPages);
+        form.addView(pages, new LinearLayout.LayoutParams(-1, dp(46)));
+
+        TextView estimateLabel = text("ESTIMATED TIME TO COMPLETE", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams estimateLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        estimateLabelLp.topMargin = dp(8);
+        form.addView(estimateLabel, estimateLabelLp);
+        EditText estimatedTime = new EditText(this);
+        estimatedTime.setSingleLine(true);
+        estimatedTime.setHint("e.g. 60–68 study hours");
+        estimatedTime.setTextColor(color("#18372E"));
+        estimatedTime.setHintTextColor(color("#82948A"));
+        estimatedTime.setPadding(dp(12), dp(5), dp(12), dp(5));
+        estimatedTime.setBackground(bg("#FFFFFF", 12));
+        String initialEstimate = existing == null ? "" : goalInfoValue(existing.estimatedTime, inferGoalEstimatedTime(existing.target, existing.track));
+        if (!initialEstimate.isEmpty()) estimatedTime.setText(initialEstimate);
+        form.addView(estimatedTime, new LinearLayout.LayoutParams(-1, dp(46)));
+
         showFullScreenEditor("MONTHLY GOALS", existing == null ? "Add monthly goal" : "Edit monthly goal",
                 "Keep the goal specific enough that you can honestly mark it complete.", form, () -> {
                     String name = title.getText().toString().trim();
@@ -3924,6 +4107,12 @@ public class MainActivity extends Activity {
                     MonthlyGoal updated = new MonthlyGoal(existing == null ? System.currentTimeMillis() : existing.id,
                             draftMonth[0], track.getSelectedItem().toString(), name,
                             target.getText().toString().trim(), existing != null && existing.done);
+                    updated.source = source.getText().toString().trim();
+                    if (updated.source.isEmpty()) updated.source = inferGoalSource(updated.target, updated.track);
+                    updated.pages = pages.getText().toString().trim();
+                    if (updated.pages.isEmpty()) updated.pages = inferGoalPages(updated.target, updated.track);
+                    updated.estimatedTime = estimatedTime.getText().toString().trim();
+                    if (updated.estimatedTime.isEmpty()) updated.estimatedTime = inferGoalEstimatedTime(updated.target, updated.track);
                     if (existing != null) {
                         updated.originalMonth = existing.originalMonth == null ? existing.month : existing.originalMonth;
                         updated.completedAt = existing.completedAt;
@@ -4544,6 +4733,12 @@ public class MainActivity extends Activity {
                 goal.sortOrder = item.optInt("sortOrder", i * 100);
                 goal.completedAt = item.optLong("completedAt", 0L);
                 goal.parentGoalId = item.optLong("parentGoalId", 0L);
+                goal.source = item.optString("source", "");
+                goal.pages = item.optString("pages", "");
+                goal.estimatedTime = item.optString("estimatedTime", "");
+                if (goal.source.trim().isEmpty()) goal.source = inferGoalSource(goal.target, goal.track);
+                if (goal.pages.trim().isEmpty()) goal.pages = inferGoalPages(goal.target, goal.track);
+                if (goal.estimatedTime.trim().isEmpty()) goal.estimatedTime = inferGoalEstimatedTime(goal.target, goal.track);
                 goal.lifecycleStatus = item.optString("lifecycleStatus",
                         done ? MonthlyGoalLifecycle.COMPLETED : MonthlyGoalLifecycle.ACTIVE);
                 if (done) goal.lifecycleStatus = MonthlyGoalLifecycle.COMPLETED;
@@ -4565,6 +4760,12 @@ public class MainActivity extends Activity {
                 JSONObject item = new JSONObject();
                 item.put("id", goal.id); item.put("month", goal.month); item.put("track", goal.track);
                 item.put("title", goal.title); item.put("target", goal.target == null ? "" : goal.target);
+                item.put("source", goal.source == null || goal.source.trim().isEmpty()
+                        ? inferGoalSource(goal.target, goal.track) : goal.source);
+                item.put("pages", goal.pages == null || goal.pages.trim().isEmpty()
+                        ? inferGoalPages(goal.target, goal.track) : goal.pages);
+                item.put("estimatedTime", goal.estimatedTime == null || goal.estimatedTime.trim().isEmpty()
+                        ? inferGoalEstimatedTime(goal.target, goal.track) : goal.estimatedTime);
                 item.put("done", goal.done);
                 item.put("sortOrder", goal.sortOrder);
                 item.put("originalMonth", goal.originalMonth == null ? goal.month : goal.originalMonth);
@@ -4877,6 +5078,12 @@ public class MainActivity extends Activity {
                 JSONObject item = new JSONObject();
                 item.put("id", goal.id); item.put("month", goal.month); item.put("track", goal.track);
                 item.put("title", goal.title); item.put("target", goal.target == null ? "" : goal.target);
+                item.put("source", goal.source == null || goal.source.trim().isEmpty()
+                        ? inferGoalSource(goal.target, goal.track) : goal.source);
+                item.put("pages", goal.pages == null || goal.pages.trim().isEmpty()
+                        ? inferGoalPages(goal.target, goal.track) : goal.pages);
+                item.put("estimatedTime", goal.estimatedTime == null || goal.estimatedTime.trim().isEmpty()
+                        ? inferGoalEstimatedTime(goal.target, goal.track) : goal.estimatedTime);
                 item.put("done", goal.done);
                 item.put("sortOrder", goal.sortOrder);
                 item.put("originalMonth", goal.originalMonth == null ? goal.month : goal.originalMonth);
