@@ -6492,11 +6492,15 @@ public class MainActivity extends Activity {
     }
 
     private String syllabusProgressLabel() {
-        ArrayList<SyllabusTopic> topics = readSyllabusTopics();
-        if (topics.isEmpty()) return "Syllabus not set";
-        int done = 0;
-        for (SyllabusTopic topic : topics) if (topic.done) done++;
-        return "Syllabus " + Math.round(done * 100f / topics.size()) + "%";
+        // Use the same live progress calculation as the UPSC CSE roadmap branch.
+        // The connected plan includes syllabus topics, monthly goals and exam checkpoints.
+        for (RoadmapNode rootNode : buildRoadmapTreeNodes()) {
+            if (!"upsc".equals(rootNode.rootKey)) continue;
+            int[] progress = roadmapNodeProgress(rootNode);
+            if (progress[1] == 0) return "Syllabus not set";
+            return "Syllabus " + Math.round(progress[0] * 100f / progress[1]) + "%";
+        }
+        return "Syllabus not set";
     }
 
     private String syllabusSummary(ArrayList<SyllabusTopic> topics) {
