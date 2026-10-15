@@ -2715,14 +2715,17 @@ public class MainActivity extends Activity {
         detail.addView(title);
         String metadata = roadmapNodeMetadata(node);
         if (metadata != null && !metadata.trim().isEmpty()) {
-            TextView meta = text(metadata, 10,
+            TextView meta = text(metadata, 12,
                     RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, todayKey())
-                            ? color("#A76821") : color("#687A70"),
-                    "track".equals(node.type));
-            meta.setMaxLines("goal".equals(node.type) || "milestone".equals(node.type) ? 3 : 2);
+                            ? color("#A76821") : color("#52675C"),
+                    false);
+            // Keep supporting copy easy to scan without competing with item titles.
+            meta.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            meta.setLineSpacing(dp(2), 1f);
+            meta.setMaxLines(3);
             meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
             LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
-            metaLp.topMargin = dp(2);
+            metaLp.topMargin = dp(3);
             detail.addView(meta, metaLp);
         }
 
