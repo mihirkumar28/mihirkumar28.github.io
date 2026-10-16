@@ -28,7 +28,7 @@
 
 ## Phase 3 — design consistency and everyday usability
 
-- [~] Fix the shared text helper so it honors the requested color; set dark text explicitly on light task cards and improve their secondary-label contrast. Establish reusable color, typography, spacing, shape, and button tokens; continue migrating screen-by-screen rather than doing a high-risk global replacement.
+- [~] Improve secondary-label contrast on light task cards. The current shared color helper also remaps legacy dark-palette values to the light theme; replace this implicit mapping with explicit palette tokens and contrast tests in a separate, screen-by-screen migration. Do not globally replace color values without visual verification.
 - [ ] Align Today, Plan, Progress, Office, Roadmap/Syllabus, Screen Time, and More around common page headers, cards, empty states, confirmation patterns, and button hierarchy.
 - [ ] Review all flows for tap count, accessible labels, minimum touch size, truncation, large font scaling, contrast, and system-bar insets.
 - [ ] Audit Today/Plan/progress metrics for a single definition of planned, completed, skipped, actual focus, and syllabus completion.
