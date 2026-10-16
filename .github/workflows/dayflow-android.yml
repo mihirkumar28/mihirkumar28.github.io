@@ -120,7 +120,7 @@ jobs:
               raise SystemExit("::error::Android aapt tool was not found.")
 
           def version_key(path):
-              return tuple(int(piece) for piece in re.findall(r"\\d+", path.parent.name))
+              return tuple(int(piece) for piece in re.findall(r"\d+", path.parent.name))
 
           aapt = max(aapt_paths, key=version_key)
           result = subprocess.run(
@@ -132,7 +132,7 @@ jobs:
               ""
           )
           package_name = re.search(r"name='([^']+)'", package_line)
-          apk_code = re.search(r"versionCode='(\\d+)'", package_line)
+          apk_code = re.search(r"versionCode='(\d+)'", package_line)
           apk_name = re.search(r"versionName='([^']+)'", package_line)
           if not package_name or not apk_code or not apk_name:
               raise SystemExit("::error::Could not read package/version metadata from the release APK.")
@@ -155,7 +155,7 @@ jobs:
               "versionCode": expected_code,
               "versionName": expected_name,
               "releaseNotes": "Latest DayFlow Android build with bug fixes and improvements."
-          }, indent=2) + "\\n", encoding="utf-8")
+          }, indent=2) + "\n", encoding="utf-8")
           metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
           if metadata.get("versionCode") != actual_code or metadata.get("versionName") != actual_name:
               raise SystemExit("::error::Update metadata does not match the APK version.")
