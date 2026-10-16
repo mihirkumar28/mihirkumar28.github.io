@@ -589,6 +589,7 @@ public class MainActivity extends Activity {
         small.setLetterSpacing(0.1f);
         LinearLayout.LayoutParams sm=new LinearLayout.LayoutParams(-1,-2); sm.bottomMargin=dp(5); page.addView(small,sm);
         TextView heading=text(title,27,color("#F2F7F3"),true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) heading.setAccessibilityHeading(true);
         LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2); hp.bottomMargin=dp(5); page.addView(heading,hp);
         TextView detail=text(subtitle,13,color("#9AABA0"),false); detail.setLineSpacing(dp(2),1f);
         LinearLayout.LayoutParams detailLp=new LinearLayout.LayoutParams(-1,-2); detailLp.bottomMargin=dp(18); page.addView(detail,detailLp);
@@ -621,7 +622,12 @@ public class MainActivity extends Activity {
         TextView hint = text(detail, 11, color("#687A70"), false);
         hint.setLineSpacing(dp(1), 1f);
         details.addView(hint);
-        row.addView(text("›", 23, color("#286B55"), true));
+        details.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        TextView arrow = text("›", 23, color("#286B55"), true);
+        arrow.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        row.addView(arrow);
+        row.setContentDescription(title + ". " + detail + ". Open item.");
+        row.setFocusable(true);
         row.setOnClickListener(v -> action.run());
         View divider = new View(this);
         divider.setBackgroundColor(color("#DDE6DE"));
@@ -5099,6 +5105,7 @@ public class MainActivity extends Activity {
             e.getValue().setTextColor(foreground);
             View parent=(View)e.getValue().getParent();
             parent.setBackground(bg(selected?"#DCEBE2":"#FFFFFF",14));
+            parent.setSelected(selected);
             if(parent instanceof LinearLayout){
                 LinearLayout item=(LinearLayout)parent;
                 if(item.getChildCount()>0 && item.getChildAt(0) instanceof TextView)
@@ -5120,6 +5127,7 @@ public class MainActivity extends Activity {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         String greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
         TextView title = text(greeting, 26, Color.WHITE, true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) title.setAccessibilityHeading(true);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
         titleLp.topMargin = dp(3);
         brand.addView(title, titleLp);

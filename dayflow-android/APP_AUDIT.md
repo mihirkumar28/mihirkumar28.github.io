@@ -30,7 +30,7 @@
 
 - [x] Extract the legacy dark-to-light color remapping into a pure, unit-tested DayFlowPalette class; improve secondary-label contrast on light task cards. [ ] Continue migrating screens to explicit semantic tokens and add automated contrast checks without a high-risk global replacement.
 - [ ] Align Today, Plan, Progress, Office, Roadmap/Syllabus, Screen Time, and More around common page headers, cards, empty states, confirmation patterns, and button hierarchy.
-- [ ] Review all flows for tap count, accessible labels, minimum touch size, truncation, large font scaling, contrast, and system-bar insets.
+- [~] Add heading semantics to page titles, selected-state semantics to bottom navigation, and a clear accessibility description for Manage rows. TalkBack traversal, touch targets, large-font behavior, contrast and system-bar insets still need device-level review.
 - [ ] Audit Today/Plan/progress metrics for a single definition of planned, completed, skipped, actual focus, and syllabus completion.
 - [~] Widget: keep the latest redesigned content and wrap the visible card to its content; the actual rendered appearance still requires device verification.
 
