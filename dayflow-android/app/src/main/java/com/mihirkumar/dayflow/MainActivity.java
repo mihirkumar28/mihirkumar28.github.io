@@ -8469,32 +8469,46 @@ private void readBackupForRestore(Uri uri) {
             return;
         }
         try {
-            // DayFlowBackupCodec validates all entries before this editor is ever cleared.
-            SharedPreferences.Editor editor = getPrefs().edit().clear();
-            for (Map.Entry<String, Object> item : values.entrySet()) {
-                String key = item.getKey();
-                Object value = item.getValue();
-                if (value instanceof String) editor.putString(key, (String) value);
-                else if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
-                else if (value instanceof Integer) editor.putInt(key, (Integer) value);
-                else if (value instanceof Long) editor.putLong(key, (Long) value);
-                else if (value instanceof Float) editor.putFloat(key, (Float) value);
-                else if (value instanceof java.util.Set) {
-                    java.util.HashSet<String> set = new java.util.HashSet<>();
-                    for (Object member : (java.util.Set<?>) value) {
-                        if (!(member instanceof String)) {
-                            throw new IllegalStateException("Validated backup contained a non-string set member.");
-                        }
-                        set.add((String) member);
-                    }
-                    editor.putStringSet(key, set);
-                } else {
-                    throw new IllegalStateException("Validated backup contained an unsupported value type.");
+            BackupRestoreTransaction.restore(new BackupRestoreTransaction.Store() {
+                @Override public Map<String, Object> readAll() {
+                    return new java.util.LinkedHashMap<>(getPrefs().getAll());
                 }
-            }
-            if (!editor.commit()) {
-                throw new IllegalStateException("Android could not save the restored data.");
-            }
+
+                @Override public boolean replaceAll(Map<String, Object> snapshot) {
+                    SharedPreferences.Editor editor = getPrefs().edit().clear();
+                    for (Map.Entry<String, Object> item : snapshot.entrySet()) {
+                        String key = item.getKey();
+                        Object value = item.getValue();
+                        if (value instanceof String) editor.putString(key, (String) value);
+                        else if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
+                        else if (value instanceof Integer) editor.putInt(key, (Integer) value);
+                        else if (value instanceof Long) editor.putLong(key, (Long) value);
+                        else if (value instanceof Float) editor.putFloat(key, (Float) value);
+                        else if (value instanceof java.util.Set) {
+                            java.util.HashSet<String> set = new java.util.HashSet<>();
+                            for (Object member : (java.util.Set<?>) value) {
+                                if (!(member instanceof String)) {
+                                    throw new IllegalStateException(
+                                            "Preference snapshot contained a non-string set member.");
+                                }
+                                set.add((String) member);
+                            }
+                            editor.putStringSet(key, set);
+                        } else {
+                            throw new IllegalStateException(
+                                    "Preference snapshot contained an unsupported value type.");
+                        }
+                    }
+                    return editor.commit();
+                }
+            }, values);
+        } catch (Exception e) {
+            debugLog("Backup restore failed: " + e.getMessage());
+            Toast.makeText(this, "Backup restore failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        try {
             selectedDateKey = todayKey();
             load();
             ensureRoadmapData();
@@ -8505,8 +8519,12 @@ private void readBackupForRestore(Uri uri) {
             Toast.makeText(this, "DayFlow backup restored.", Toast.LENGTH_LONG).show();
             debugLog("Backup restored: values=" + values.size());
         } catch (Exception e) {
-            debugLog("Backup restore failed: " + e.getMessage());
-            Toast.makeText(this, "Backup restore failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            // Preference replacement already succeeded; report a UI refresh problem separately
+            // instead of telling the user that the restore itself failed.
+            debugLog("Backup restored but screen refresh failed: " + e.getMessage());
+            Toast.makeText(this,
+                    "Backup was restored, but DayFlow could not refresh the screen. Reopen the app.",
+                    Toast.LENGTH_LONG).show();
         }
     }
 
