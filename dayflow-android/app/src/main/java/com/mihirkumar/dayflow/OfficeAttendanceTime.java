@@ -4,7 +4,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.text.ParseException;
 import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -131,18 +130,14 @@ final class OfficeAttendanceTime {
         Calendar calendar = Calendar.getInstance();
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         formatter.setLenient(false);
-        try {
-            ParsePosition position = new ParsePosition(0);
-            Date selectedDate = formatter.parse(dayKey, position);
-            if (selectedDate == null || position.getErrorIndex() >= 0
-                    || position.getIndex() != dayKey.length()
-                    || !formatter.format(selectedDate).equals(dayKey)) {
-                throw new IllegalArgumentException("Invalid date: " + dayKey);
-            }
-            calendar.setTime(selectedDate);
-        } catch (IllegalArgumentException e) {
-            throw e;
+        ParsePosition position = new ParsePosition(0);
+        Date selectedDate = formatter.parse(dayKey, position);
+        if (selectedDate == null || position.getErrorIndex() >= 0
+                || position.getIndex() != dayKey.length()
+                || !formatter.format(selectedDate).equals(dayKey)) {
+            throw new IllegalArgumentException("Invalid date: " + dayKey);
         }
+        calendar.setTime(selectedDate);
         calendar.set(Calendar.HOUR_OF_DAY, Math.max(0, Math.min(23, hour)));
         calendar.set(Calendar.MINUTE, Math.max(0, Math.min(59, minute)));
         calendar.set(Calendar.SECOND, 0);
