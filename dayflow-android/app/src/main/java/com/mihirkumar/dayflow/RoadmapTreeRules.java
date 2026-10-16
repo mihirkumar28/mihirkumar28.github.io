@@ -59,8 +59,8 @@ final class RoadmapTreeRules {
                                       boolean hasCompletedWork, String targetTrack, String targetMonth) {
         if (hasCompletedWork || draggedParentId > 0L
                 || !java.util.Objects.equals(draggedTrack, targetTrack)
-                || draggedMonth == null || draggedMonth.length() != 7
-                || targetMonth == null || targetMonth.length() != 7) return false;
+                || !isValidMonthKey(draggedMonth)
+                || !isValidMonthKey(targetMonth)) return false;
         if (java.util.Objects.equals(draggedMonth, targetMonth)) return true;
         return "General Studies".equals(draggedTrack);
     }
