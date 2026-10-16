@@ -67,6 +67,9 @@ jobs:
       - name: Validate widget RemoteViews layout
         run: python3 scripts/validate_widget_layout.py
 
+      - name: Run release tooling tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       - name: Run attendance regression tests
         run: gradle :app:testDebugUnitTest
 
@@ -93,75 +96,10 @@ jobs:
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
         run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import re
-          import subprocess
-
-          repo = pathlib.Path.cwd()
-          apk = repo / "dayflow-android/app/build/outputs/apk/release/app-release.apk"
-          if not apk.is_file():
-              raise SystemExit(f"::error::Release APK is missing: {apk}")
-
-          sdk_candidates = [
-              os.environ.get("ANDROID_HOME"),
-              os.environ.get("ANDROID_SDK_ROOT"),
-              "/usr/local/lib/android/sdk",
-          ]
-          sdk_roots = [pathlib.Path(p) for p in sdk_candidates if p]
-          sdk = next((p for p in sdk_roots if (p / "build-tools").is_dir()), None)
-          if sdk is None:
-              raise SystemExit("::error::Android SDK build-tools directory was not found.")
-
-          aapt_paths = [p for p in (sdk / "build-tools").glob("*/aapt") if p.is_file()]
-          if not aapt_paths:
-              raise SystemExit("::error::Android aapt tool was not found.")
-
-          def version_key(path):
-              return tuple(int(piece) for piece in re.findall(r"\d+", path.parent.name))
-
-          aapt = max(aapt_paths, key=version_key)
-          result = subprocess.run(
-              [str(aapt), "dump", "badging", str(apk)],
-              check=True, capture_output=True, text=True
-          )
-          package_line = next(
-              (line for line in result.stdout.splitlines() if line.startswith("package:")),
-              ""
-          )
-          package_name = re.search(r"name='([^']+)'", package_line)
-          apk_code = re.search(r"versionCode='(\d+)'", package_line)
-          apk_name = re.search(r"versionName='([^']+)'", package_line)
-          if not package_name or not apk_code or not apk_name:
-              raise SystemExit("::error::Could not read package/version metadata from the release APK.")
-          if package_name.group(1) != "com.mihirkumar.dayflow":
-              raise SystemExit("::error::Release APK has an unexpected package name.")
-
-          run_number = int(os.environ["GITHUB_RUN_NUMBER"])
-          expected_code = run_number
-          expected_name = f"1.0.{run_number}"
-          actual_code = int(apk_code.group(1))
-          actual_name = apk_name.group(1)
-          if actual_code != expected_code or actual_name != expected_name:
-              raise SystemExit(
-                  f"::error::APK version mismatch: expected {expected_code}/{expected_name}, "
-                  f"got {actual_code}/{actual_name}."
-              )
-
-          metadata_path = repo / "dayflow-android/update.json"
-          metadata_path.write_text(json.dumps({
-              "versionCode": expected_code,
-              "versionName": expected_name,
-              "releaseNotes": "Latest DayFlow Android build with bug fixes and improvements."
-          }, indent=2) + "\n", encoding="utf-8")
-          metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-          if metadata.get("versionCode") != actual_code or metadata.get("versionName") != actual_name:
-              raise SystemExit("::error::Update metadata does not match the APK version.")
-
-          print(f"Verified release APK and update metadata: {actual_code}/{actual_name}")
-          PY
+          python3 dayflow-android/scripts/verify_release_metadata.py \
+            --apk dayflow-android/app/build/outputs/apk/release/app-release.apk \
+            --metadata dayflow-android/update.json \
+            --run-number "$GITHUB_RUN_NUMBER"
 
       - name: Build debug APK
         if: env.DAYFLOW_SIGNED != 'true'
