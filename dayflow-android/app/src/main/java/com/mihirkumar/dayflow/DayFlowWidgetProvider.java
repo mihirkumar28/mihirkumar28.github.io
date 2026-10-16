@@ -244,29 +244,55 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
             JSONObject block = blocks.optJSONObject(i);
             if (block != null && "done".equals(block.optString("status"))) doneBlocks++;
         }
-        if (officeMode && hasOpenCommute(day)) {
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics_label, "COMMUTE");
-            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metrics,
-                    SystemClock.elapsedRealtime() - commuteMs, "%s", true);
-            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metrics, false);
-        } else if (officeMode && inOffice) {
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics_label, "OFFICE");
-            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metrics,
-                    SystemClock.elapsedRealtime() - officeMs, "%s", true);
-            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metrics, false);
-        } else if (officeMode) {
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics_label, "TOTAL");
-            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metrics,
+
+        String todayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        long screenTimeMs = ScreenTimeTracker.getStoredMillis(context, todayKey);
+        String screenTimeValue;
+        if (!ScreenTimeTracker.hasUsageAccess(context)) screenTimeValue = "Allow access";
+        else if (screenTimeMs < 0) screenTimeValue = "Collecting";
+        else screenTimeValue = ScreenTimeTracker.formatDuration(screenTimeMs);
+        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_3_value, screenTimeValue);
+        views.setContentDescription(com.mihirkumar.dayflow.R.id.widget_metric_3_value,
+                "Screen time: " + screenTimeValue);
+
+        if (officeMode) {
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_1_label, "OFFICE");
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_2_label, "COMMUTE");
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metric_1_value,
                     SystemClock.elapsedRealtime(), "%s", false);
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics,
-                    "O " + fmtMillis(officeMs) + " • C " + fmtMillis(commuteMs));
+            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metric_1_value, false);
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metric_2_value,
+                    SystemClock.elapsedRealtime(), "%s", false);
+            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metric_2_value, false);
+
+            if (hasOpenCommute(day)) {
+                views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_1_value, fmtMillis(officeMs));
+                views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metric_2_value,
+                        SystemClock.elapsedRealtime() - commuteMs, "%s", true);
+                views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metric_2_value, false);
+            } else if (inOffice) {
+                views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metric_1_value,
+                        SystemClock.elapsedRealtime() - officeMs, "%s", true);
+                views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metric_1_value, false);
+                views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_2_value, fmtMillis(commuteMs));
+            } else {
+                views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_1_value, fmtMillis(officeMs));
+                views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_2_value, fmtMillis(commuteMs));
+            }
         } else {
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics_label, "PLAN");
-            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metrics,
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_1_label, "PLAN");
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_2_label, "SYLLABUS");
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metric_1_value,
                     SystemClock.elapsedRealtime(), "%s", false);
+            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metric_1_value, false);
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_1_value,
+                    doneBlocks + "/" + blocks.length());
+            views.setChronometer(com.mihirkumar.dayflow.R.id.widget_metric_2_value,
+                    SystemClock.elapsedRealtime(), "%s", false);
+            views.setChronometerCountDown(com.mihirkumar.dayflow.R.id.widget_metric_2_value, false);
             String syllabus = syllabusProgressPercent(context);
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metrics,
-                    doneBlocks + "/" + blocks.length() + " • S " + syllabus + "%");
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_metric_2_value,
+                    "—".equals(syllabus) ? "—" : syllabus + "%");
         }
 
         boolean showControls = officeMode || target != null;
@@ -276,16 +302,9 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
                 showControls ? android.view.View.VISIBLE : android.view.View.GONE);
         views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_controls,
                 showControls ? android.view.View.VISIBLE : android.view.View.GONE);
-        String todayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-        long screenTimeMs = ScreenTimeTracker.getStoredMillis(context, todayKey);
-        String screenTimeText;
-        if (!ScreenTimeTracker.hasUsageAccess(context)) screenTimeText = "SCREEN • Allow access";
-        else if (screenTimeMs < 0) screenTimeText = "SCREEN • Collecting";
-        else screenTimeText = "SCREEN " + ScreenTimeTracker.formatDuration(screenTimeMs);
-        views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_screen_time, screenTimeText);
 
         if (officeMode) {
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, inOffice ? "OUT" : "IN");
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, inOffice ? "Check out" : "Check in");
             views.setContentDescription(com.mihirkumar.dayflow.R.id.widget_action,
                     inOffice ? "Check out of office" : "Check in to office");
             views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_commute, commuteAction(day));
@@ -298,10 +317,10 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
                     context, 1001, toggle, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_action, togglePi);
         } else if (target != null && targetIndex >= 0) {
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, "DONE");
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, "Mark done");
             views.setContentDescription(com.mihirkumar.dayflow.R.id.widget_action,
                     "Mark " + current + " complete");
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_commute, "SKIP");
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_commute, "Skip task");
             views.setContentDescription(com.mihirkumar.dayflow.R.id.widget_commute,
                     "Skip " + current);
             views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_action,
@@ -391,10 +410,10 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         long b = day.optLong("commuteInEnd", 0);
         long c = day.optLong("commuteOutStart", 0);
         long d = day.optLong("commuteOutEnd", 0);
-        if (a > 0 && b == 0) return "END";
-        if (b > 0 && c == 0) return "START";
-        if (c > 0 && d == 0) return "END";
-        return "DONE";
+        if (a > 0 && b == 0) return "End commute";
+        if (b > 0 && c == 0) return "Start commute";
+        if (c > 0 && d == 0) return "End commute";
+        return "Commute done";
     }
 
     private static void toggleCommute(Context context) {

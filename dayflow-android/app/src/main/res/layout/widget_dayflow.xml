@@ -3,138 +3,218 @@
     android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:paddingLeft="8dp"
-    android:paddingTop="2dp"
-    android:paddingRight="8dp"
-    android:paddingBottom="2dp"
-    android:background="#F4F6F1">
+    android:orientation="vertical"
+    android:paddingLeft="10dp"
+    android:paddingTop="6dp"
+    android:paddingRight="10dp"
+    android:paddingBottom="6dp"
+    android:background="@drawable/widget_card_background">
 
-    <!-- Content-sized primary column avoids an artificial gap after short task names. -->
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
         <TextView
             android:id="@+id/widget_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:maxWidth="130dp"
+            android:maxWidth="125dp"
             android:maxLines="1"
             android:ellipsize="end"
+            android:paddingLeft="6dp"
+            android:paddingTop="3dp"
+            android:paddingRight="6dp"
+            android:paddingBottom="3dp"
             android:includeFontPadding="false"
             android:text="WFH"
-            android:textColor="#52685D"
-            android:textSize="9sp"
-            android:textStyle="bold" />
+            android:textColor="#285A43"
+            android:textSize="8sp"
+            android:textStyle="bold"
+            android:background="@drawable/widget_status_badge" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
 
         <TextView
-            android:id="@+id/widget_task"
+            android:id="@+id/widget_timing"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:maxWidth="140dp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:text="Current task"
-            android:textColor="#18372E"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:id="@+id/widget_timing"
-                android:layout_width="38dp"
-                android:layout_height="wrap_content"
-                android:text="ENDS IN"
-                android:textColor="#687A70"
-                android:textSize="7sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false" />
-
-            <Chronometer
-                android:id="@+id/widget_countdown"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:countDown="true"
-                android:format="%s"
-                android:text="00:00"
-                android:textColor="#18372E"
-                android:textSize="9sp"
-                android:textStyle="bold"
-                android:singleLine="true"
-                android:includeFontPadding="false" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- Live metrics now begin just after the content-sized task column. -->
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="8dp"
-        android:orientation="vertical"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:id="@+id/widget_metrics_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="PLAN"
+            android:layout_marginEnd="4dp"
+            android:text="ENDS IN"
             android:textColor="#687A70"
             android:textSize="7sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
 
         <Chronometer
-            android:id="@+id/widget_metrics"
-            android:layout_width="match_parent"
+            android:id="@+id/widget_countdown"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:countDown="true"
             android:format="%s"
-            android:text="0/0 • S —%"
-            android:textColor="#496257"
-            android:textSize="8sp"
+            android:text="00:00"
+            android:textColor="#18372E"
+            android:textSize="10sp"
+            android:textStyle="bold"
             android:singleLine="true"
-            android:ellipsize="end"
             android:includeFontPadding="false" />
-
-        <TextView
-            android:id="@+id/widget_screen_time"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:text="SCREEN • Collecting"
-            android:textColor="#687A70"
-            android:textSize="7sp" />
     </LinearLayout>
 
-    <!-- Taller rounded actions use the available widget height more effectively. -->
+    <TextView
+        android:id="@+id/widget_task"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:text="Current task"
+        android:textColor="#18372E"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:background="#DCE6DE" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_metric_1_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="OFFICE"
+                android:textColor="#687A70"
+                android:textSize="7sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
+
+            <Chronometer
+                android:id="@+id/widget_metric_1_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:format="%s"
+                android:text="0m"
+                android:textColor="#18372E"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:includeFontPadding="false" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="25dp"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="6dp"
+            android:background="#DCE6DE" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_metric_2_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="COMMUTE"
+                android:textColor="#687A70"
+                android:textSize="7sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
+
+            <Chronometer
+                android:id="@+id/widget_metric_2_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:format="%s"
+                android:text="0m"
+                android:textColor="#18372E"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:includeFontPadding="false" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="25dp"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="6dp"
+            android:background="#DCE6DE" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_metric_3_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="SCREEN"
+                android:textColor="#687A70"
+                android:textSize="7sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
+
+            <TextView
+                android:id="@+id/widget_metric_3_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:text="Collecting"
+                android:textColor="#18372E"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
     <LinearLayout
         android:id="@+id/widget_controls"
-        android:layout_width="50dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_marginTop="7dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
         <TextView
             android:id="@+id/widget_action"
-            android:layout_width="match_parent"
-            android:layout_height="27dp"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
             android:gravity="center"
-            android:text="IN"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="Check in"
             android:textColor="#FFFFFF"
             android:textSize="9sp"
             android:textStyle="bold"
@@ -143,13 +223,16 @@
 
         <TextView
             android:id="@+id/widget_commute"
-            android:layout_width="match_parent"
-            android:layout_height="27dp"
-            android:layout_marginTop="3dp"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
             android:gravity="center"
-            android:text="START"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="Start commute"
             android:textColor="#18372E"
-            android:textSize="8sp"
+            android:textSize="9sp"
             android:textStyle="bold"
             android:background="@drawable/widget_action_secondary"
             android:includeFontPadding="false" />
