@@ -72,6 +72,25 @@ def main() -> None:
     if initial_layout != "@layout/widget_dayflow":
         fail(f"unexpected initial widget layout: {initial_layout!r}")
 
+    # Keep the launcher-sized surface transparent while the visible card wraps its
+    # content. A match_parent white card recreates the large empty white area below
+    # the action buttons even when the widget itself needs two launcher rows.
+    if layout_root.attrib.get(ANDROID_NS + "background") != "@android:color/transparent":
+        fail("widget root must stay transparent so launcher cell space is not painted white")
+
+    visible_card = next(iter(layout_root), None)
+    if visible_card is None or visible_card.tag.rsplit("}", 1)[-1] != "LinearLayout":
+        fail("widget root must contain a visible card as its first child")
+    if visible_card.attrib.get(ANDROID_NS + "layout_height") != "wrap_content":
+        fail("visible widget card must wrap content to avoid blank white space below buttons")
+    if visible_card.attrib.get(ANDROID_NS + "background") != "@drawable/widget_card_background":
+        fail("visible widget card must use @drawable/widget_card_background")
+
+    min_height = info_root.attrib.get(ANDROID_NS + "minHeight")
+    target_height = info_root.attrib.get(ANDROID_NS + "targetCellHeight")
+    if min_height != "108dp" or target_height != "2":
+        fail("widget launcher sizing changed unexpectedly; expected 108dp minimum and two target rows")
+
     if not 1 <= len(ids) <= 80:
         fail(f"unexpected widget ID count: {len(ids)}")
 
