@@ -67,6 +67,9 @@ jobs:
       - name: Validate widget RemoteViews layout
         run: python3 scripts/validate_widget_layout.py
 
+      - name: Run release tooling tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       - name: Run attendance regression tests
         run: gradle :app:testDebugUnitTest
 
@@ -87,6 +90,17 @@ jobs:
           DAYFLOW_KEY_ALIAS: ${{ secrets.DAYFLOW_KEY_ALIAS }}
         run: gradle :app:assembleRelease
 
+      - name: Generate and verify update metadata
+        if: env.DAYFLOW_SIGNED == 'true'
+        working-directory: .
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          python3 dayflow-android/scripts/verify_release_metadata.py \
+            --apk dayflow-android/app/build/outputs/apk/release/app-release.apk \
+            --metadata dayflow-android/update.json \
+            --run-number "$GITHUB_RUN_NUMBER"
+
       - name: Build debug APK
         if: env.DAYFLOW_SIGNED != 'true'
         run: gradle :app:assembleDebug
@@ -106,13 +120,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "DayFlow latest" --notes "Latest stable DayFlow APK."
-          cat > dayflow-android/update.json <<EOF
-          {
-            "versionCode": ${GITHUB_RUN_NUMBER},
-            "versionName": "1.0.${GITHUB_RUN_NUMBER}",
-            "releaseNotes": "Latest DayFlow Android build with bug fixes and improvements."
-          }
-          EOF
           gh release upload latest dayflow-android/app/build/outputs/apk/release/app-release.apk --clobber
           gh release upload latest dayflow-android/update.json --clobber
 
