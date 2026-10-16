@@ -8463,51 +8463,66 @@ private JSONObject buildBackupDocument() throws Exception {
     }
 
 private void readBackupForRestore(Uri uri) {
+        final int maxBytes = DayFlowBackupCodec.MAX_DOCUMENT_CHARS;
         try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
-            if (input == null) throw new java.io.IOException("Could not open backup file");
+            if (input == null) throw new java.io.IOException("Could not open backup file.");
             java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
             byte[] bytes = new byte[4096];
             int count;
-            while ((count = input.read(bytes)) != -1) buffer.write(bytes, 0, count);
-            JSONObject root = new JSONObject(buffer.toString(java.nio.charset.StandardCharsets.UTF_8.name()));
-            if (!"DayFlow".equals(root.optString("app")) || root.optInt("formatVersion", 0) != 1
-                    || !(root.opt("preferences") instanceof JSONObject)) {
-                throw new IllegalArgumentException("This is not a supported DayFlow backup.");
+            int total = 0;
+            while ((count = input.read(bytes)) != -1) {
+                total += count;
+                if (total > maxBytes) {
+                    throw new IllegalArgumentException("Backup is too large to restore safely.");
+                }
+                buffer.write(bytes, 0, count);
             }
-            JSONObject values = root.getJSONObject("preferences");
+            String raw = buffer.toString(java.nio.charset.StandardCharsets.UTF_8.name());
+            DayFlowBackupCodec.Document document = DayFlowBackupCodec.parse(raw);
+            Map<String, Object> values = document.preferences;
             new AlertDialog.Builder(this).setTitle("Restore backup?")
-                    .setMessage("The backup contains " + values.length() + " values. It replaces current plans, attendance, syllabus and screen-time history.")
+                    .setMessage("The backup contains " + values.size()
+                            + " validated values. It replaces current plans, attendance, syllabus and settings.")
                     .setPositiveButton("Restore", (d, w) -> restoreBackupValues(values))
                     .setNegativeButton("Cancel", null).show();
         } catch (Exception e) {
-            debugLog("Backup import failed: " + e.getMessage());
-            Toast.makeText(this, "Couldn't read backup: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            debugLog("Backup import rejected: " + e.getMessage());
+            Toast.makeText(this, "Couldn't use this backup: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
-private void restoreBackupValues(JSONObject values) {
+    private void restoreBackupValues(Map<String, Object> values) {
+        if (values == null) {
+            Toast.makeText(this, "Backup contains no validated data.", Toast.LENGTH_LONG).show();
+            return;
+        }
         try {
+            // DayFlowBackupCodec validates all entries before this editor is ever cleared.
             SharedPreferences.Editor editor = getPrefs().edit().clear();
-            java.util.Iterator<String> keys = values.keys();
-            while (keys.hasNext()) {
-                String key = keys.next();
-                JSONObject typed = values.optJSONObject(key);
-                if (typed == null) continue;
-                String type = typed.optString("type");
-                Object value = typed.opt("value");
-                if ("string".equals(type)) editor.putString(key, value == null ? "" : String.valueOf(value));
-                else if ("boolean".equals(type)) editor.putBoolean(key, typed.optBoolean("value", false));
-                else if ("int".equals(type)) editor.putInt(key, typed.optInt("value", 0));
-                else if ("long".equals(type)) editor.putLong(key, typed.optLong("value", 0L));
-                else if ("float".equals(type)) editor.putFloat(key, (float) typed.optDouble("value", 0.0));
-                else if ("stringSet".equals(type) && value instanceof JSONArray) {
-                    HashSet<String> set = new HashSet<>();
-                    JSONArray list = (JSONArray) value;
-                    for (int i = 0; i < list.length(); i++) set.add(list.optString(i));
+            for (Map.Entry<String, Object> item : values.entrySet()) {
+                String key = item.getKey();
+                Object value = item.getValue();
+                if (value instanceof String) editor.putString(key, (String) value);
+                else if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
+                else if (value instanceof Integer) editor.putInt(key, (Integer) value);
+                else if (value instanceof Long) editor.putLong(key, (Long) value);
+                else if (value instanceof Float) editor.putFloat(key, (Float) value);
+                else if (value instanceof java.util.Set) {
+                    java.util.HashSet<String> set = new java.util.HashSet<>();
+                    for (Object member : (java.util.Set<?>) value) {
+                        if (!(member instanceof String)) {
+                            throw new IllegalStateException("Validated backup contained a non-string set member.");
+                        }
+                        set.add((String) member);
+                    }
                     editor.putStringSet(key, set);
+                } else {
+                    throw new IllegalStateException("Validated backup contained an unsupported value type.");
                 }
             }
-            editor.apply();
+            if (!editor.commit()) {
+                throw new IllegalStateException("Android could not save the restored data.");
+            }
             selectedDateKey = todayKey();
             load();
             ensureRoadmapData();
@@ -8516,7 +8531,7 @@ private void restoreBackupValues(JSONObject values) {
             ensureScreenTimeWorker();
             DayFlowWidgetProvider.refreshAll(this);
             Toast.makeText(this, "DayFlow backup restored.", Toast.LENGTH_LONG).show();
-            debugLog("Backup restored");
+            debugLog("Backup restored: values=" + values.size());
         } catch (Exception e) {
             debugLog("Backup restore failed: " + e.getMessage());
             Toast.makeText(this, "Backup restore failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
