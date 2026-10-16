@@ -16,7 +16,7 @@
 - [x] Add a CI validator for widget layout inflation: supported RemoteViews classes only, unique IDs, and every widget-provider view reference present in XML.
 - [x] Add a CI validator for widget RemoteViews compatibility and provider/layout IDs. [ ] Add Android UI/instrumentation coverage for actual widget inflation, task completion, office check-in/out, and navigation.
 - [x] Add strict typed-backup validation and unit tests for unsupported formats, malformed entries, invalid numbers, bad string sets, and oversized documents; validate fully before preferences are cleared.
-- [ ] Add workflow-level verification that the published update metadata and APK come from the same commit/build.
+- [x] Verify the signed APK package/version and generate matching update metadata before publication; release tooling unit tests run in CI.
 
 ## Phase 2 — scheduling and data integrity
 
