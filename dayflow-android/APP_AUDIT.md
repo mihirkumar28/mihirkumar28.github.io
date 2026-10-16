@@ -28,7 +28,7 @@
 
 ## Phase 3 — design consistency and everyday usability
 
-- [~] Improve secondary-label contrast on light task cards. The current shared color helper also remaps legacy dark-palette values to the light theme; replace this implicit mapping with explicit palette tokens and contrast tests in a separate, screen-by-screen migration. Do not globally replace color values without visual verification.
+- [x] Extract the legacy dark-to-light color remapping into a pure, unit-tested DayFlowPalette class; improve secondary-label contrast on light task cards. [ ] Continue migrating screens to explicit semantic tokens and add automated contrast checks without a high-risk global replacement.
 - [ ] Align Today, Plan, Progress, Office, Roadmap/Syllabus, Screen Time, and More around common page headers, cards, empty states, confirmation patterns, and button hierarchy.
 - [ ] Review all flows for tap count, accessible labels, minimum touch size, truncation, large font scaling, contrast, and system-bar insets.
 - [ ] Audit Today/Plan/progress metrics for a single definition of planned, completed, skipped, actual focus, and syllabus completion.
