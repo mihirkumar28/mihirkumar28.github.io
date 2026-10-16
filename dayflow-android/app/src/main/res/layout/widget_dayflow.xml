@@ -4,11 +4,19 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:paddingLeft="10dp"
-    android:paddingTop="6dp"
-    android:paddingRight="10dp"
-    android:paddingBottom="6dp"
-    android:background="@drawable/widget_card_background">
+    android:gravity="top"
+    android:background="@android:color/transparent">
+
+    <!-- The outer widget may occupy two launcher rows, but the visible card wraps its content. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="10dp"
+        android:paddingTop="6dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="6dp"
+        android:background="@drawable/widget_card_background">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -240,5 +248,6 @@
             android:textStyle="bold"
             android:background="@drawable/widget_action_secondary"
             android:includeFontPadding="false" />
+    </LinearLayout>
     </LinearLayout>
 </LinearLayout>
