@@ -622,7 +622,10 @@ public class MainActivity extends Activity {
         TextView hint = text(detail, 11, color("#687A70"), false);
         hint.setLineSpacing(dp(1), 1f);
         details.addView(hint);
-        row.addView(text("›", 23, color("#286B55"), true));
+        details.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        TextView arrow = text("›", 23, color("#286B55"), true);
+        arrow.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        row.addView(arrow);
         row.setContentDescription(title + ". " + detail + ". Open item.");
         row.setFocusable(true);
         row.setOnClickListener(v -> action.run());
