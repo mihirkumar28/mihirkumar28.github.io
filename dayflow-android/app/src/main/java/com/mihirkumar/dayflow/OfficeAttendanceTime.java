@@ -5,6 +5,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.text.ParseException;
+import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -124,15 +125,23 @@ final class OfficeAttendanceTime {
     }
 
     static long timestampForDayAndTime(String dayKey, int hour, int minute) {
+        if (dayKey == null || !dayKey.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            throw new IllegalArgumentException("Invalid date: " + dayKey);
+        }
         Calendar calendar = Calendar.getInstance();
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         formatter.setLenient(false);
         try {
-            Date selectedDate = formatter.parse(dayKey);
-            if (selectedDate == null) throw new IllegalArgumentException("Invalid date: " + dayKey);
+            ParsePosition position = new ParsePosition(0);
+            Date selectedDate = formatter.parse(dayKey, position);
+            if (selectedDate == null || position.getErrorIndex() >= 0
+                    || position.getIndex() != dayKey.length()
+                    || !formatter.format(selectedDate).equals(dayKey)) {
+                throw new IllegalArgumentException("Invalid date: " + dayKey);
+            }
             calendar.setTime(selectedDate);
-        } catch (ParseException e) {
-            throw new IllegalArgumentException("Invalid date: " + dayKey, e);
+        } catch (IllegalArgumentException e) {
+            throw e;
         }
         calendar.set(Calendar.HOUR_OF_DAY, Math.max(0, Math.min(23, hour)));
         calendar.set(Calendar.MINUTE, Math.max(0, Math.min(59, minute)));
