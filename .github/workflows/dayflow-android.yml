@@ -11,6 +11,12 @@ on:
 permissions:
   contents: write
 
+# Only one build for a branch may publish artifacts/release assets at a time.
+# New commits cancel older in-flight builds so a stale APK cannot overwrite latest.
+concurrency:
+  group: dayflow-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -58,6 +64,9 @@ jobs:
             exit 1
           fi
 
+      - name: Validate widget RemoteViews layout
+        run: python3 scripts/validate_widget_layout.py
+
       - name: Run attendance regression tests
         run: gradle :app:testDebugUnitTest
 
@@ -91,7 +100,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish latest signed APK
-        if: env.DAYFLOW_SIGNED == 'true'
+        if: env.DAYFLOW_SIGNED == 'true' && github.ref == 'refs/heads/main'
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
