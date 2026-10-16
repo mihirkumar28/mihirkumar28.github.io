@@ -2732,8 +2732,8 @@ public class MainActivity extends Activity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         int left = 4 + Math.min(depth, 5) * 13;
         row.setPadding(dp(left), dp(7), dp(4), dp(7));
-        if ("track".equals(node.type)) row.setBackground(bg("#EAF3EC", 11));
-        else if ("subject".equals(node.type)) row.setBackground(bg("#F7F9F6", 9));
+        if ("track".equals(node.type)) row.setBackground(bg(DayFlowDesignTokens.SURFACE_ALT, 11));
+        else if ("subject".equals(node.type)) row.setBackground(bg(DayFlowDesignTokens.CANVAS, 9));
         else row.setBackgroundColor(Color.TRANSPARENT);
         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
         rowLp.bottomMargin = dp("track".equals(node.type) ? 5 : 1);
@@ -2796,7 +2796,8 @@ public class MainActivity extends Activity {
         row.addView(detail, detailLp);
         float titleSize = "track".equals(node.type) ? 14f : "subject".equals(node.type) ? 13f : 12f;
         TextView title = text(node.title, titleSize,
-                node.done && isRoadmapActionNode(node) ? color("#687A70") : color("#18372E"),
+                node.done && isRoadmapActionNode(node) ? color(DayFlowDesignTokens.TEXT_SECONDARY)
+                        : color(DayFlowDesignTokens.TEXT_PRIMARY),
                 !"group".equals(node.type) && !"topic".equals(node.type));
         title.setMaxLines("track".equals(node.type) || "subject".equals(node.type) ? 2 : 3);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -2809,7 +2810,7 @@ public class MainActivity extends Activity {
             boolean trackDescription = "track".equals(node.type) || "subject".equals(node.type);
             TextView meta = text(metadata, trackDescription ? 12 : 11,
                     RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, todayKey())
-                            ? color("#A76821") : color("#52675C"),
+                            ? color(DayFlowDesignTokens.WARNING_TEXT) : color(DayFlowDesignTokens.TEXT_SECONDARY),
                     false);
             // Darker neutral copy stays readable; regular weight preserves title hierarchy.
             meta.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -2828,7 +2829,8 @@ public class MainActivity extends Activity {
 
         int[] progress = roadmapNodeProgress(node);
         if (progress[1] > 0 && hasChildren) {
-            TextView count = text(progress[0] + "/" + progress[1], 10, color("#2E8060"), true);
+            TextView count = text(progress[0] + "/" + progress[1], 10,
+                    color(DayFlowDesignTokens.ACCENT), true);
             count.setGravity(Gravity.CENTER);
             row.addView(count, new LinearLayout.LayoutParams(dp(42), dp(30)));
         }
