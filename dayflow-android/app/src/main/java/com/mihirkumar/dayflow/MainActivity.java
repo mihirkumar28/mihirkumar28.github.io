@@ -6056,8 +6056,8 @@ public class MainActivity extends Activity {
             return;
         }
         int end = start + duration;
-        if (duration <= 0 || end > 1439) {
-            Toast.makeText(this, "That block would run past midnight.", Toast.LENGTH_SHORT).show();
+        if (!ScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "Choose a valid time range within the same day.", Toast.LENGTH_SHORT).show();
             return;
         }
         addRecurringBlocks(name, start, end, behavior, repeat);
@@ -6068,37 +6068,49 @@ public class MainActivity extends Activity {
             addCustomTimedBlock(name, start, end, behavior);
             return;
         }
-        if (end <= start) {
-            Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+        if (!ScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "End time must be after start time and within the same day.",
+                    Toast.LENGTH_SHORT).show();
             return;
         }
         addRecurringBlocks(name, start, end, behavior, repeat);
     }
 
     private void addRecurringBlocks(String name, int start, int end, String behavior, String repeat) {
+        if (!ScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "Choose a valid time range within the same day.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Date base = parseDateKey(selectedDateKey);
         if (base == null) {
             finishAddBlock(name, start, end - start, behavior);
             return;
         }
         int count = 0;
+        int skipped = 0;
         Calendar cursor = Calendar.getInstance();
         cursor.setTime(base);
         for (int i = 0; i < 30; i++) {
             int dow = cursor.get(Calendar.DAY_OF_WEEK);
-            boolean include = "daily".equals(repeat) || (dow != Calendar.SATURDAY && dow != Calendar.SUNDAY);
-            if (include) {
+            if (ScheduleRules.shouldRepeatOnDay(repeat, dow)) {
                 String key = keyForDate(cursor.getTime());
                 ArrayList<Block> dayBlocks = readBlocksForDate(key);
-                dayBlocks.add(new Block(System.currentTimeMillis() + i + count,
-                        toTime(start), toTime(end), name, behavior, "pending"));
-                writeBlocksForDate(key, dayBlocks);
-                count++;
+                if (findOverlappingBlock(dayBlocks, start, end, null) != null) {
+                    skipped++;
+                } else {
+                    dayBlocks.add(new Block(System.currentTimeMillis() + i + count + skipped,
+                            toTime(start), toTime(end), name, behavior, "pending"));
+                    writeBlocksForDate(key, dayBlocks);
+                    count++;
+                }
             }
             cursor.add(Calendar.DAY_OF_YEAR, 1);
         }
         loadSelectedDate();
-        Toast.makeText(this, "Added " + count + " occurrences.", Toast.LENGTH_SHORT).show();
+        String message = "Added " + count + (count == 1 ? " occurrence." : " occurrences.");
+        if (skipped > 0) message += " Skipped " + skipped + " conflicting " +
+                (skipped == 1 ? "date." : "dates.");
+        Toast.makeText(this, message, skipped > 0 ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show();
         render();
     }
 
@@ -6141,25 +6153,59 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean validateBlockInterval(List<Block> dayBlocks, int start, int end, Block excluded) {
+        if (!ScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "Choose a valid start and end time within the same day.",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        Block conflict = findOverlappingBlock(dayBlocks, start, end, excluded);
+        if (conflict != null) {
+            Toast.makeText(this, "Overlaps with “" + conflict.title + "” (" +
+                    time12(conflict.start) + "–" + time12(conflict.end) + ").",
+                    Toast.LENGTH_LONG).show();
+            return false;
+        }
+        return true;
+    }
+
+    private Block findOverlappingBlock(List<Block> dayBlocks, int start, int end, Block excluded) {
+        if (dayBlocks == null || !ScheduleRules.isValidInterval(start, end)) return null;
+        for (Block existing : dayBlocks) {
+            if (existing == excluded) continue;
+            try {
+                if (ScheduleRules.overlaps(start, end, mins(existing.start), mins(existing.end))) {
+                    return existing;
+                }
+            } catch (RuntimeException ignored) {
+                // A malformed legacy record is not allowed to crash creation of a valid block.
+            }
+        }
+        return null;
+    }
+
     private void finishAddBlock(String name, int start, int duration, String behavior) {
         if (duration <= 0) {
             Toast.makeText(this, "Choose a valid duration.", Toast.LENGTH_SHORT).show();
             return;
         }
         int end = start + duration;
-        if (end > 1439) {
-            Toast.makeText(this, "That block would run past midnight.", Toast.LENGTH_SHORT).show();
+        if (!ScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "That block would run past midnight or has an invalid time.", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (!validateBlockInterval(blocks, start, end, null)) return;
         blocks.add(new Block(System.currentTimeMillis(), toTime(start), toTime(end), name, behavior, "pending"));
         save();
     }
 
     private void addCustomTimedBlock(String name, int start, int end, String behavior) {
-        if (end <= start) {
-            Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+        if (!ScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "End time must be after start time and within the same day.",
+                    Toast.LENGTH_SHORT).show();
             return;
         }
+        if (!validateBlockInterval(blocks, start, end, null)) return;
         blocks.add(new Block(System.currentTimeMillis(), toTime(start), toTime(end), name, behavior, "pending"));
         save();
     }
@@ -6284,6 +6330,7 @@ public class MainActivity extends Activity {
                         Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
                         return false;
                     }
+                    if (!validateBlockInterval(blocks, start[0], end[0], b)) return false;
                     stopFocusForBlock(b, System.currentTimeMillis());
                     b.title = name;
                     b.start = toTime(start[0]);
