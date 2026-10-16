@@ -44,7 +44,7 @@
 
 - [ ] Extract scheduling, persistence, attendance, backup/restore, updates, and per-screen UI from the very large `MainActivity` in small, tested steps.
 - [ ] Keep pure business rules Android-independent where possible and add tests before moving logic.
-- [ ] Add lint/static analysis and a documented smoke-test checklist before APK publication.
+- [~] Added Android Lint to the pre-release CI path and documented device-level smoke tests in `SMOKE_TEST_CHECKLIST.md`; CI must pass and the manual device checklist remains to be executed.
 
 ## Current constraints
 
