@@ -6180,7 +6180,9 @@ public class MainActivity extends Activity {
                 JSONObject o = arr.getJSONObject(i);
                 result.add(blockFromJson(o, "pending"));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            result.clear();
+            debugLog("Could not read blocks for " + dayKey + ": " + e.getMessage());
         }
         return result;
     }
@@ -6200,7 +6202,9 @@ public class MainActivity extends Activity {
                 arr.put(o);
             }
             getPrefs().edit().putString(blocksKey(dayKey), arr.toString()).apply();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            debugLog("Could not save blocks for " + dayKey + ": " + e.getMessage());
+            Toast.makeText(this, "Could not save the schedule for that date.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -7354,7 +7358,9 @@ public class MainActivity extends Activity {
                 if (o == null) continue;
                 result.add(blockFromJson(o, "pending"));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            result.clear();
+            debugLog("Could not read " + key + " template: " + e.getMessage());
         }
         return result;
     }
@@ -7375,7 +7381,9 @@ public class MainActivity extends Activity {
             getPrefs().edit().putString(templateKey(key), arr.toString()).apply();
             debugLog("Template saved: " + key + " blocks=" + template.size());
             DayFlowWidgetProvider.refreshAll(this);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            debugLog("Template save failed for " + key + ": " + e.getMessage());
+            Toast.makeText(this, "Could not save the " + key + " routine.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -7936,10 +7944,17 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void saveOfficeDay(JSONObject day) {
+    private boolean saveOfficeDay(JSONObject day) {
         try {
-            if (day == null) return;
-            String key = day.optString("date");
+            if (day == null) {
+                debugLog("Office day save rejected: missing record.");
+                return false;
+            }
+            String key = day.optString("date", "");
+            if (key.trim().isEmpty()) {
+                debugLog("Office day save rejected: missing date.");
+                return false;
+            }
             JSONArray arr = new JSONArray(getPrefs().getString(OFFICE_LOG_KEY, "[]"));
             boolean replaced = false;
             for (int i = 0; i < arr.length(); i++) {
@@ -7953,7 +7968,12 @@ public class MainActivity extends Activity {
             if (!replaced) arr.put(day);
             getPrefs().edit().putString(OFFICE_LOG_KEY, arr.toString()).apply();
             DayFlowWidgetProvider.refreshAll(this);
-        } catch (Exception ignored) {
+            debugLog("Office day saved: " + key);
+            return true;
+        } catch (Exception e) {
+            debugLog("Office day save failed: " + e.getMessage());
+            Toast.makeText(this, "Could not save the attendance record.", Toast.LENGTH_LONG).show();
+            return false;
         }
     }
 
@@ -7989,26 +8009,35 @@ public class MainActivity extends Activity {
         try {
             long now = System.currentTimeMillis();
             JSONObject day = getOfficeDay(todayKey(), true);
+            if (day == null) {
+                Toast.makeText(this, "Could not open today's attendance record.", Toast.LENGTH_LONG).show();
+                return;
+            }
             JSONArray sessions = day.optJSONArray("sessions");
             if (sessions == null) {
                 sessions = new JSONArray();
                 day.put("sessions", sessions);
             }
 
-            if (hasOpenOfficeSession(day)) {
+            boolean checkingOut = hasOpenOfficeSession(day);
+            if (checkingOut) {
                 JSONObject last = sessions.optJSONObject(sessions.length() - 1);
+                if (last == null) throw new IllegalStateException("The open office session is missing.");
                 last.put("out", now);
-                Toast.makeText(this, "Checked out at " + clock(now), Toast.LENGTH_SHORT).show();
             } else {
                 JSONObject session = new JSONObject();
                 session.put("in", now);
                 session.put("out", 0);
                 sessions.put(session);
-                Toast.makeText(this, "Checked in at " + clock(now), Toast.LENGTH_SHORT).show();
             }
-            saveOfficeDay(day);
+            if (!saveOfficeDay(day)) return;
+            Toast.makeText(this,
+                    (checkingOut ? "Checked out at " : "Checked in at ") + clock(now),
+                    Toast.LENGTH_SHORT).show();
             render();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            debugLog("Attendance toggle failed: " + e.getMessage());
+            Toast.makeText(this, "Could not update attendance. Please try again.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -8016,32 +8045,40 @@ public class MainActivity extends Activity {
         try {
             long now = System.currentTimeMillis();
             JSONObject day = getOfficeDay(todayKey(), true);
+            if (day == null) {
+                Toast.makeText(this, "Could not open today's attendance record.", Toast.LENGTH_LONG).show();
+                return;
+            }
 
             long inStart = day.optLong("commuteInStart", 0);
             long inEnd = day.optLong("commuteInEnd", 0);
             long outStart = day.optLong("commuteOutStart", 0);
             long outEnd = day.optLong("commuteOutEnd", 0);
+            String statusMessage;
 
             if (inStart == 0) {
                 day.put("commuteInStart", now);
-                Toast.makeText(this, "Commute started.", Toast.LENGTH_SHORT).show();
+                statusMessage = "Commute started.";
             } else if (inEnd == 0) {
                 day.put("commuteInEnd", now);
-                Toast.makeText(this, "Office commute logged.", Toast.LENGTH_SHORT).show();
+                statusMessage = "Office commute logged.";
             } else if (outStart == 0) {
                 day.put("commuteOutStart", now);
-                Toast.makeText(this, "Home commute started.", Toast.LENGTH_SHORT).show();
+                statusMessage = "Home commute started.";
             } else if (outEnd == 0) {
                 day.put("commuteOutEnd", now);
-                Toast.makeText(this, "Home commute logged.", Toast.LENGTH_SHORT).show();
+                statusMessage = "Home commute logged.";
             } else {
                 Toast.makeText(this, "Today's commute is already complete.", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            saveOfficeDay(day);
+            if (!saveOfficeDay(day)) return;
+            Toast.makeText(this, statusMessage, Toast.LENGTH_SHORT).show();
             render();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            debugLog("Commute toggle failed: " + e.getMessage());
+            Toast.makeText(this, "Could not update commute tracking. Please try again.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -8262,7 +8299,7 @@ public class MainActivity extends Activity {
                                     .show();
                             return false;
                         }
-                        saveOfficeDay(day);
+                        if (!saveOfficeDay(day)) return false;
                         render();
                         renderOfficePage();
                         if (returnToDetail) {
@@ -8362,7 +8399,9 @@ public class MainActivity extends Activity {
                     .apply();
             debugLog("Day saved: date=" + selectedDateKey + " mode=" + mode + " blocks=" + blocks.size());
             DayFlowWidgetProvider.refreshAll(this);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            debugLog("Day save failed for " + selectedDateKey + ": " + e.getMessage());
+            Toast.makeText(this, "Could not save the schedule. Please try again.", Toast.LENGTH_LONG).show();
         }
         render();
     }

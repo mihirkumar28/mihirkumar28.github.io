@@ -14,15 +14,15 @@
 - [x] Keep GitHub Actions release builds serialized by branch; cancel stale in-flight runs so an older commit cannot race to overwrite the `latest` release.
 - [x] Publish the `latest` signed APK only from `main`.
 - [x] Add a CI validator for widget layout inflation: supported RemoteViews classes only, unique IDs, and every widget-provider view reference present in XML.
-- [ ] Add Android UI/instrumentation coverage for actual widget inflation, task completion, office check-in/out, and navigation.
-- [ ] Add tests for backup compatibility and restore failure paths.
+- [x] Add a CI validator for widget RemoteViews compatibility and provider/layout IDs. [ ] Add Android UI/instrumentation coverage for actual widget inflation, task completion, office check-in/out, and navigation.
+- [x] Add strict typed-backup validation and unit tests for unsupported formats, malformed entries, invalid numbers, bad string sets, and oversized documents; validate fully before preferences are cleared.
 - [ ] Add workflow-level verification that the published update metadata and APK come from the same commit/build.
 
 ## Phase 2 — scheduling and data integrity
 
 - [ ] Add explicit invariant tests for non-overlapping blocks, valid start/end times, fixed anchors, and behavior when work will not fit in the remaining day.
 - [ ] Test recurrence scope (single occurrence vs future occurrences vs template) and ensure generated blocks are idempotent.
-- [ ] Validate every imported backup completely before mutating preferences; preserve an automatic rollback snapshot for restore.
+- [x] Validate every imported backup completely before mutating preferences; reject malformed/oversized files before clearing saved data. (Automatic rollback snapshot remains open.)
 - [ ] Test attendance edits across multiple sessions, open sessions, invalid historical intervals, and date boundaries.
 - [ ] Add migration tests for older saved preference formats.
 
