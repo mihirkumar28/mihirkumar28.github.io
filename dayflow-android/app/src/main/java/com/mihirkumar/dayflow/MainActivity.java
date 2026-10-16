@@ -290,6 +290,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        loadSelectedDate();
         ensureScreenTimeWorker();
         if (ScreenTimeTracker.refreshRecentDays(this, 7)) DayFlowWidgetProvider.refreshAll(this);
         render();

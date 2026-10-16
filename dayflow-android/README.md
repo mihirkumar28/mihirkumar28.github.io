@@ -8,7 +8,8 @@ Native Android implementation of DayFlow. The app stores its timetable in Androi
 - WFH / Office / Weekend templates
 - Add blocks
 - Done / Skip / Undo
-- Live current + next block
+- Compact home-screen widget with live task timing and progress
+- Office check-in/out and commute actions, plus WFH/weekend Done/Skip actions
 - Recovery mode
 - Daily execution metrics
 - Offline-first: no backend required

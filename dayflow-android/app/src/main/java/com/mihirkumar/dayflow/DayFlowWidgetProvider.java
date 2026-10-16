@@ -25,6 +25,9 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
     private static final String BLOCKS_KEY = "blocks";
     private static final String MODE_KEY = "mode";
     private static final String ACTION_TOGGLE = "com.mihirkumar.dayflow.CHECK_IN_OUT";
+    private static final String ACTION_TASK_DONE = "com.mihirkumar.dayflow.TASK_DONE";
+    private static final String ACTION_TASK_SKIP = "com.mihirkumar.dayflow.TASK_SKIP";
+    private static final String EXTRA_BLOCK_INDEX = "blockIndex";
     private static final String DEBUG_LOG_KEY = "debugLog";
     private static final String DEBUG_TAG = "DayFlow";
     private static final String SYLLABUS_KEY = "syllabusTopics";
@@ -45,6 +48,12 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
             refreshAll(context);
         } else if ("com.mihirkumar.dayflow.COMMUTE".equals(action)) {
             toggleCommute(context);
+            refreshAll(context);
+        } else if (ACTION_TASK_DONE.equals(action)) {
+            updateTaskStatus(context, intent.getIntExtra(EXTRA_BLOCK_INDEX, -1), "done");
+            refreshAll(context);
+        } else if (ACTION_TASK_SKIP.equals(action)) {
+            updateTaskStatus(context, intent.getIntExtra(EXTRA_BLOCK_INDEX, -1), "skipped");
             refreshAll(context);
         } else if (ACTION_TICK.equals(action)
                 || Intent.ACTION_BOOT_COMPLETED.equals(action)
@@ -169,6 +178,8 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         JSONArray blocks = getTodayBlocks(context);
         JSONObject active = null;
         JSONObject next = null;
+        int activeIndex = -1;
+        int nextIndex = -1;
         int now = currentMinutes();
         try {
             debugLog(context, "Widget read blocks=" + blocks.length()
@@ -180,15 +191,20 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
                 int end = mins(b.optString("end", "00:00"));
                 if (start <= now && now < end) {
                     active = b;
+                    activeIndex = i;
                     break;
                 }
-                if (start > now && next == null) next = b;
+                if (start > now && next == null) {
+                    next = b;
+                    nextIndex = i;
+                }
             }
         } catch (Exception e) {
             debugLog(context, "Widget task selection failed: " + e.getMessage());
         }
 
         JSONObject target = active != null ? active : next;
+        int targetIndex = active != null ? activeIndex : nextIndex;
         long nowWall = System.currentTimeMillis();
         if (target != null) {
             current = target.optString("title", "Current task");
@@ -253,33 +269,46 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
                     doneBlocks + "/" + blocks.length() + " • S " + syllabus + "%");
         }
 
+        boolean showControls = officeMode || target != null;
         views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_action,
-                officeMode ? android.view.View.VISIBLE : android.view.View.GONE);
+                showControls ? android.view.View.VISIBLE : android.view.View.GONE);
         views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_commute,
-                officeMode ? android.view.View.VISIBLE : android.view.View.GONE);
-
+                showControls ? android.view.View.VISIBLE : android.view.View.GONE);
         views.setViewVisibility(com.mihirkumar.dayflow.R.id.widget_controls,
-                officeMode ? android.view.View.VISIBLE : android.view.View.GONE);
+                showControls ? android.view.View.VISIBLE : android.view.View.GONE);
         String todayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
         long screenTimeMs = ScreenTimeTracker.getStoredMillis(context, todayKey);
         String screenTimeText;
-        if (!ScreenTimeTracker.hasUsageAccess(context)) screenTimeText = "SCREEN TIME • Enable access in DayFlow";
-        else if (screenTimeMs < 0) screenTimeText = "SCREEN TIME • Collecting history";
-        else screenTimeText = "SCREEN " + ScreenTimeTracker.formatDuration(screenTimeMs) + " today";
+        if (!ScreenTimeTracker.hasUsageAccess(context)) screenTimeText = "SCREEN • Allow access";
+        else if (screenTimeMs < 0) screenTimeText = "SCREEN • Collecting";
+        else screenTimeText = "SCREEN " + ScreenTimeTracker.formatDuration(screenTimeMs);
         views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_screen_time, screenTimeText);
 
         if (officeMode) {
             views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, inOffice ? "OUT" : "IN");
-
-            String commuteAction = commuteAction(day);
-            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_commute, commuteAction);
+            views.setContentDescription(com.mihirkumar.dayflow.R.id.widget_action,
+                    inOffice ? "Check out of office" : "Check in to office");
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_commute, commuteAction(day));
+            views.setContentDescription(com.mihirkumar.dayflow.R.id.widget_commute,
+                    "Toggle commute tracking");
             views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_commute, commutePendingIntent(context));
-        }
 
-        Intent toggle = new Intent(context, DayFlowWidgetProvider.class).setAction(ACTION_TOGGLE);
-        PendingIntent togglePi = PendingIntent.getBroadcast(
-                context, 1001, toggle, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_action, togglePi);
+            Intent toggle = new Intent(context, DayFlowWidgetProvider.class).setAction(ACTION_TOGGLE);
+            PendingIntent togglePi = PendingIntent.getBroadcast(
+                    context, 1001, toggle, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_action, togglePi);
+        } else if (target != null && targetIndex >= 0) {
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_action, "DONE");
+            views.setContentDescription(com.mihirkumar.dayflow.R.id.widget_action,
+                    "Mark " + current + " complete");
+            views.setTextViewText(com.mihirkumar.dayflow.R.id.widget_commute, "SKIP");
+            views.setContentDescription(com.mihirkumar.dayflow.R.id.widget_commute,
+                    "Skip " + current);
+            views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_action,
+                    taskPendingIntent(context, targetIndex, false));
+            views.setOnClickPendingIntent(com.mihirkumar.dayflow.R.id.widget_commute,
+                    taskPendingIntent(context, targetIndex, true));
+        }
 
         Intent openIntent = new Intent(context, MainActivity.class);
         PendingIntent openPi = PendingIntent.getActivity(
@@ -297,6 +326,57 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
                 .setAction("com.mihirkumar.dayflow.COMMUTE");
         return PendingIntent.getBroadcast(context, 1003, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private static PendingIntent taskPendingIntent(Context context, int blockIndex, boolean skip) {
+        String action = skip ? ACTION_TASK_SKIP : ACTION_TASK_DONE;
+        Intent intent = new Intent(context, DayFlowWidgetProvider.class)
+                .setAction(action)
+                .putExtra(EXTRA_BLOCK_INDEX, blockIndex);
+        int requestCode = 1200 + blockIndex * 2 + (skip ? 1 : 0);
+        return PendingIntent.getBroadcast(context, requestCode, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private static boolean updateTaskStatus(Context context, int blockIndex, String status) {
+        if (blockIndex < 0 || !("done".equals(status) || "skipped".equals(status))) return false;
+        try {
+            String todayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            String key = "blocks_" + todayKey;
+            String raw = prefs.getString(key, null);
+            if (raw == null) raw = prefs.getString(BLOCKS_KEY, "[]");
+            JSONArray blocks = new JSONArray(raw);
+            if (blockIndex >= blocks.length()) return false;
+
+            JSONObject block = blocks.optJSONObject(blockIndex);
+            if (block == null || !"pending".equals(block.optString("status", "pending"))) return false;
+
+            long now = System.currentTimeMillis();
+            long startedAt = block.optLong("actualStartedAt", 0L);
+            if (startedAt > 0L) {
+                Calendar scheduledEnd = Calendar.getInstance();
+                int endMinute = mins(block.optString("end", "23:59"));
+                scheduledEnd.set(Calendar.HOUR_OF_DAY, endMinute / 60);
+                scheduledEnd.set(Calendar.MINUTE, endMinute % 60);
+                scheduledEnd.set(Calendar.SECOND, 0);
+                scheduledEnd.set(Calendar.MILLISECOND, 0);
+                long stopAt = Math.min(now, scheduledEnd.getTimeInMillis());
+                long accumulated = Math.max(0L, block.optLong("actualMs", 0L));
+                if (stopAt > startedAt) accumulated += stopAt - startedAt;
+                block.put("actualMs", accumulated);
+                block.put("actualStartedAt", 0L);
+            }
+
+            block.put("status", status);
+            String updated = blocks.toString();
+            prefs.edit().putString(key, updated).putString(BLOCKS_KEY, updated).apply();
+            debugLog(context, "Widget marked block index=" + blockIndex + " status=" + status);
+            return true;
+        } catch (Exception e) {
+            debugLog(context, "Widget task action failed: " + e.getMessage());
+            return false;
+        }
     }
 
     private static String getTodayMode(Context context) {
