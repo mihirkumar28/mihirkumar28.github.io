@@ -25,10 +25,10 @@ public class DayFlowDesignTokensTest {
         assertContrast(DayFlowDesignTokens.TEXT_PRIMARY, DayFlowDesignTokens.SUCCESS_SURFACE);
     }
 
-    @Test public void flagsCurrentLowContrastLegacySecondaryColor() {
-        assertTrue(DayFlowDesignTokens.contrastRatio("#687A70", "#FFFFFF") < NORMAL_TEXT_MINIMUM);
+    @Test public void flagsCurrentLowContrastLegacySecondaryColorOnPaleGreenSurface() {
+        assertTrue(DayFlowDesignTokens.contrastRatio("#687A70", "#EAF0E9") < NORMAL_TEXT_MINIMUM);
         assertTrue(DayFlowDesignTokens.contrastRatio(
-                DayFlowDesignTokens.TEXT_SECONDARY, "#FFFFFF") >= NORMAL_TEXT_MINIMUM);
+                DayFlowDesignTokens.TEXT_SECONDARY, "#EAF0E9") >= NORMAL_TEXT_MINIMUM);
     }
 
     @Test public void contrastRatioRejectsNonRgbValues() {
