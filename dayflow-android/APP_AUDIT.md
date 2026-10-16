@@ -38,7 +38,7 @@
 
 - [ ] Preserve tree continuity, empty month slots, parent-child identity, and completed-goal invariants through add/move/drop/reorder/archive flows.
 - [ ] Test that moving a node refreshes Today/Plan summaries immediately and does not create duplicate nodes or lose the source slot.
-- [ ] Add edge-case tests for search/filter combinations, malformed periods, split/retire/restore goal lifecycle, and import/export.
+- [~] Roadmap drop validation now requires real `yyyy-MM` calendar keys, not only seven-character strings. Added regression tests for malformed month values, de-duplicated planned/custom slots, empty source months, and chronological/reverse-chronological ordering. Search/filter and split/retire/restore lifecycle edges remain open.
 
 ## Phase 5 — maintainability
 
