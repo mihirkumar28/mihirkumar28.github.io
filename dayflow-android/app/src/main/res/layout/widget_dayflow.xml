@@ -11,44 +11,24 @@
     android:paddingBottom="2dp"
     android:background="#F4F6F1">
 
+    <!-- Primary information: status, task, and its countdown. -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
+        android:layout_weight="1.2"
         android:orientation="vertical">
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/widget_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:id="@+id/widget_status"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:text="WFH"
-                android:textColor="#18372E"
-                android:textSize="9sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/widget_screen_time"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="5dp"
-                android:gravity="end"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:text="SCREEN • Collecting"
-                android:textColor="#687A70"
-                android:textSize="7sp" />
-        </LinearLayout>
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:text="WFH"
+            android:textColor="#18372E"
+            android:textSize="9sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_task"
@@ -66,7 +46,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -93,44 +73,59 @@
                 android:singleLine="true"
                 android:includeFontPadding="false" />
         </LinearLayout>
+    </LinearLayout>
 
-        <LinearLayout
+    <!-- Use the middle of the widget for compact live metrics instead of empty space. -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/widget_metrics_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="PLAN"
+            android:textColor="#687A70"
+            android:textSize="7sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false" />
+
+        <Chronometer
+            android:id="@+id/widget_metrics"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:format="%s"
+            android:text="0/0 • S —%"
+            android:textColor="#496257"
+            android:textSize="8sp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:includeFontPadding="false" />
 
-            <TextView
-                android:id="@+id/widget_metrics_label"
-                android:layout_width="34dp"
-                android:layout_height="wrap_content"
-                android:text="PLAN"
-                android:textColor="#687A70"
-                android:textSize="7sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false" />
-
-            <Chronometer
-                android:id="@+id/widget_metrics"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:format="%s"
-                android:text="0/0 • S —%"
-                android:textColor="#496257"
-                android:textSize="8sp"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:includeFontPadding="false" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/widget_screen_time"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:text="SCREEN • Collecting"
+            android:textColor="#687A70"
+            android:textSize="7sp" />
     </LinearLayout>
 
+    <!-- Keep the two quick actions grouped at the edge. -->
     <LinearLayout
         android:id="@+id/widget_controls"
         android:layout_width="50dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="5dp"
         android:orientation="vertical">
 
         <TextView
