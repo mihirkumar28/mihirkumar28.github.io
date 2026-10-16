@@ -5,46 +5,47 @@
     android:layout_height="match_parent"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingLeft="6dp"
+    android:paddingLeft="8dp"
     android:paddingTop="2dp"
-    android:paddingRight="6dp"
+    android:paddingRight="8dp"
     android:paddingBottom="2dp"
     android:background="#F4F6F1">
 
-    <!-- Primary information: status, task, and its countdown. -->
+    <!-- Content-sized primary column avoids an artificial gap after short task names. -->
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_weight="1.2"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/widget_status"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:maxWidth="130dp"
             android:maxLines="1"
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:text="WFH"
-            android:textColor="#18372E"
+            android:textColor="#52685D"
             android:textSize="9sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_task"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
+            android:maxWidth="140dp"
             android:maxLines="1"
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:text="Current task"
             android:textColor="#18372E"
-            android:textSize="11sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
             android:orientation="horizontal"
@@ -75,12 +76,12 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Use the middle of the widget for compact live metrics instead of empty space. -->
+    <!-- Live metrics now begin just after the content-sized task column. -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="10dp"
         android:layout_marginEnd="8dp"
         android:orientation="vertical"
         android:gravity="center_vertical">
@@ -121,7 +122,7 @@
             android:textSize="7sp" />
     </LinearLayout>
 
-    <!-- Keep the two quick actions grouped at the edge. -->
+    <!-- Taller rounded actions use the available widget height more effectively. -->
     <LinearLayout
         android:id="@+id/widget_controls"
         android:layout_width="50dp"
@@ -131,26 +132,26 @@
         <TextView
             android:id="@+id/widget_action"
             android:layout_width="match_parent"
-            android:layout_height="23dp"
+            android:layout_height="27dp"
             android:gravity="center"
             android:text="IN"
             android:textColor="#FFFFFF"
             android:textSize="9sp"
             android:textStyle="bold"
-            android:background="#286B55"
+            android:background="@drawable/widget_action_primary"
             android:includeFontPadding="false" />
 
         <TextView
             android:id="@+id/widget_commute"
             android:layout_width="match_parent"
-            android:layout_height="23dp"
-            android:layout_marginTop="2dp"
+            android:layout_height="27dp"
+            android:layout_marginTop="3dp"
             android:gravity="center"
             android:text="START"
             android:textColor="#18372E"
             android:textSize="8sp"
             android:textStyle="bold"
-            android:background="#E6EEE7"
+            android:background="@drawable/widget_action_secondary"
             android:includeFontPadding="false" />
     </LinearLayout>
 </LinearLayout>
