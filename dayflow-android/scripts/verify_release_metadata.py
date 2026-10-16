@@ -16,7 +16,7 @@ def parse_apk_badging(output):
         "",
     )
     package_name = re.search(r"name='([^']+)'", package_line)
-    version_code = re.search(r"versionCode='(\\d+)'", package_line)
+    version_code = re.search(r"versionCode='(\d+)'", package_line)
     version_name = re.search(r"versionName='([^']+)'", package_line)
     if not package_name or not version_code or not version_name:
         raise ValueError("Could not read package/version metadata from the release APK.")
@@ -58,7 +58,7 @@ def find_aapt():
         raise FileNotFoundError("Android aapt tool was not found.")
 
     def version_key(path):
-        return tuple(int(piece) for piece in re.findall(r"\\d+", path.parent.name))
+        return tuple(int(piece) for piece in re.findall(r"\d+", path.parent.name))
 
     return max(tools, key=version_key)
 
@@ -90,7 +90,7 @@ def main():
         "releaseNotes": "Latest DayFlow Android build with bug fixes and improvements.",
     }
     args.metadata.parent.mkdir(parents=True, exist_ok=True)
-    args.metadata.write_text(json.dumps(payload, indent=2) + "\\n", encoding="utf-8")
+    args.metadata.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     written = json.loads(args.metadata.read_text(encoding="utf-8"))
     if written.get("versionCode") != apk_code or written.get("versionName") != apk_name:
