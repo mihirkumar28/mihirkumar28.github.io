@@ -524,7 +524,7 @@ public class MainActivity extends Activity {
         TextView t = new TextView(this);
         t.setText(value);
         t.setTextSize(sp);
-        t.setTextColor(c);
+        t.setTextColor(c == Color.WHITE ? color("#18372E") : c);
         t.setTypeface(Typeface.DEFAULT, bold ? Typeface.BOLD : Typeface.NORMAL);
         return t;
     }
@@ -5190,7 +5190,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
         titleLp.topMargin = dp(3);
         brand.addView(title, titleLp);
-        brand.addView(text("Make the next block count.", 12, color("#9AAEA2"), false));
+        brand.addView(text("Make the next block count.", 12, color("#687A70"), false));
         top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
 
         Button add = actionButton("＋", Color.WHITE, "#23845F");
@@ -5259,7 +5259,7 @@ public class MainActivity extends Activity {
         label.setLetterSpacing(0.12f);
         card.addView(label);
 
-        currentTitle = text("Loading…", 24, color("#18372E"), true);
+        currentTitle = text("Loading…", 24, Color.WHITE, true);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
         tp.topMargin = dp(5);
         card.addView(currentTitle, tp);
@@ -5644,7 +5644,7 @@ public class MainActivity extends Activity {
         row.addView(card, cardLp);
 
         LinearLayout details = vertical();
-        TextView title = text(b.title, 15, color("#18372E"), true);
+        TextView title = text(b.title, 15, Color.WHITE, true);
         TextView meta = text(blockBehaviorLabel(b) + " • " + fmt(mins(b.end) - mins(b.start)), 11, color("#496257"), false);
         details.addView(title);
         details.addView(meta);
