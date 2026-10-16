@@ -35,7 +35,7 @@ final class DayFlowPalette {
             case "#F2F7F3": case "#F1F6F2": case "#F5F6F1":
                 return "#18372E";
             case "#F5FBF7":
-                return Color.WHITE;
+                return "#FFFFFF";
             case "#D6E4DA": case "#D6E1D8": case "#DCE2EE": case "#DCE7DF":
                 return "#496257";
             case "#9AABA0": case "#91A197": case "#82948A": case "#A5B5AA":
@@ -43,7 +43,7 @@ final class DayFlowPalette {
             case "#A8BAAE": case "#DEE8E0": case "#7F9689": case "#47584D":
             case "#B7C7BC":
                 return "#687A70";
-            case "#FFFFFF": return Color.WHITE;
+            case "#FFFFFF": return "#FFFFFF";
             default: return hex;
         }
     }
@@ -57,10 +57,10 @@ final class DayFlowPalette {
             case "#34483D": case "#47584D":
                 return "#EAF0E9";
             case "#17231D": case "#1B2922": case "#18231E":
-                return Color.WHITE;
+                return "#FFFFFF";
             case "#23352C": case "#283A30": case "#263243": case "#202936":
             case "#214036":
-                return Color.WHITE;
+                return "#FFFFFF";
             case "#23845F": case "#40B58A": case "#27513E": case "#245B45":
             case "#243F34": case "#2C8061": case "#3F8E69": case "#286B55":
             case "#2E8060":
@@ -79,7 +79,7 @@ final class DayFlowPalette {
                 return "#EAF0E9";
             case "#F2F7F3": case "#F1F6F2": case "#F5FBF7": case "#F5F6F1":
             case "#FFFFFF":
-                return Color.WHITE;
+                return "#FFFFFF";
             default: return hex;
         }
     }
