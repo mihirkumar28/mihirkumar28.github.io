@@ -94,7 +94,7 @@ public class MainActivity extends Activity {
     private LinearLayout root, timeline, officeCard;
     private FrameLayout screenFrame;
     private LinearLayout pagePlan, pageProgress, pageOffice, pageMore, pageSyllabus, pageScreenTime;
-    private LinearLayout planList, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
+    private LinearLayout planList, planTemplatePreview, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
     private LinearLayout bottomNavigation;
     private TextView syllabusSummaryView, screenTimeSummaryView, syllabusCoverageSummary;
     private LinearLayout syllabusDetailContent;
@@ -734,6 +734,9 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams editRoutineLp=new LinearLayout.LayoutParams(0,dp(42),1);editRoutineLp.leftMargin=dp(8);
         templateRow.addView(editRoutine,editRoutineLp);
         LinearLayout.LayoutParams templateRowLp=new LinearLayout.LayoutParams(-1,dp(44));templateRowLp.topMargin=dp(10);dateCard.addView(templateRow,templateRowLp);pagePlan.addView(dateCard);
+        planTemplatePreview=vertical();
+        LinearLayout.LayoutParams templatePreviewLp=new LinearLayout.LayoutParams(-1,-2);templatePreviewLp.topMargin=dp(12);templatePreviewLp.bottomMargin=dp(16);
+        pagePlan.addView(planTemplatePreview,templatePreviewLp);
         Button add=primaryButton("＋  Add a block",()->openAddDialog());LinearLayout.LayoutParams addLp=new LinearLayout.LayoutParams(-1,dp(48));addLp.bottomMargin=dp(15);pagePlan.addView(add,addLp);
         TextView section=text("YOUR BLOCKS",11,color("#9AABA0"),true);LinearLayout.LayoutParams secLp=new LinearLayout.LayoutParams(-1,-2);secLp.bottomMargin=dp(9);pagePlan.addView(section,secLp);
         planList=vertical();pagePlan.addView(planList);renderPlanPage();
@@ -758,6 +761,7 @@ public class MainActivity extends Activity {
             }
         }
 
+        renderPlanTemplatePreview();
         planList.removeAllViews();
         ArrayList<Block> ordered = new ArrayList<>(blocks);
         Collections.sort(ordered, Comparator.comparingInt(b -> mins(b.start)));
@@ -844,6 +848,64 @@ public class MainActivity extends Activity {
             row.setOnClickListener(v -> editBlockDialog(block));
             card.addView(row);
             planList.addView(card);
+        }
+    }
+
+    private void renderPlanTemplatePreview() {
+        if (planTemplatePreview == null) return;
+        planTemplatePreview.removeAllViews();
+
+        LinearLayout heading = horizontal();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout headingText = vertical();
+        headingText.addView(text("SELECTED TEMPLATE", 10, color("#2E8060"), true));
+        headingText.addView(text(templateLabel(mode) + " routine", 18, color("#18372E"), true));
+        heading.addView(headingText, new LinearLayout.LayoutParams(0, -2, 1));
+        heading.addView(text("PREVIEW", 9, color("#687A70"), true));
+        planTemplatePreview.addView(heading);
+
+        TextView hint = text("Updates when you select WFH, Office or Weekend. Preview only — this does not replace the selected day's routine.", 11, color("#687A70"), false);
+        hint.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.topMargin = dp(4);
+        hintLp.bottomMargin = dp(8);
+        planTemplatePreview.addView(hint, hintLp);
+
+        ArrayList<Block> preview = getCombinedTemplateBlocks(mode);
+        Collections.sort(preview, Comparator.comparingInt(b -> mins(b.start)));
+        if (preview.isEmpty()) {
+            LinearLayout empty = surfaceCard();
+            empty.addView(text("No blocks in this template yet", 14, color("#18372E"), true));
+            empty.addView(text("Use Edit templates to add shared or " + templateLabel(mode).toLowerCase(Locale.ROOT) + "-specific blocks.", 11, color("#687A70"), false));
+            planTemplatePreview.addView(empty);
+            return;
+        }
+
+        for (Block block : preview) {
+            LinearLayout card = surfaceCard();
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout time = vertical();
+            time.addView(text(time12(block.start), 12, color("#286B55"), true));
+            time.addView(text(time12(block.end), 10, color("#687A70"), false));
+            row.addView(time, new LinearLayout.LayoutParams(dp(66), -2));
+
+            LinearLayout details = vertical();
+            LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(0, -2, 1);
+            detailsLp.leftMargin = dp(8);
+            row.addView(details, detailsLp);
+            TextView title = text(block.title, 13, color("#18372E"), true);
+            title.setMaxLines(3);
+            details.addView(title);
+            String source = "common".equals(block.templateOwner) ? "SHARED · LOCKED" : templateLabel(mode).toUpperCase(Locale.ROOT) + " · TEMPLATE";
+            TextView meta = text(source + "  •  " + fmt(Math.max(0, mins(block.end) - mins(block.start))), 9, color("#687A70"), false);
+            LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
+            metaLp.topMargin = dp(3);
+            details.addView(meta, metaLp);
+            card.addView(row);
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            cardLp.bottomMargin = dp(6);
+            planTemplatePreview.addView(card, cardLp);
         }
     }
 
