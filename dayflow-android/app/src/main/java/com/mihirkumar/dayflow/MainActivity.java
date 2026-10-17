@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
     private FrameLayout screenFrame;
     private LinearLayout pagePlan, pageProgress, pageOffice, pageMore, pageSyllabus, pageScreenTime;
     private LinearLayout planList, planTemplatePreview, actualScheduleContent, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
-    private Button planDayScheduleToggle, homeApplyTemplateButton;
+    private Button planDayScheduleToggle, todayRoutineEditButton;
     private LinearLayout bottomNavigation;
     private TextView syllabusSummaryView, screenTimeSummaryView, syllabusCoverageSummary;
     private LinearLayout syllabusDetailContent;
@@ -5279,11 +5279,11 @@ public class MainActivity extends Activity {
             b.setContentDescription(item + " day");
             b.setOnClickListener(v -> chooseMode(modeKey));
         }
-        homeApplyTemplateButton = secondaryButton("Apply selected template", () -> confirmApplySelectedTemplate(mode));
-        LinearLayout.LayoutParams applyLp = new LinearLayout.LayoutParams(-1, dp(40));
+        todayRoutineEditButton = secondaryButton("Modify & Save Today's Routine", this::openTodayRoutineEditor);
+        LinearLayout.LayoutParams applyLp = new LinearLayout.LayoutParams(-1, dp(44));
         applyLp.topMargin = dp(7);
-        wrapper.addView(homeApplyTemplateButton, applyLp);
-        homeApplyTemplateButton.setVisibility(View.GONE);
+        wrapper.addView(todayRoutineEditButton, applyLp);
+        todayRoutineEditButton.setVisibility(View.VISIBLE);
     }
 
     private void buildCurrentCard() {
@@ -5460,12 +5460,13 @@ public class MainActivity extends Activity {
         }
         View headerMode = root.findViewWithTag("modeHeader");
         if (headerMode instanceof TextView) ((TextView) headerMode).setText(modeLabel.toUpperCase(Locale.US));
-        if (homeApplyTemplateButton != null) {
-            // Keep an explicit recovery action visible on Today even if a legacy or
-            // incorrectly tagged date schedule appears to match by title/time alone.
-            // This lets the user re-sync the actual date with the selected template.
-            homeApplyTemplateButton.setText("Apply " + modeLabel + " template to this date");
-            homeApplyTemplateButton.setVisibility(View.VISIBLE);
+        if (todayRoutineEditButton != null) {
+            // This action edits only the selected date's own schedule; it never applies
+            // or writes back to any reusable template.
+            todayRoutineEditButton.setText(selectedDateKey.equals(todayKey())
+                    ? "Modify & Save Today's Routine"
+                    : "Modify & Save This Date's Routine");
+            todayRoutineEditButton.setVisibility(View.VISIBLE);
         }
 
         Block current = null, next = null;
@@ -6634,10 +6635,292 @@ public class MainActivity extends Activity {
     }
 
     private void chooseMode(String key) {
-        // On Today, day-type selection means switching the live date to that reusable
-        // routine. Confirm first because date-specific blocks not in the template are removed.
-        if (key.equals(mode) && scheduleMatchesTemplate(key)) return;
-        confirmApplySelectedTemplate(key);
+        if (key == null || key.equals(mode)) return;
+        // Today day-type chips only change the date's classification. They must never
+        // apply a reusable template or discard date-specific blocks.
+        mode = key;
+        SharedPreferences.Editor selection = getPrefs().edit()
+                .putString(modeKey(selectedDateKey), mode);
+        if (selectedDateKey.equals(todayKey())) selection.putString(MODE_KEY, mode);
+        selection.apply();
+        render();
+        renderOfficePage();
+        Toast.makeText(this,
+                "Day type changed. This date's schedule and all saved templates are unchanged.",
+                Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Opens a staged editor for this date's actual schedule. The working copy is not
+     * persisted until Save, and commit writes only through save() to the date key.
+     * Reusable template storage is never touched by this flow.
+     */
+    private void openTodayRoutineEditor() {
+        final String editingDate = selectedDateKey;
+        final ArrayList<Block> draft = new ArrayList<>();
+        for (Block block : blocks) draft.add(copyBlockForDailyEditor(block));
+
+        LinearLayout content = vertical();
+        content.setPadding(dp(16), dp(8), dp(16), dp(16));
+        LinearLayout protection = surfaceCard();
+        protection.addView(text("DATE-ONLY CHANGES", 10, color("#2E8060"), true));
+        protection.addView(text("Changes here are saved only to "
+                + (editingDate.equals(todayKey()) ? "today" : editingDate)
+                + ". Shared, WFH, Office and Weekend templates will not be changed.",
+                12, color("#687A70"), false));
+        content.addView(protection);
+
+        LinearLayout draftRows = vertical();
+        LinearLayout.LayoutParams rowsLp = new LinearLayout.LayoutParams(-1, -2);
+        rowsLp.topMargin = dp(10);
+        content.addView(draftRows, rowsLp);
+
+        Button add = primaryButton("＋  Add block to this routine", () ->
+                addBlockToDailyDraft(draft, draftRows));
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(46));
+        addLp.topMargin = dp(8);
+        content.addView(add, addLp);
+
+        String editorTitle = editingDate.equals(todayKey())
+                ? "Modify & Save Today's Routine"
+                : "Modify & Save This Date's Routine";
+        showFullScreenViewer("DATE-ONLY EDITOR", editorTitle,
+                "Edit, add or remove blocks. Nothing is committed until you tap Save, and no reusable template is modified.",
+                content, editingDate.equals(todayKey()) ? "Save Today's Routine" : "Save This Date's Routine",
+                () -> saveTodayRoutineDraft(draft, editingDate));
+        renderTodayRoutineDraftRows(draftRows, draft);
+    }
+
+    private Block copyBlockForDailyEditor(Block source) {
+        Block copy = new Block(source.id, source.start, source.end, source.title,
+                source.priority, source.rigidity, source.status);
+        copy.actualMs = source.actualMs;
+        copy.actualStartedAt = source.actualStartedAt;
+        copy.templateOwner = source.templateOwner;
+        return copy;
+    }
+
+    private void renderTodayRoutineDraftRows(LinearLayout rows, ArrayList<Block> draft) {
+        rows.removeAllViews();
+        Collections.sort(draft, Comparator.comparingInt(b -> mins(b.start)));
+        if (draft.isEmpty()) {
+            LinearLayout empty = surfaceCard();
+            empty.addView(text("No blocks yet", 16, color("#18372E"), true));
+            empty.addView(text("Add the blocks you want in this date's routine.", 12,
+                    color("#687A70"), false));
+            rows.addView(empty);
+            return;
+        }
+        for (Block block : new ArrayList<>(draft)) {
+            LinearLayout card = surfaceCard();
+            LinearLayout line = horizontal();
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout time = vertical();
+            time.addView(text(time12(block.start), 12, color("#286B55"), true));
+            time.addView(text(time12(block.end), 10, color("#687A70"), false));
+            line.addView(time, new LinearLayout.LayoutParams(dp(66), -2));
+
+            LinearLayout details = vertical();
+            LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(0, -2, 1);
+            detailsLp.leftMargin = dp(8);
+            detailsLp.rightMargin = dp(4);
+            line.addView(details, detailsLp);
+            TextView title = text(block.title, 13, color("#18372E"), true);
+            title.setMaxLines(3);
+            details.addView(title);
+            TextView meta = text(blockBehaviorLabel(block) + "  •  "
+                    + fmt(Math.max(0, mins(block.end) - mins(block.start))), 10, color("#687A70"), false);
+            LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
+            metaLp.topMargin = dp(3);
+            details.addView(meta, metaLp);
+
+            Button edit = secondaryButton("Edit", () ->
+                    editDailyDraftBlock(block, draft, rows));
+            Button remove = secondaryButton("×", () -> new AlertDialog.Builder(this)
+                    .setTitle("Remove from this date?")
+                    .setMessage("\"" + block.title + "\" will be removed from the draft for this date only. Templates will not change.")
+                    .setPositiveButton("Remove", (dialog, which) -> {
+                        draft.remove(block);
+                        renderTodayRoutineDraftRows(rows, draft);
+                    })
+                    .setNegativeButton("Keep", null)
+                    .show());
+            LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(dp(54), dp(38));
+            editLp.leftMargin = dp(4);
+            line.addView(edit, editLp);
+            LinearLayout.LayoutParams removeLp = new LinearLayout.LayoutParams(dp(38), dp(38));
+            removeLp.leftMargin = dp(4);
+            line.addView(remove, removeLp);
+
+            card.addView(line);
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            cardLp.bottomMargin = dp(7);
+            rows.addView(card, cardLp);
+        }
+    }
+
+    private void addBlockToDailyDraft(ArrayList<Block> draft, LinearLayout rows) {
+        int start = roundUp5(currentMinutes());
+        if (start >= 1380) start = 8 * 60;
+        int end = Math.min(1439, start + 60);
+        Block blank = new Block(System.currentTimeMillis() + draft.size(), toTime(start), toTime(end),
+                "", "normal", "flexible", "pending");
+        editDailyDraftBlock(blank, draft, rows);
+    }
+
+    private void editDailyDraftBlock(Block target, ArrayList<Block> draft, LinearLayout rows) {
+        boolean isNew = target.title == null || target.title.trim().isEmpty();
+        LinearLayout form = vertical();
+        form.setPadding(dp(20), dp(4), dp(20), dp(4));
+
+        EditText title = new EditText(this);
+        title.setSingleLine(true);
+        title.setText(target.title == null ? "" : target.title);
+        title.setHint("Block name");
+        title.setTextColor(color("#18372E"));
+        title.setHintTextColor(color("#82948A"));
+        form.addView(title, new LinearLayout.LayoutParams(-1, dp(50)));
+
+        final int[] start = {mins(target.start)};
+        final int[] end = {mins(target.end)};
+        Button startButton = chip("Start • " + time12(target.start));
+        Button endButton = chip("End • " + time12(target.end));
+        LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(-1, dp(40));
+        startLp.topMargin = dp(8);
+        form.addView(startButton, startLp);
+        LinearLayout.LayoutParams endLp = new LinearLayout.LayoutParams(-1, dp(40));
+        endLp.topMargin = dp(6);
+        form.addView(endButton, endLp);
+        startButton.setOnClickListener(v -> new TimePickerDialog(this, (picker, h, m) -> {
+            start[0] = h * 60 + m;
+            startButton.setText("Start • " + time12(toTime(start[0])));
+        }, start[0] / 60, start[0] % 60, true).show());
+        endButton.setOnClickListener(v -> new TimePickerDialog(this, (picker, h, m) -> {
+            end[0] = h * 60 + m;
+            endButton.setText("End • " + time12(toTime(end[0])));
+        }, end[0] / 60, end[0] % 60, true).show());
+
+        TextView rigidityLabel = text("RIGIDITY", 10, color("#91A197"), true);
+        LinearLayout.LayoutParams rigidityLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        rigidityLabelLp.topMargin = dp(12);
+        form.addView(rigidityLabel, rigidityLabelLp);
+        LinearLayout rigidities = horizontal();
+        form.addView(rigidities, new LinearLayout.LayoutParams(-1, dp(40)));
+        String[] rigidityNames = {"Fixed time", "Flexible time"};
+        String[] rigidityValues = {"fixed", "flexible"};
+        String[] selectedRigidity = {target.rigidity};
+        for (int i = 0; i < rigidityNames.length; i++) {
+            final int idx = i;
+            Button button = chip(rigidityNames[i]);
+            boolean selected = rigidityValues[i].equals(selectedRigidity[0]);
+            button.setTextColor(selected ? Color.WHITE : color("#D6E1D8"));
+            button.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+            if (i > 0) lp.leftMargin = dp(6);
+            rigidities.addView(button, lp);
+            button.setOnClickListener(v -> {
+                selectedRigidity[0] = rigidityValues[idx];
+                for (int j = 0; j < rigidities.getChildCount(); j++) {
+                    Button child = (Button) rigidities.getChildAt(j);
+                    child.setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    child.setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
+                }
+            });
+        }
+
+        TextView priorityLabel = text("PRIORITY", 10, color("#91A197"), true);
+        LinearLayout.LayoutParams priorityLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        priorityLabelLp.topMargin = dp(10);
+        form.addView(priorityLabel, priorityLabelLp);
+        LinearLayout priorities = horizontal();
+        form.addView(priorities, new LinearLayout.LayoutParams(-1, dp(40)));
+        String[] priorityNames = {"Critical", "Important", "Normal", "Optional"};
+        String[] priorityValues = {"critical", "important", "normal", "optional"};
+        String[] selectedPriority = {target.priority};
+        for (int i = 0; i < priorityNames.length; i++) {
+            final int idx = i;
+            Button button = chip(priorityNames[i]);
+            boolean selected = priorityValues[i].equals(selectedPriority[0]);
+            button.setTextColor(selected ? Color.WHITE : color("#D6E1D8"));
+            button.setBackground(bg(selected ? "#245B45" : "#1B2621", 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1);
+            if (i > 0) lp.leftMargin = dp(4);
+            priorities.addView(button, lp);
+            button.setOnClickListener(v -> {
+                selectedPriority[0] = priorityValues[idx];
+                for (int j = 0; j < priorities.getChildCount(); j++) {
+                    Button child = (Button) priorities.getChildAt(j);
+                    child.setTextColor(j == idx ? Color.WHITE : color("#D6E1D8"));
+                    child.setBackground(bg(j == idx ? "#245B45" : "#1B2621", 12));
+                }
+            });
+        }
+
+        showFullScreenEditor("DATE-ONLY EDITOR", isNew ? "Add block" : "Edit block",
+                "Changes stay in this date's draft until you save the routine.", form, () -> {
+                    String name = title.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        title.setError("Give this block a name");
+                        title.requestFocus();
+                        return false;
+                    }
+                    if (end[0] <= start[0]) {
+                        Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+                        return false;
+                    }
+                    target.title = name;
+                    target.start = toTime(start[0]);
+                    target.end = toTime(end[0]);
+                    target.rigidity = selectedRigidity[0];
+                    target.priority = selectedPriority[0];
+                    if (isNew && !draft.contains(target)) {
+                        // Date-only additions have no ownership in a reusable template.
+                        target.templateOwner = null;
+                        target.status = "pending";
+                        draft.add(target);
+                    }
+                    renderTodayRoutineDraftRows(rows, draft);
+                    return true;
+                });
+    }
+
+    private void saveTodayRoutineDraft(ArrayList<Block> draft, String editingDate) {
+        // Never commit a stale draft over another date if navigation changed while editing.
+        if (!editingDate.equals(selectedDateKey)) {
+            Toast.makeText(this, "The selected date changed. Reopen the editor to save safely.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (Block original : new ArrayList<>(blocks)) {
+            Block edited = null;
+            for (Block candidate : draft) {
+                if (candidate.id == original.id) {
+                    edited = candidate;
+                    break;
+                }
+            }
+            boolean changedOrRemoved = edited == null
+                    || !Objects.equals(original.title, edited.title)
+                    || !Objects.equals(original.start, edited.start)
+                    || !Objects.equals(original.end, edited.end);
+            if (changedOrRemoved && original.actualStartedAt > 0) {
+                stopFocusForBlock(original, now);
+            }
+            if (edited != null) {
+                // Preserve the freshest focus totals/timer for matching daily blocks.
+                edited.actualMs = original.actualMs;
+                edited.actualStartedAt = original.actualStartedAt;
+            }
+        }
+        blocks.clear();
+        Collections.sort(draft, Comparator.comparingInt(b -> mins(b.start)));
+        for (Block block : draft) blocks.add(block);
+        save(); // Writes only blocksKey(editingDate), never template_common/wfh/office/weekend.
+        Toast.makeText(this, editingDate.equals(todayKey())
+                ? "Today's routine saved. Templates were not changed."
+                : "This date's routine saved. Templates were not changed.",
+                Toast.LENGTH_LONG).show();
     }
 
     private boolean scheduleMatchesTemplate(String key) {
