@@ -7823,17 +7823,11 @@ public class MainActivity extends Activity {
             // The same activity name is still a shared-block duplicate: day templates cannot
             // override, rename around, or delete the shared activity from their own editor.
             if (candidate.id == shared.id) return true;
-            if (candidate.title != null && shared.title != null
-                    && !candidate.title.trim().isEmpty()
-                    && candidate.title.trim().equalsIgnoreCase(shared.title.trim())) {
-                return true;
-            }
-            // Legacy copies can have a different ID and activity label. An exact shared
-            // time slot is also protected and must never be editable from a day-type editor.
-            if (candidate.start != null && candidate.end != null
-                    && candidate.start.equals(shared.start) && candidate.end.equals(shared.end)) {
-                return true;
-            }
+            // Legacy templates did not store ownership. Shared blocks may have been copied
+            // and subsequently renamed/rescheduled there, so a title-only or exact-slot
+            // comparison is insufficient. Any such legacy entry that collides with protected
+            // shared time/name is shadowed by the common template and must not become editable.
+            if (templateBlocksConflict(candidate, shared)) return true;
         }
         return false;
     }
