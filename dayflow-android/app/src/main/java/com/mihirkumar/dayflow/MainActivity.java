@@ -7346,6 +7346,8 @@ public class MainActivity extends Activity {
     }
 
     private void saveTemplate(String key, ArrayList<Block> template) {
+        // Defensive cleanup so shared routine entries can never be persisted as day-specific blocks.
+        removeSharedRoutineCopies(key, template);
         try {
             JSONArray arr = new JSONArray();
             for (Block b : template) {
@@ -7533,6 +7535,9 @@ public class MainActivity extends Activity {
 
         private void openTemplateEditor(String key) {
         ArrayList<Block> template = getTemplateBlocks(key);
+        // Older versions could leave a copy of a shared block inside a day-type template.
+        // Remove those from the editable model; the canonical shared block remains locked below.
+        removeSharedRoutineCopies(key, template);
         LinearLayout list = vertical();
         list.setPadding(dp(16), dp(8), dp(16), dp(16));
 
@@ -7570,6 +7575,7 @@ public class MainActivity extends Activity {
         LinearLayout row = horizontal();
         row.addView(secondaryButton("Cancel", editor::dismiss), new LinearLayout.LayoutParams(0, dp(44), 1));
         Button saveTemplate = secondaryButton("Save template", () -> {
+            removeSharedRoutineCopies(key, template);
             if (!"common".equals(key) && hasProtectedSharedConflicts(template)) {
                 Toast.makeText(this,
                         "Resolve blocks marked 'Blocked by shared routine' before saving. Shared times are protected.",
@@ -7587,6 +7593,7 @@ public class MainActivity extends Activity {
         row.addView(saveTemplate, saveLp);
         footer.addView(row);
         Button saveApply = primaryButton("Save + apply to selected day", () -> {
+            removeSharedRoutineCopies(key, template);
             if (!"common".equals(key) && hasProtectedSharedConflicts(template)) {
                 Toast.makeText(this,
                         "Resolve blocks marked 'Blocked by shared routine' before saving. Shared times are protected.",
@@ -7632,6 +7639,8 @@ public class MainActivity extends Activity {
 
     private void renderTemplateEditorRows(LinearLayout list, ArrayList<Block> template, android.app.Dialog editor, String key) {
         list.removeAllViews();
+        // Keep any legacy shared copies out of the editable day-specific rows.
+        removeSharedRoutineCopies(key, template);
 
         LinearLayout intro = surfaceCard();
         intro.addView(text("common".equals(key) ? "SHARED BLOCKS" : "DAY-TYPE-SPECIFIC BLOCKS", 10, color("#2E8060"), true));
@@ -7723,7 +7732,12 @@ public class MainActivity extends Activity {
             row.addView(secondaryButton("›", () -> editTemplateBlockDialog(template, index,
                     () -> renderTemplateEditorRows(list, template, editor, key), key)),
                     new LinearLayout.LayoutParams(dp(38), dp(38)));
-            Button del = secondaryButton("×", () -> new AlertDialog.Builder(this)
+            Button del = secondaryButton("×", () -> {
+                if (!"common".equals(key) && isSharedRoutineCopy(b)) {
+                    Toast.makeText(this, "Shared blocks are locked. Edit them in the Shared routine instead.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                new AlertDialog.Builder(this)
                     .setTitle("Remove this block?")
                     .setMessage(b.title + " will be removed from the reusable routine. Existing days are unchanged.")
                     .setPositiveButton("Remove", (d, w) -> {
@@ -7731,12 +7745,41 @@ public class MainActivity extends Activity {
                         renderTemplateEditorRows(list, template, editor, key);
                     })
                     .setNegativeButton("Cancel", null)
-                    .show());
+                    .show();
+            });
             LinearLayout.LayoutParams delLp = new LinearLayout.LayoutParams(dp(38), dp(38));
             delLp.leftMargin = dp(5);
             row.addView(del, delLp);
             row.setOnClickListener(v -> editTemplateBlockDialog(template, index,
                     () -> renderTemplateEditorRows(list, template, editor, key), key));
+        }
+    }
+
+    /**
+     * True only when a day-type entry is actually a stale copy of a shared block,
+     * rather than a separate day-specific block that merely conflicts with it.
+     */
+    private boolean isSharedRoutineCopy(Block candidate) {
+        if (candidate == null) return false;
+        for (Block shared : getTemplateBlocks("common")) {
+            if (candidate.id == shared.id) return true;
+            boolean sameTitle = candidate.title != null && shared.title != null
+                    && candidate.title.trim().equalsIgnoreCase(shared.title.trim());
+            boolean sameStart = candidate.start != null && candidate.start.equals(shared.start);
+            boolean sameEnd = candidate.end != null && candidate.end.equals(shared.end);
+            if (sameTitle && sameStart && sameEnd) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Removes stale copies of shared blocks from a day-specific editing model.
+     * The canonical entries remain in template_common and are rendered read-only.
+     */
+    private void removeSharedRoutineCopies(String key, ArrayList<Block> template) {
+        if (template == null || "common".equals(key)) return;
+        for (int i = template.size() - 1; i >= 0; i--) {
+            if (isSharedRoutineCopy(template.get(i))) template.remove(i);
         }
     }
 
@@ -7759,6 +7802,11 @@ public class MainActivity extends Activity {
     }
 
     private void editTemplateBlockDialog(ArrayList<Block> template, int index, Runnable onChanged, String key) {
+        if (!"common".equals(key) && index >= 0 && index < template.size()
+                && isSharedRoutineCopy(template.get(index))) {
+            Toast.makeText(this, "Shared blocks are locked. Edit them in the Shared routine instead.", Toast.LENGTH_LONG).show();
+            return;
+        }
         boolean adding = index < 0;
         Block original;
         if (adding) {
