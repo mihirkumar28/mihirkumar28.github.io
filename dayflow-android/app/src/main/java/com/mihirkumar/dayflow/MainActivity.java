@@ -7570,6 +7570,13 @@ public class MainActivity extends Activity {
         LinearLayout row = horizontal();
         row.addView(secondaryButton("Cancel", editor::dismiss), new LinearLayout.LayoutParams(0, dp(44), 1));
         Button saveTemplate = secondaryButton("Save template", () -> {
+            if (!"common".equals(key) && hasProtectedSharedConflicts(template)) {
+                Toast.makeText(this,
+                        "Resolve blocks marked 'Blocked by shared routine' before saving. Shared times are protected.",
+                        Toast.LENGTH_LONG).show();
+                renderTemplateEditorRows(list, template, editor, key);
+                return;
+            }
             saveTemplate(key, template);
             editor.dismiss();
             Toast.makeText(this, templateLabel(key) + " template saved.", Toast.LENGTH_SHORT).show();
@@ -7580,6 +7587,13 @@ public class MainActivity extends Activity {
         row.addView(saveTemplate, saveLp);
         footer.addView(row);
         Button saveApply = primaryButton("Save + apply to selected day", () -> {
+            if (!"common".equals(key) && hasProtectedSharedConflicts(template)) {
+                Toast.makeText(this,
+                        "Resolve blocks marked 'Blocked by shared routine' before saving. Shared times are protected.",
+                        Toast.LENGTH_LONG).show();
+                renderTemplateEditorRows(list, template, editor, key);
+                return;
+            }
             saveTemplate(key, template);
             String applyMode;
             if (!"common".equals(key)) {
@@ -7618,16 +7632,63 @@ public class MainActivity extends Activity {
 
     private void renderTemplateEditorRows(LinearLayout list, ArrayList<Block> template, android.app.Dialog editor, String key) {
         list.removeAllViews();
+
         LinearLayout intro = surfaceCard();
         intro.addView(text("common".equals(key) ? "SHARED BLOCKS" : "DAY-TYPE-SPECIFIC BLOCKS", 10, color("#2E8060"), true));
         String introText = "common".equals(key)
-                ? "Every saved block here is inherited by WFH, office and weekend routines. These shared blocks take priority over conflicting day-specific blocks."
-                : "These blocks customize " + templateLabel(key) + " days. Shared blocks take priority, so conflicting day-specific blocks are omitted.";
+                ? "These blocks apply to WFH, office and weekend. They have the highest priority over any day-specific routine."
+                : "Shared blocks are shown below as locked and protect their time. Day-specific blocks cannot overlap them or reuse their activity names.";
         intro.addView(text(introText, 12, color("#687A70"), false));
         list.addView(intro);
 
+        if (!"common".equals(key)) {
+            ArrayList<Block> sharedBlocks = getTemplateBlocks("common");
+            Collections.sort(sharedBlocks, Comparator.comparingInt(b -> mins(b.start)));
+
+            LinearLayout protectedSection = surfaceCard();
+            protectedSection.addView(text("SHARED BLOCKS  ·  LOCKED", 10, color("#286B55"), true));
+            protectedSection.addView(text("Read-only · Protected for every day type", 11, color("#687A70"), false));
+            LinearLayout.LayoutParams protectedSectionLp = new LinearLayout.LayoutParams(-1, -2);
+            protectedSectionLp.topMargin = dp(8);
+            protectedSectionLp.bottomMargin = dp(8);
+            list.addView(protectedSection, protectedSectionLp);
+
+            if (sharedBlocks.isEmpty()) {
+                protectedSection.addView(text("No shared blocks yet. Add them in Edit shared routine.", 12, color("#687A70"), false));
+            } else {
+                for (Block shared : sharedBlocks) {
+                    LinearLayout row = horizontal();
+                    row.setPadding(dp(10), dp(9), dp(10), dp(9));
+                    row.setBackground(surfaceBackground(12));
+                    LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+                    rowLp.bottomMargin = dp(6);
+                    list.addView(row, rowLp);
+
+                    LinearLayout time = vertical();
+                    time.addView(text(time12(shared.start), 12, color("#286B55"), true));
+                    time.addView(text(time12(shared.end), 10, color("#687A70"), false));
+                    row.addView(time, new LinearLayout.LayoutParams(dp(70), -2));
+
+                    LinearLayout details = vertical();
+                    LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(0, -2, 1);
+                    detailsLp.leftMargin = dp(8);
+                    detailsLp.rightMargin = dp(6);
+                    row.addView(details, detailsLp);
+                    details.addView(text(shared.title, 13, color("#18372E"), true));
+                    details.addView(text(blockBehaviorLabel(shared), 10, color("#687A70"), false));
+                    TextView locked = text("LOCKED", 9, color("#286B55"), true);
+                    locked.setGravity(Gravity.CENTER_VERTICAL);
+                    row.addView(locked, new LinearLayout.LayoutParams(-2, -2));
+                    // Intentionally no click listener or edit/delete controls: common blocks
+                    // are visible here for context but can only be edited in the shared editor.
+                }
+            }
+
+            list.addView(text("DAY-SPECIFIC BLOCKS", 10, color("#2E8060"), true));
+        }
+
         Button add = primaryButton("＋  Add template block", () -> editTemplateBlockDialog(template, -1,
-                () -> renderTemplateEditorRows(list, template, editor, key)));
+                () -> renderTemplateEditorRows(list, template, editor, key), key));
         LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(46));
         addLp.bottomMargin = dp(10);
         list.addView(add, addLp);
@@ -7636,6 +7697,7 @@ public class MainActivity extends Activity {
         for (int i = 0; i < template.size(); i++) {
             final int index = i;
             Block b = template.get(i);
+            boolean protectedConflict = !"common".equals(key) && hasProtectedSharedConflict(b);
             LinearLayout row = horizontal();
             row.setPadding(dp(10), dp(10), dp(8), dp(10));
             row.setBackground(surfaceBackground(14));
@@ -7644,7 +7706,7 @@ public class MainActivity extends Activity {
             list.addView(row, rowLp);
 
             LinearLayout time = vertical();
-            time.addView(text(time12(b.start), 12, color("#286B55"), true));
+            time.addView(text(time12(b.start), 12, protectedConflict ? color("#A45B20") : color("#286B55"), true));
             time.addView(text(time12(b.end), 10, color("#687A70"), false));
             row.addView(time, new LinearLayout.LayoutParams(dp(70), -2));
 
@@ -7654,9 +7716,12 @@ public class MainActivity extends Activity {
             detailsLp.rightMargin = dp(6);
             row.addView(details, detailsLp);
             details.addView(text(b.title, 13, color("#18372E"), true));
-            details.addView(text(blockBehaviorLabel(b), 10, color("#687A70"), false));
+            details.addView(text(protectedConflict
+                            ? "Blocked by shared routine · move or remove this block"
+                            : blockBehaviorLabel(b),
+                    10, protectedConflict ? color("#A45B20") : color("#687A70"), false));
             row.addView(secondaryButton("›", () -> editTemplateBlockDialog(template, index,
-                    () -> renderTemplateEditorRows(list, template, editor, key))),
+                    () -> renderTemplateEditorRows(list, template, editor, key), key)),
                     new LinearLayout.LayoutParams(dp(38), dp(38)));
             Button del = secondaryButton("×", () -> new AlertDialog.Builder(this)
                     .setTitle("Remove this block?")
@@ -7671,11 +7736,29 @@ public class MainActivity extends Activity {
             delLp.leftMargin = dp(5);
             row.addView(del, delLp);
             row.setOnClickListener(v -> editTemplateBlockDialog(template, index,
-                    () -> renderTemplateEditorRows(list, template, editor, key)));
+                    () -> renderTemplateEditorRows(list, template, editor, key), key));
         }
     }
 
-    private void editTemplateBlockDialog(ArrayList<Block> template, int index, Runnable onChanged) {
+    /**
+     * Returns true when a day-specific block would conflict with a shared block by
+     * overlapping protected time or repeating a shared activity name.
+     */
+    private boolean hasProtectedSharedConflict(Block candidate) {
+        for (Block shared : getTemplateBlocks("common")) {
+            if (templateBlocksConflict(candidate, shared)) return true;
+        }
+        return false;
+    }
+
+    private boolean hasProtectedSharedConflicts(ArrayList<Block> dayTemplate) {
+        for (Block dayBlock : dayTemplate) {
+            if (hasProtectedSharedConflict(dayBlock)) return true;
+        }
+        return false;
+    }
+
+    private void editTemplateBlockDialog(ArrayList<Block> template, int index, Runnable onChanged, String key) {
         boolean adding = index < 0;
         Block original;
         if (adding) {
@@ -7791,6 +7874,16 @@ public class MainActivity extends Activity {
                     if (end[0] <= start[0]) {
                         Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
                         return false;
+                    }
+                    if (!"common".equals(key)) {
+                        Block candidate = new Block(0L, toTime(start[0]), toTime(end[0]),
+                                name, selectedPriority[0], selectedRigidity[0], "pending");
+                        if (hasProtectedSharedConflict(candidate)) {
+                            Toast.makeText(this,
+                                    "That time or activity is protected by the Shared routine. Choose a non-conflicting slot or activity.",
+                                    Toast.LENGTH_LONG).show();
+                            return false;
+                        }
                     }
                     if (adding) {
                         template.add(new Block(System.currentTimeMillis(), toTime(start[0]), toTime(end[0]),
