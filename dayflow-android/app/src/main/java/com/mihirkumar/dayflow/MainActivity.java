@@ -7815,21 +7815,20 @@ public class MainActivity extends Activity {
      */
     private boolean isSharedRoutineCopy(Block candidate) {
         if (candidate == null) return false;
-        // Explicit provenance takes precedence. A day-specific block with a matching
-        // name/time is still a different block; never infer ownership after migration.
-        if (candidate.templateOwner != null) return "common".equals(candidate.templateOwner);
         for (Block shared : getTemplateBlocks("common")) {
-            // A copied block may have a different ID or edited times in older saved templates.
-            // The same activity name is still a shared-block duplicate: day templates cannot
-            // override, rename around, or delete the shared activity from their own editor.
+            // Check identity and shared activity before trusting a legacy ownership marker.
+            // Older versions could incorrectly mark a copied shared block as day-specific.
             if (candidate.id == shared.id) return true;
-            // Legacy templates did not store ownership. Shared blocks may have been copied
-            // and subsequently renamed/rescheduled there, so a title-only or exact-slot
-            // comparison is insufficient. Any such legacy entry that collides with protected
-            // shared time/name is shadowed by the common template and must not become editable.
-            if (templateBlocksConflict(candidate, shared)) return true;
+            if (candidate.title != null && shared.title != null
+                    && !candidate.title.trim().isEmpty()
+                    && candidate.title.trim().equalsIgnoreCase(shared.title.trim())) {
+                return true;
+            }
         }
-        return false;
+        // Explicit ownership is authoritative after checking for recognizable legacy copies.
+        // A distinct day-specific block that merely overlaps shared time remains editable so
+        // the user can move or remove that conflicting day-specific block.
+        return "common".equals(candidate.templateOwner);
     }
 
     /**
@@ -7840,10 +7839,7 @@ public class MainActivity extends Activity {
         if (template == null || "common".equals(key)) return;
         for (int i = template.size() - 1; i >= 0; i--) {
             Block block = template.get(i);
-            if ("common".equals(block.templateOwner)
-                    || (block.templateOwner == null && isSharedRoutineCopy(block))) {
-                template.remove(i);
-            }
+            if (isSharedRoutineCopy(block)) template.remove(i);
         }
     }
 
