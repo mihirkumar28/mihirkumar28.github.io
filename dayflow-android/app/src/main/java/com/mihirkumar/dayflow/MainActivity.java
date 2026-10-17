@@ -5461,9 +5461,11 @@ public class MainActivity extends Activity {
         View headerMode = root.findViewWithTag("modeHeader");
         if (headerMode instanceof TextView) ((TextView) headerMode).setText(modeLabel.toUpperCase(Locale.US));
         if (homeApplyTemplateButton != null) {
-            boolean mismatch = !scheduleMatchesTemplate(mode);
+            // Keep an explicit recovery action visible on Today even if a legacy or
+            // incorrectly tagged date schedule appears to match by title/time alone.
+            // This lets the user re-sync the actual date with the selected template.
             homeApplyTemplateButton.setText("Apply " + modeLabel + " template to this date");
-            homeApplyTemplateButton.setVisibility(mismatch ? View.VISIBLE : View.GONE);
+            homeApplyTemplateButton.setVisibility(View.VISIBLE);
         }
 
         Block current = null, next = null;
