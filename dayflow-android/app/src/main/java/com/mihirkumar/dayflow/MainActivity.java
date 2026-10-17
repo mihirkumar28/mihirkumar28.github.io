@@ -94,7 +94,8 @@ public class MainActivity extends Activity {
     private LinearLayout root, timeline, officeCard;
     private FrameLayout screenFrame;
     private LinearLayout pagePlan, pageProgress, pageOffice, pageMore, pageSyllabus, pageScreenTime;
-    private LinearLayout planList, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
+    private LinearLayout planList, planTemplatePreview, actualScheduleContent, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
+    private Button planDayScheduleToggle;
     private LinearLayout bottomNavigation;
     private TextView syllabusSummaryView, screenTimeSummaryView, syllabusCoverageSummary;
     private LinearLayout syllabusDetailContent;
@@ -710,7 +711,7 @@ public class MainActivity extends Activity {
     }
 
     private void buildPlanPage() {
-        pageHeading(pagePlan,"Build your day","Plan","Edit the selected date without hunting through the timeline. Fixed times stay anchored; flexible tasks can move.");
+        pageHeading(pagePlan,"Build your day","Plan","Choose WFH, Office or Weekend to view its saved template. The selected date's actual schedule stays separate.");
         LinearLayout dateCard=surfaceCard();LinearLayout dateRow=horizontal();
         dateRow.addView(secondaryButton("‹",()->{changeSelectedDate(-1);renderPlanPage();}),new LinearLayout.LayoutParams(dp(45),dp(40)));
         TextView date=text("",14,color("#F1F6F2"),true);date.setGravity(Gravity.CENTER);date.setTag("planDate");dateRow.addView(date,new LinearLayout.LayoutParams(0,dp(40),1));
@@ -728,15 +729,49 @@ public class MainActivity extends Activity {
         }
         LinearLayout.LayoutParams modesLp=new LinearLayout.LayoutParams(-1,dp(42));modesLp.topMargin=dp(6);dateCard.addView(modes,modesLp);
         LinearLayout templateRow=horizontal();
-        Button applyRoutine=primaryButton("Apply saved routine",()->showTemplatePicker());
+        Button applyRoutine=primaryButton("Apply template to date",()->showTemplatePicker());
         templateRow.addView(applyRoutine,new LinearLayout.LayoutParams(0,dp(42),1));
         Button editRoutine=secondaryButton("Edit templates",()->showTemplateEditorPicker());
         LinearLayout.LayoutParams editRoutineLp=new LinearLayout.LayoutParams(0,dp(42),1);editRoutineLp.leftMargin=dp(8);
         templateRow.addView(editRoutine,editRoutineLp);
         LinearLayout.LayoutParams templateRowLp=new LinearLayout.LayoutParams(-1,dp(44));templateRowLp.topMargin=dp(10);dateCard.addView(templateRow,templateRowLp);pagePlan.addView(dateCard);
-        Button add=primaryButton("＋  Add a block",()->openAddDialog());LinearLayout.LayoutParams addLp=new LinearLayout.LayoutParams(-1,dp(48));addLp.bottomMargin=dp(15);pagePlan.addView(add,addLp);
-        TextView section=text("YOUR BLOCKS",11,color("#9AABA0"),true);LinearLayout.LayoutParams secLp=new LinearLayout.LayoutParams(-1,-2);secLp.bottomMargin=dp(9);pagePlan.addView(section,secLp);
-        planList=vertical();pagePlan.addView(planList);renderPlanPage();
+
+        planTemplatePreview=vertical();
+        LinearLayout.LayoutParams templatePreviewLp=new LinearLayout.LayoutParams(-1,-2);templatePreviewLp.topMargin=dp(12);templatePreviewLp.bottomMargin=dp(10);
+        pagePlan.addView(planTemplatePreview,templatePreviewLp);
+
+        planDayScheduleToggle=secondaryButton("Show this date's saved schedule",()->{
+            boolean expand=actualScheduleContent!=null&&actualScheduleContent.getVisibility()!=View.VISIBLE;
+            setPlanDayScheduleExpanded(expand);
+        });
+        LinearLayout.LayoutParams toggleLp=new LinearLayout.LayoutParams(-1,dp(44));toggleLp.topMargin=dp(4);toggleLp.bottomMargin=dp(10);
+        pagePlan.addView(planDayScheduleToggle,toggleLp);
+
+        actualScheduleContent=vertical();
+        actualScheduleContent.setVisibility(View.GONE);
+        TextView separationHint=text("This is the actual schedule saved for this date, including its progress and date-specific edits. It is separate from the reusable template above; selecting a day type does not overwrite it.",11,color("#687A70"),false);
+        separationHint.setLineSpacing(dp(2),1f);
+        LinearLayout.LayoutParams separationHintLp=new LinearLayout.LayoutParams(-1,-2);separationHintLp.bottomMargin=dp(10);
+        actualScheduleContent.addView(separationHint,separationHintLp);
+        Button add=primaryButton("＋  Add a block to this date",()->openAddDialog());
+        LinearLayout.LayoutParams addLp=new LinearLayout.LayoutParams(-1,dp(48));addLp.bottomMargin=dp(15);actualScheduleContent.addView(add,addLp);
+        TextView section=text("SAVED BLOCKS FOR THIS DATE",11,color("#9AABA0"),true);
+        LinearLayout.LayoutParams secLp=new LinearLayout.LayoutParams(-1,-2);secLp.bottomMargin=dp(9);actualScheduleContent.addView(section,secLp);
+        planList=vertical();actualScheduleContent.addView(planList);
+        pagePlan.addView(actualScheduleContent);
+        renderPlanPage();
+    }
+
+    private void setPlanDayScheduleExpanded(boolean expanded) {
+        if (actualScheduleContent != null) actualScheduleContent.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        if (planDayScheduleToggle != null) {
+            planDayScheduleToggle.setText(expanded
+                    ? "Hide this date's saved schedule"
+                    : "Show this date's saved schedule");
+            planDayScheduleToggle.setContentDescription(expanded
+                    ? "Hide the saved schedule for this date"
+                    : "Show the saved schedule for this date");
+        }
     }
 
     private void renderPlanPage() {
@@ -758,6 +793,7 @@ public class MainActivity extends Activity {
             }
         }
 
+        renderPlanTemplatePreview();
         planList.removeAllViews();
         ArrayList<Block> ordered = new ArrayList<>(blocks);
         Collections.sort(ordered, Comparator.comparingInt(b -> mins(b.start)));
@@ -844,6 +880,63 @@ public class MainActivity extends Activity {
             row.setOnClickListener(v -> editBlockDialog(block));
             card.addView(row);
             planList.addView(card);
+        }
+    }
+
+    private void renderPlanTemplatePreview() {
+        if (planTemplatePreview == null) return;
+        planTemplatePreview.removeAllViews();
+
+        LinearLayout heading = horizontal();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout headingText = vertical();
+        headingText.addView(text("SELECTED TEMPLATE", 10, color("#2E8060"), true));
+        headingText.addView(text(templateLabel(mode) + " routine", 18, color("#18372E"), true));
+        heading.addView(headingText, new LinearLayout.LayoutParams(0, -2, 1));
+        planTemplatePreview.addView(heading);
+
+        TextView hint = text("This is the saved " + templateLabel(mode).toLowerCase(Locale.ROOT) + " template combined with shared blocks. Save changes in Edit templates; use Apply template to date to replace this date's saved schedule.", 11, color("#687A70"), false);
+        hint.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.topMargin = dp(4);
+        hintLp.bottomMargin = dp(8);
+        planTemplatePreview.addView(hint, hintLp);
+
+        ArrayList<Block> preview = getCombinedTemplateBlocks(mode);
+        Collections.sort(preview, Comparator.comparingInt(b -> mins(b.start)));
+        if (preview.isEmpty()) {
+            LinearLayout empty = surfaceCard();
+            empty.addView(text("No blocks in this template yet", 14, color("#18372E"), true));
+            empty.addView(text("Use Edit templates to add shared or " + templateLabel(mode).toLowerCase(Locale.ROOT) + "-specific blocks.", 11, color("#687A70"), false));
+            planTemplatePreview.addView(empty);
+            return;
+        }
+
+        for (Block block : preview) {
+            LinearLayout card = surfaceCard();
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout time = vertical();
+            time.addView(text(time12(block.start), 12, color("#286B55"), true));
+            time.addView(text(time12(block.end), 10, color("#687A70"), false));
+            row.addView(time, new LinearLayout.LayoutParams(dp(66), -2));
+
+            LinearLayout details = vertical();
+            LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(0, -2, 1);
+            detailsLp.leftMargin = dp(8);
+            row.addView(details, detailsLp);
+            TextView title = text(block.title, 13, color("#18372E"), true);
+            title.setMaxLines(3);
+            details.addView(title);
+            String source = "common".equals(block.templateOwner) ? "SHARED · LOCKED" : templateLabel(mode).toUpperCase(Locale.ROOT) + " · TEMPLATE";
+            TextView meta = text(source + "  •  " + fmt(Math.max(0, mins(block.end) - mins(block.start))), 9, color("#687A70"), false);
+            LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
+            metaLp.topMargin = dp(3);
+            details.addView(meta, metaLp);
+            card.addView(row);
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            cardLp.bottomMargin = dp(6);
+            planTemplatePreview.addView(card, cardLp);
         }
     }
 
@@ -6520,7 +6613,12 @@ public class MainActivity extends Activity {
     }
 
     private void chooseMode(String key) {
-        if (mode.equals(key)) return;
+        if (mode.equals(key)) {
+            setPlanDayScheduleExpanded(false);
+            renderPlanPage();
+            return;
+        }
+        setPlanDayScheduleExpanded(false);
         mode = key;
         SharedPreferences.Editor editor = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
         if (selectedDateKey.equals(todayKey())) editor.putString(MODE_KEY, mode);
@@ -7275,6 +7373,8 @@ public class MainActivity extends Activity {
                     mode = key;
                     getPrefs().edit().putString(modeKey(selectedDateKey), mode).putString(MODE_KEY, mode).apply();
                     loadTemplate(key);
+                    setPlanDayScheduleExpanded(true);
+                    renderPlanPage();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -7625,7 +7725,7 @@ public class MainActivity extends Activity {
             }
             saveTemplate(key, template);
             editor.dismiss();
-            Toast.makeText(this, templateLabel(key) + " template saved.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, templateLabel(key) + " template saved only to the " + templateLabel(key) + " template. Existing day schedules are unchanged.", Toast.LENGTH_SHORT).show();
             refreshCurrentWorkspace();
         });
         LinearLayout.LayoutParams saveLp = new LinearLayout.LayoutParams(0, dp(44), 1);
@@ -7653,6 +7753,7 @@ public class MainActivity extends Activity {
                 applyMode = mode;
             }
             loadTemplate(applyMode);
+            setPlanDayScheduleExpanded(true);
             editor.dismiss();
             String message = "common".equals(key)
                     ? "Shared routine saved and applied to this day."
@@ -8860,6 +8961,7 @@ private void changeSelectedDate(int delta) {
         c.setTime(d);
         c.add(Calendar.DAY_OF_YEAR, delta);
         selectedDateKey = keyForDate(c.getTime());
+        setPlanDayScheduleExpanded(false);
         loadSelectedDate();
         render();
     }
@@ -8875,6 +8977,7 @@ private void openDatePicker() {
             chosen.set(Calendar.DAY_OF_MONTH, day);
             save();
             selectedDateKey = keyForDate(chosen.getTime());
+            setPlanDayScheduleExpanded(false);
             loadSelectedDate();
             render();
         }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
