@@ -727,7 +727,7 @@ public class MainActivity extends Activity {
         LinearLayout templateRow=horizontal();
         Button applyRoutine=primaryButton("Apply saved routine",()->showTemplatePicker());
         templateRow.addView(applyRoutine,new LinearLayout.LayoutParams(0,dp(42),1));
-        Button editRoutine=secondaryButton("Edit template",()->openTemplateEditor(mode));
+        Button editRoutine=secondaryButton("Edit templates",()->showTemplateEditorPicker());
         LinearLayout.LayoutParams editRoutineLp=new LinearLayout.LayoutParams(0,dp(42),1);editRoutineLp.leftMargin=dp(8);
         templateRow.addView(editRoutine,editRoutineLp);
         LinearLayout.LayoutParams templateRowLp=new LinearLayout.LayoutParams(-1,dp(44));templateRowLp.topMargin=dp(10);dateCard.addView(templateRow,templateRowLp);pagePlan.addView(dateCard);
@@ -1207,9 +1207,10 @@ public class MainActivity extends Activity {
     private void renderMorePage() {
         if(moreContent==null)return;moreContent.removeAllViews();
         addMoreRow("Focus & screen time","Actual focus sessions and phone-use history","↗",()->switchPage("progress"));
-        addMoreRow("Edit WFH routine","Change the reusable work-from-home template","↗",()->openTemplateEditor("wfh"));
-        addMoreRow("Edit office routine","Change the reusable office-day template","↗",()->openTemplateEditor("office"));
-        addMoreRow("Edit weekend routine","Change the reusable weekend template","↗",()->openTemplateEditor("weekend"));
+        addMoreRow("Edit shared routine","Blocks inherited by WFH, office and weekend days","↗",()->openTemplateEditor("common"));
+        addMoreRow("Edit WFH routine","Change WFH-specific blocks alongside the shared routine","↗",()->openTemplateEditor("wfh"));
+        addMoreRow("Edit office routine","Change office-specific blocks alongside the shared routine","↗",()->openTemplateEditor("office"));
+        addMoreRow("Edit weekend routine","Change weekend-specific blocks alongside the shared routine","↗",()->openTemplateEditor("weekend"));
         addMoreRow("Precise widget timing","Schedule-boundary alarm setting","↗",()->enablePreciseLiveWidgetUpdates());
         addMoreRow("Attendance history","Review and correct office hours","↗",()->showAttendanceHistory());
         addMoreRow("Export backup","Save plans, attendance, syllabus and screen-time history","↗",()->requestExportBackup());
@@ -7239,12 +7240,22 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    private void showTemplateEditorPicker() {
+        String[] labels={"Shared routine · all day types","WFH-specific routine","Office-specific routine","Weekend-specific routine"};
+        String[] keys={"common","wfh","office","weekend"};
+        new AlertDialog.Builder(this)
+                .setTitle("Which template would you like to edit?")
+                .setItems(labels,(dialog,which)->openTemplateEditor(keys[which]))
+                .setNegativeButton("Cancel",null)
+                .show();
+    }
+
     private void showTemplatePicker() {
         String[] labels={"Work from home","Office day","Weekend"};
         String[] keys={"wfh","office","weekend"};
         new AlertDialog.Builder(this)
                 .setTitle("Apply a saved routine")
-                .setMessage("Applying a routine replaces the selected day's blocks. Office attendance and historical records are kept.")
+                .setMessage("The shared routine is combined with the selected day-type routine. Applying it replaces the selected day's blocks. Day-specific blocks take priority when a time or activity conflicts; office attendance and historical records are kept.")
                 .setItems(labels,(dialog,which)->chooseTemplateDirect(keys[which]))
                 .setNegativeButton("Cancel",null)
                 .show();
@@ -7254,7 +7265,7 @@ public class MainActivity extends Activity {
         String label = key.equals("office") ? "Office" : key.equals("weekend") ? "Weekend" : "WFH";
         new AlertDialog.Builder(this)
                 .setTitle("Load " + label + " template?")
-                .setMessage("Your current timeline will be replaced with your saved " + label + " template.")
+                .setMessage("Your current timeline will be replaced with the shared routine plus your saved " + label + "-specific routine. Day-specific blocks take priority when a time or activity conflicts.")
                 .setPositiveButton("Load", (d, w) -> {
                     mode = key;
                     getPrefs().edit().putString(modeKey(selectedDateKey), mode).putString(MODE_KEY, mode).apply();
@@ -7269,6 +7280,7 @@ public class MainActivity extends Activity {
     }
 
     private String templateLabel(String key) {
+        if ("common".equals(key)) return "Shared";
         return "office".equals(key) ? "Office" : "weekend".equals(key) ? "Weekend" : "WFH";
     }
 
@@ -7298,6 +7310,40 @@ public class MainActivity extends Activity {
         return result;
     }
 
+    /**
+     * Compose the inherited shared routine with a day-type routine. Existing day-specific
+     * blocks win on time conflicts and matching activity names, so shared blocks never
+     * silently create overlapping schedules or duplicate an activity.
+     */
+    private ArrayList<Block> getCombinedTemplateBlocks(String key) {
+        ArrayList<Block> specific = getTemplateBlocks(key);
+        if ("common".equals(key)) return specific;
+
+        ArrayList<Block> combined = new ArrayList<>(specific);
+        for (Block shared : getTemplateBlocks("common")) {
+            boolean conflict = false;
+            for (Block existing : combined) {
+                if (templateBlocksConflict(shared, existing)) {
+                    conflict = true;
+                    break;
+                }
+            }
+            if (!conflict) combined.add(shared);
+        }
+        Collections.sort(combined, Comparator.comparingInt(b -> mins(b.start)));
+        return combined;
+    }
+
+    private boolean templateBlocksConflict(Block first, Block second) {
+        if (first.title != null && second.title != null
+                && first.title.trim().equalsIgnoreCase(second.title.trim())) return true;
+        int firstStart = mins(first.start);
+        int firstEnd = mins(first.end);
+        int secondStart = mins(second.start);
+        int secondEnd = mins(second.end);
+        return firstStart < secondEnd && secondStart < firstEnd;
+    }
+
     private void saveTemplate(String key, ArrayList<Block> template) {
         try {
             JSONArray arr = new JSONArray();
@@ -7321,6 +7367,8 @@ public class MainActivity extends Activity {
     }
 
     private String[][] defaultTemplate(String key) {
+        // Keep the shared routine empty by default so existing schedules remain unchanged.
+        if ("common".equals(key)) return new String[0][4];
         if ("office".equals(key)) {
             return new String[][]{
                     {"06:00","06:30","Wake up + routine","fixed"},
@@ -7500,8 +7548,11 @@ public class MainActivity extends Activity {
         headingLp.leftMargin = dp(12);
         header.addView(heading, headingLp);
         heading.addView(text("ROUTINE EDITOR", 10, color("#2E8060"), true));
-        heading.addView(text(templateLabel(key) + " routine", 22, color("#18372E"), true));
-        TextView subtitle = text("Edit the reusable routine. Save + apply is the only action that changes the selected day.", 11, color("#687A70"), false);
+        heading.addView(text("common".equals(key) ? "Shared routine" : templateLabel(key) + " routine", 22, color("#18372E"), true));
+        String editorHint = "common".equals(key)
+                ? "These blocks are shared by WFH, office and weekend. A day-specific block takes priority if it overlaps in time or has the same activity name."
+                : "This routine adds day-type-specific blocks. The shared routine is inherited wherever a block does not conflict.";
+        TextView subtitle = text(editorHint + " Save + apply updates only the selected day.", 11, color("#687A70"), false);
         subtitle.setLineSpacing(dp(2), 1f);
         heading.addView(subtitle);
         shell.addView(header, new LinearLayout.LayoutParams(-1, -2));
@@ -7529,17 +7580,22 @@ public class MainActivity extends Activity {
         footer.addView(row);
         Button saveApply = primaryButton("Save + apply to selected day", () -> {
             saveTemplate(key, template);
-            mode = key;
-            getPrefs().edit().putString(modeKey(selectedDateKey), mode).apply();
-            if (selectedDateKey.equals(todayKey())) getPrefs().edit().putString(MODE_KEY, mode).apply();
-            blocks.clear();
-            for (Block source : template) {
-                blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
-                        source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
+            String applyMode;
+            if (!"common".equals(key)) {
+                mode = key;
+                applyMode = key;
+                SharedPreferences.Editor selection = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
+                if (selectedDateKey.equals(todayKey())) selection.putString(MODE_KEY, mode);
+                selection.apply();
+            } else {
+                applyMode = mode;
             }
-            save();
+            loadTemplate(applyMode);
             editor.dismiss();
-            Toast.makeText(this, templateLabel(key) + " routine saved and applied.", Toast.LENGTH_SHORT).show();
+            String message = "common".equals(key)
+                    ? "Shared routine saved and applied to this day."
+                    : templateLabel(key) + " routine saved and applied.";
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
             refreshCurrentWorkspace();
         });
         LinearLayout.LayoutParams applyLp = new LinearLayout.LayoutParams(-1, dp(46));
@@ -7556,18 +7612,21 @@ public class MainActivity extends Activity {
         editor.show();
         if (window != null) window.setLayout(android.view.WindowManager.LayoutParams.MATCH_PARENT,
                 android.view.WindowManager.LayoutParams.MATCH_PARENT);
-        renderTemplateEditorRows(list, template, editor);
+        renderTemplateEditorRows(list, template, editor, key);
     }
 
-    private void renderTemplateEditorRows(LinearLayout list, ArrayList<Block> template, android.app.Dialog editor) {
+    private void renderTemplateEditorRows(LinearLayout list, ArrayList<Block> template, android.app.Dialog editor, String key) {
         list.removeAllViews();
         LinearLayout intro = surfaceCard();
-        intro.addView(text("YOUR ROUTINE", 10, color("#2E8060"), true));
-        intro.addView(text("Tap a block to edit its timing, rigidity and priority. Remove blocks with ×. The order is chronological.", 12, color("#687A70"), false));
+        intro.addView(text("common".equals(key) ? "SHARED BLOCKS" : "DAY-TYPE-SPECIFIC BLOCKS", 10, color("#2E8060"), true));
+        String introText = "common".equals(key)
+                ? "Every saved block here is inherited by WFH, office and weekend routines, unless that day's template already covers the time or activity."
+                : "These blocks customize " + templateLabel(key) + " days. Shared blocks are inherited when they do not conflict.";
+        intro.addView(text(introText, 12, color("#687A70"), false));
         list.addView(intro);
 
         Button add = primaryButton("＋  Add template block", () -> editTemplateBlockDialog(template, -1,
-                () -> renderTemplateEditorRows(list, template, editor)));
+                () -> renderTemplateEditorRows(list, template, editor, key)));
         LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(46));
         addLp.bottomMargin = dp(10);
         list.addView(add, addLp);
@@ -7596,14 +7655,14 @@ public class MainActivity extends Activity {
             details.addView(text(b.title, 13, color("#18372E"), true));
             details.addView(text(blockBehaviorLabel(b), 10, color("#687A70"), false));
             row.addView(secondaryButton("›", () -> editTemplateBlockDialog(template, index,
-                    () -> renderTemplateEditorRows(list, template, editor))),
+                    () -> renderTemplateEditorRows(list, template, editor, key))),
                     new LinearLayout.LayoutParams(dp(38), dp(38)));
             Button del = secondaryButton("×", () -> new AlertDialog.Builder(this)
                     .setTitle("Remove this block?")
                     .setMessage(b.title + " will be removed from the reusable routine. Existing days are unchanged.")
                     .setPositiveButton("Remove", (d, w) -> {
                         template.remove(index);
-                        renderTemplateEditorRows(list, template, editor);
+                        renderTemplateEditorRows(list, template, editor, key);
                     })
                     .setNegativeButton("Cancel", null)
                     .show());
@@ -7611,7 +7670,7 @@ public class MainActivity extends Activity {
             delLp.leftMargin = dp(5);
             row.addView(del, delLp);
             row.setOnClickListener(v -> editTemplateBlockDialog(template, index,
-                    () -> renderTemplateEditorRows(list, template, editor)));
+                    () -> renderTemplateEditorRows(list, template, editor, key)));
         }
     }
 
@@ -7752,7 +7811,7 @@ public class MainActivity extends Activity {
 
     private void loadTemplate(String key) {
         blocks.clear();
-        for (Block source : getTemplateBlocks(key)) {
+        for (Block source : getCombinedTemplateBlocks(key)) {
             blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
                     source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
         }
@@ -8345,7 +8404,7 @@ public class MainActivity extends Activity {
     }
 
     private void loadTemplateSilent() {
-        for (Block source : getTemplateBlocks(mode)) {
+        for (Block source : getCombinedTemplateBlocks(mode)) {
             blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
                     source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
         }
