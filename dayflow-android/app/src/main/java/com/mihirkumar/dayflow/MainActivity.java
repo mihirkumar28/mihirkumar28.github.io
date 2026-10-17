@@ -7729,9 +7729,12 @@ public class MainActivity extends Activity {
                             ? "Blocked by shared routine · move or remove this block"
                             : blockBehaviorLabel(b),
                     10, protectedConflict ? color("#A45B20") : color("#687A70"), false));
-            row.addView(secondaryButton("›", () -> editTemplateBlockDialog(template, index,
-                    () -> renderTemplateEditorRows(list, template, editor, key), key)),
-                    new LinearLayout.LayoutParams(dp(38), dp(38)));
+            boolean lockedSharedCopy = !"common".equals(key) && isSharedRoutineCopy(b);
+            if (!lockedSharedCopy) {
+                row.addView(secondaryButton("›", () -> editTemplateBlockDialog(template, index,
+                        () -> renderTemplateEditorRows(list, template, editor, key), key)),
+                        new LinearLayout.LayoutParams(dp(38), dp(38)));
+            }
             Button del = secondaryButton("×", () -> {
                 if (!"common".equals(key) && isSharedRoutineCopy(b)) {
                     Toast.makeText(this, "Shared blocks are locked. Edit them in the Shared routine instead.", Toast.LENGTH_LONG).show();
@@ -7754,11 +7757,15 @@ public class MainActivity extends Activity {
                     .setNegativeButton("Cancel", null)
                     .show();
             });
-            LinearLayout.LayoutParams delLp = new LinearLayout.LayoutParams(dp(38), dp(38));
-            delLp.leftMargin = dp(5);
-            row.addView(del, delLp);
-            row.setOnClickListener(v -> editTemplateBlockDialog(template, index,
-                    () -> renderTemplateEditorRows(list, template, editor, key), key));
+            if (!lockedSharedCopy) {
+                LinearLayout.LayoutParams delLp = new LinearLayout.LayoutParams(dp(38), dp(38));
+                delLp.leftMargin = dp(5);
+                row.addView(del, delLp);
+                row.setOnClickListener(v -> editTemplateBlockDialog(template, index,
+                        () -> renderTemplateEditorRows(list, template, editor, key), key));
+            } else {
+                row.setContentDescription("Shared block locked. Edit only in the Shared routine.");
+            }
         }
     }
 
@@ -7776,6 +7783,12 @@ public class MainActivity extends Activity {
             if (candidate.title != null && shared.title != null
                     && !candidate.title.trim().isEmpty()
                     && candidate.title.trim().equalsIgnoreCase(shared.title.trim())) {
+                return true;
+            }
+            // Legacy copies can have a different ID and activity label. An exact shared
+            // time slot is also protected and must never be editable from a day-type editor.
+            if (candidate.start != null && candidate.end != null
+                    && candidate.start.equals(shared.start) && candidate.end.equals(shared.end)) {
                 return true;
             }
         }
