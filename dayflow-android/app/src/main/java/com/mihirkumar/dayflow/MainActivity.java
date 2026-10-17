@@ -139,6 +139,9 @@ public class MainActivity extends Activity {
     private static class Block {
         long id;
         String start, end, title, priority, rigidity, status;
+        // Template ownership is provenance, not storage identity. A daily block is still
+        // stored under its date key and can never write back into any reusable template.
+        String templateOwner;
         long actualMs, actualStartedAt;
         Block(long id, String start, String end, String title, String legacyBehavior, String status) {
             this(id, start, end, title, importanceFromBehavior(legacyBehavior), rigidityFromBehavior(legacyBehavior), status);
@@ -5652,6 +5655,8 @@ public class MainActivity extends Activity {
         }
         b.actualMs = o.optLong("actualMs", 0L);
         b.actualStartedAt = o.optLong("actualStartedAt", 0L);
+        String owner = o.optString("templateOwner", "").trim();
+        b.templateOwner = owner.isEmpty() ? null : owner;
         return b;
     }
 
@@ -7287,12 +7292,15 @@ public class MainActivity extends Activity {
     private ArrayList<Block> getTemplateBlocks(String key) {
         ArrayList<Block> result = new ArrayList<>();
         String raw = getPrefs().getString(templateKey(key), null);
+        boolean needsOwnershipMigration = false;
         try {
             if (raw == null) {
                 String[][] defaults = defaultTemplate(key);
                 for (int i = 0; i < defaults.length; i++) {
-                    result.add(new Block(System.currentTimeMillis() + i, defaults[i][0], defaults[i][1],
-                            defaults[i][2], defaults[i][3], "pending"));
+                    Block block = new Block(System.currentTimeMillis() + i, defaults[i][0], defaults[i][1],
+                            defaults[i][2], defaults[i][3], "pending");
+                    block.templateOwner = key;
+                    result.add(block);
                 }
                 saveTemplate(key, result);
                 return result;
@@ -7301,12 +7309,34 @@ public class MainActivity extends Activity {
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.optJSONObject(i);
                 if (o == null) continue;
-                result.add(blockFromJson(o, "pending"));
+                Block block = blockFromJson(o, "pending");
+                String owner = o.optString("templateOwner", "").trim();
+                if (!owner.isEmpty()) {
+                    block.templateOwner = owner;
+                    // Never load a block owned by another reusable template into this
+                    // template's editable collection. This is a source-of-truth check.
+                    if (!key.equals(owner)) {
+                        needsOwnershipMigration = true;
+                        continue;
+                    }
+                } else {
+                    // Legacy templates had no ownership marker. Remove recognizable old
+                    // shared copies once; then mark the remaining rows as this template's
+                    // own blocks so future edits never depend on title/time heuristics.
+                    if (!"common".equals(key) && isSharedRoutineCopy(block)) {
+                        needsOwnershipMigration = true;
+                        continue;
+                    }
+                    block.templateOwner = key;
+                    needsOwnershipMigration = true;
+                }
+                result.add(block);
             }
         } catch (Exception e) {
             result.clear();
             debugLog("Could not read " + key + " template: " + e.getMessage());
         }
+        if (needsOwnershipMigration) saveTemplate(key, result);
         return result;
     }
 
@@ -7318,10 +7348,12 @@ public class MainActivity extends Activity {
     private ArrayList<Block> getCombinedTemplateBlocks(String key) {
         ArrayList<Block> shared = getTemplateBlocks("common");
         if ("common".equals(key)) return shared;
+        for (Block block : shared) block.templateOwner = "common";
 
         ArrayList<Block> combined = new ArrayList<>(shared);
         ArrayList<Block> specific = getTemplateBlocks(key);
         for (Block dayBlock : specific) {
+            dayBlock.templateOwner = key;
             boolean conflictsWithShared = false;
             for (Block sharedBlock : shared) {
                 if (templateBlocksConflict(dayBlock, sharedBlock)) {
@@ -7346,11 +7378,18 @@ public class MainActivity extends Activity {
     }
 
     private void saveTemplate(String key, ArrayList<Block> template) {
-        // Defensive cleanup so shared routine entries can never be persisted as day-specific blocks.
+        // Each reusable template persists only blocks it owns. Shared rows are rendered
+        // from template_common in a separate, read-only section of day-type editors.
         removeSharedRoutineCopies(key, template);
+        for (int i = template.size() - 1; i >= 0; i--) {
+            if (!key.equals(template.get(i).templateOwner) && template.get(i).templateOwner != null) {
+                template.remove(i);
+            }
+        }
         try {
             JSONArray arr = new JSONArray();
             for (Block b : template) {
+                b.templateOwner = key;
                 JSONObject o = new JSONObject();
                 o.put("id", b.id);
                 o.put("start", b.start);
@@ -7358,6 +7397,7 @@ public class MainActivity extends Activity {
                 o.put("title", b.title);
                 o.put("priority", b.priority);
                 o.put("rigidity", b.rigidity);
+                o.put("templateOwner", key);
                 arr.put(o);
             }
             getPrefs().edit().putString(templateKey(key), arr.toString()).apply();
@@ -7775,6 +7815,9 @@ public class MainActivity extends Activity {
      */
     private boolean isSharedRoutineCopy(Block candidate) {
         if (candidate == null) return false;
+        // Explicit provenance takes precedence. A day-specific block with a matching
+        // name/time is still a different block; never infer ownership after migration.
+        if (candidate.templateOwner != null) return "common".equals(candidate.templateOwner);
         for (Block shared : getTemplateBlocks("common")) {
             // A copied block may have a different ID or edited times in older saved templates.
             // The same activity name is still a shared-block duplicate: day templates cannot
@@ -7802,7 +7845,11 @@ public class MainActivity extends Activity {
     private void removeSharedRoutineCopies(String key, ArrayList<Block> template) {
         if (template == null || "common".equals(key)) return;
         for (int i = template.size() - 1; i >= 0; i--) {
-            if (isSharedRoutineCopy(template.get(i))) template.remove(i);
+            Block block = template.get(i);
+            if ("common".equals(block.templateOwner)
+                    || (block.templateOwner == null && isSharedRoutineCopy(block))) {
+                template.remove(i);
+            }
         }
     }
 
@@ -7866,6 +7913,7 @@ public class MainActivity extends Activity {
         } else {
             original = template.get(index);
         }
+        if (original.templateOwner == null) original.templateOwner = key;
 
         LinearLayout form = vertical();
         form.setPadding(dp(20), 0, dp(20), 0);
@@ -8002,8 +8050,10 @@ public class MainActivity extends Activity {
     private void loadTemplate(String key) {
         blocks.clear();
         for (Block source : getCombinedTemplateBlocks(key)) {
-            blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
-                    source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
+            Block dailyCopy = new Block(System.currentTimeMillis() + blocks.size(),
+                    source.start, source.end, source.title, source.priority, source.rigidity, "pending");
+            dailyCopy.templateOwner = source.templateOwner == null ? key : source.templateOwner;
+            blocks.add(dailyCopy);
         }
         save();
     }
@@ -8571,6 +8621,7 @@ public class MainActivity extends Activity {
                 o.put("status", b.status);
                 o.put("actualMs", b.actualMs);
                 o.put("actualStartedAt", b.actualStartedAt);
+                if (b.templateOwner != null) o.put("templateOwner", b.templateOwner);
                 arr.put(o);
             }
             getPrefs().edit()
@@ -8595,8 +8646,10 @@ public class MainActivity extends Activity {
 
     private void loadTemplateSilent() {
         for (Block source : getCombinedTemplateBlocks(mode)) {
-            blocks.add(new Block(System.currentTimeMillis() + blocks.size(),
-                    source.start, source.end, source.title, source.priority, source.rigidity, "pending"));
+            Block dailyCopy = new Block(System.currentTimeMillis() + blocks.size(),
+                    source.start, source.end, source.title, source.priority, source.rigidity, "pending");
+            dailyCopy.templateOwner = source.templateOwner == null ? mode : source.templateOwner;
+            blocks.add(dailyCopy);
         }
     }
 
