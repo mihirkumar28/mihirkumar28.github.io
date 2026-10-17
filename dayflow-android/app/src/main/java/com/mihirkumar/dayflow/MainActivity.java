@@ -6612,7 +6612,7 @@ public class MainActivity extends Activity {
         render();
         renderPlanPage();
         renderOfficePage();
-        Toast.makeText(this, templateLabel(mode) + " day type selected. Use Apply saved routine if you want to replace the timeline.", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, templateLabel(mode) + " template preview updated. The selected day's schedule is unchanged.", Toast.LENGTH_LONG).show();
     }
 
     private android.app.Dialog showFullScreenViewer(String eyebrow, String title, String subtitle,
