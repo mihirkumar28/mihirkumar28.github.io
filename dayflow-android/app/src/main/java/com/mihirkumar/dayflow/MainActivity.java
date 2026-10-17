@@ -6763,10 +6763,8 @@ public class MainActivity extends Activity {
         int start = roundUp5(currentMinutes());
         if (start >= 1380) start = 8 * 60;
         int end = Math.min(1439, start + 60);
-        Block blank = new Block(System.currentTimeMillis(), toTime(start), toTime(end),
-                "", "normal", "pending");
-        blank.rigidity = "flexible";
-        blank.priority = "normal";
+        Block blank = new Block(System.currentTimeMillis() + draft.size(), toTime(start), toTime(end),
+                "", "normal", "flexible", "pending");
         editDailyDraftBlock(blank, draft, rows);
     }
 
@@ -6903,9 +6901,9 @@ public class MainActivity extends Activity {
                 }
             }
             boolean changedOrRemoved = edited == null
-                    || !safeEquals(original.title, edited.title)
-                    || !safeEquals(original.start, edited.start)
-                    || !safeEquals(original.end, edited.end);
+                    || !Objects.equals(original.title, edited.title)
+                    || !Objects.equals(original.start, edited.start)
+                    || !Objects.equals(original.end, edited.end);
             if (changedOrRemoved && original.actualStartedAt > 0) {
                 stopFocusForBlock(original, now);
             }
