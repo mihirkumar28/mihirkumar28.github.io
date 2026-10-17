@@ -7311,24 +7311,25 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Compose the inherited shared routine with a day-type routine. Existing day-specific
-     * blocks win on time conflicts and matching activity names, so shared blocks never
-     * silently create overlapping schedules or duplicate an activity.
+     * Compose the shared routine with a day-type routine. Shared blocks have the
+     * highest priority: a day-specific block is omitted if it conflicts with any
+     * shared block by time overlap or matching activity name.
      */
     private ArrayList<Block> getCombinedTemplateBlocks(String key) {
-        ArrayList<Block> specific = getTemplateBlocks(key);
-        if ("common".equals(key)) return specific;
+        ArrayList<Block> shared = getTemplateBlocks("common");
+        if ("common".equals(key)) return shared;
 
-        ArrayList<Block> combined = new ArrayList<>(specific);
-        for (Block shared : getTemplateBlocks("common")) {
-            boolean conflict = false;
-            for (Block existing : combined) {
-                if (templateBlocksConflict(shared, existing)) {
-                    conflict = true;
+        ArrayList<Block> combined = new ArrayList<>(shared);
+        ArrayList<Block> specific = getTemplateBlocks(key);
+        for (Block dayBlock : specific) {
+            boolean conflictsWithShared = false;
+            for (Block sharedBlock : shared) {
+                if (templateBlocksConflict(dayBlock, sharedBlock)) {
+                    conflictsWithShared = true;
                     break;
                 }
             }
-            if (!conflict) combined.add(shared);
+            if (!conflictsWithShared) combined.add(dayBlock);
         }
         Collections.sort(combined, Comparator.comparingInt(b -> mins(b.start)));
         return combined;
@@ -7550,8 +7551,8 @@ public class MainActivity extends Activity {
         heading.addView(text("ROUTINE EDITOR", 10, color("#2E8060"), true));
         heading.addView(text("common".equals(key) ? "Shared routine" : templateLabel(key) + " routine", 22, color("#18372E"), true));
         String editorHint = "common".equals(key)
-                ? "These blocks are shared by WFH, office and weekend. A day-specific block takes priority if it overlaps in time or has the same activity name."
-                : "This routine adds day-type-specific blocks. The shared routine is inherited wherever a block does not conflict.";
+                ? "These blocks are shared by WFH, office and weekend. Shared blocks always take priority if a day-specific block overlaps in time or has the same activity name."
+                : "This routine adds day-type-specific blocks. Shared blocks always take priority; conflicting day-specific blocks are omitted.";
         TextView subtitle = text(editorHint + " Save + apply updates only the selected day.", 11, color("#687A70"), false);
         subtitle.setLineSpacing(dp(2), 1f);
         heading.addView(subtitle);
@@ -7620,8 +7621,8 @@ public class MainActivity extends Activity {
         LinearLayout intro = surfaceCard();
         intro.addView(text("common".equals(key) ? "SHARED BLOCKS" : "DAY-TYPE-SPECIFIC BLOCKS", 10, color("#2E8060"), true));
         String introText = "common".equals(key)
-                ? "Every saved block here is inherited by WFH, office and weekend routines, unless that day's template already covers the time or activity."
-                : "These blocks customize " + templateLabel(key) + " days. Shared blocks are inherited when they do not conflict.";
+                ? "Every saved block here is inherited by WFH, office and weekend routines. These shared blocks take priority over conflicting day-specific blocks."
+                : "These blocks customize " + templateLabel(key) + " days. Shared blocks take priority, so conflicting day-specific blocks are omitted.";
         intro.addView(text(introText, 12, color("#687A70"), false));
         list.addView(intro);
 
