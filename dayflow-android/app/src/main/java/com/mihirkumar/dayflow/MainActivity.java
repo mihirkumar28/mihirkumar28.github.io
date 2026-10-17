@@ -7741,7 +7741,14 @@ public class MainActivity extends Activity {
                     .setTitle("Remove this block?")
                     .setMessage(b.title + " will be removed from the reusable routine. Existing days are unchanged.")
                     .setPositiveButton("Remove", (d, w) -> {
-                        template.remove(index);
+                        // Recheck on confirmation as a final guard before mutating the template.
+                        if (!"common".equals(key) && isSharedRoutineCopy(b)) {
+                            Toast.makeText(this, "Shared blocks can only be changed in the Shared routine.", Toast.LENGTH_LONG).show();
+                            removeSharedRoutineCopies(key, template);
+                            renderTemplateEditorRows(list, template, editor, key);
+                            return;
+                        }
+                        template.remove(b);
                         renderTemplateEditorRows(list, template, editor, key);
                     })
                     .setNegativeButton("Cancel", null)
@@ -7762,12 +7769,15 @@ public class MainActivity extends Activity {
     private boolean isSharedRoutineCopy(Block candidate) {
         if (candidate == null) return false;
         for (Block shared : getTemplateBlocks("common")) {
+            // A copied block may have a different ID or edited times in older saved templates.
+            // The same activity name is still a shared-block duplicate: day templates cannot
+            // override, rename around, or delete the shared activity from their own editor.
             if (candidate.id == shared.id) return true;
-            boolean sameTitle = candidate.title != null && shared.title != null
-                    && candidate.title.trim().equalsIgnoreCase(shared.title.trim());
-            boolean sameStart = candidate.start != null && candidate.start.equals(shared.start);
-            boolean sameEnd = candidate.end != null && candidate.end.equals(shared.end);
-            if (sameTitle && sameStart && sameEnd) return true;
+            if (candidate.title != null && shared.title != null
+                    && !candidate.title.trim().isEmpty()
+                    && candidate.title.trim().equalsIgnoreCase(shared.title.trim())) {
+                return true;
+            }
         }
         return false;
     }
@@ -7804,7 +7814,9 @@ public class MainActivity extends Activity {
     private void editTemplateBlockDialog(ArrayList<Block> template, int index, Runnable onChanged, String key) {
         if (!"common".equals(key) && index >= 0 && index < template.size()
                 && isSharedRoutineCopy(template.get(index))) {
-            Toast.makeText(this, "Shared blocks are locked. Edit them in the Shared routine instead.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Shared blocks can only be changed in the Shared routine.", Toast.LENGTH_LONG).show();
+            removeSharedRoutineCopies(key, template);
+            onChanged.run();
             return;
         }
         boolean adding = index < 0;
