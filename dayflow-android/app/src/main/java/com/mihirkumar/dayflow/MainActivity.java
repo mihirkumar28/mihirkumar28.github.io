@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
     private FrameLayout screenFrame;
     private LinearLayout pagePlan, pageProgress, pageOffice, pageMore, pageSyllabus, pageScreenTime;
     private LinearLayout planList, planTemplatePreview, actualScheduleContent, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
-    private Button planDayScheduleToggle;
+    private Button planDayScheduleToggle, homeApplyTemplateButton;
     private LinearLayout bottomNavigation;
     private TextView syllabusSummaryView, screenTimeSummaryView, syllabusCoverageSummary;
     private LinearLayout syllabusDetailContent;
@@ -129,6 +129,8 @@ public class MainActivity extends Activity {
     private TextView officeStatus, officeTimes, commuteView;
     private Button officeAction, commuteAction, focusAction;
     private String mode = "wfh";
+    // Plan preview selection is deliberately separate from the template applied to the live date.
+    private String planPreviewMode;
     private String selectedDateKey;
     private String officeSummaryPeriod = "all";
     private Calendar attendanceCalendarMonth = Calendar.getInstance();
@@ -711,6 +713,7 @@ public class MainActivity extends Activity {
     }
 
     private void buildPlanPage() {
+        if (planPreviewMode == null) planPreviewMode = mode;
         pageHeading(pagePlan,"Build your day","Plan","Choose WFH, Office or Weekend to view its saved template. The selected date's actual schedule stays separate.");
         LinearLayout dateCard=surfaceCard();LinearLayout dateRow=horizontal();
         dateRow.addView(secondaryButton("‹",()->{changeSelectedDate(-1);renderPlanPage();}),new LinearLayout.LayoutParams(dp(45),dp(40)));
@@ -721,7 +724,7 @@ public class MainActivity extends Activity {
         LinearLayout modes=horizontal();
         String[][] choices={{"WFH","wfh"},{"Office","office"},{"Weekend","weekend"}};
         for(String[] choice:choices){
-            Button b=secondaryButton(choice[0],()->chooseMode(choice[1]));
+            Button b=secondaryButton(choice[0],()->choosePlanPreviewMode(choice[1]));
             b.setTag("plan-mode-chip-"+choice[1]);
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(40),1);
             if(modes.getChildCount()>0)lp.leftMargin=dp(6);
@@ -787,7 +790,7 @@ public class MainActivity extends Activity {
         for (String key : new String[]{"wfh", "office", "weekend"}) {
             View choice = pagePlan.findViewWithTag("plan-mode-chip-" + key);
             if (choice instanceof Button) {
-                boolean selected = mode.equals(key);
+                boolean selected = (planPreviewMode == null ? mode : planPreviewMode).equals(key);
                 ((Button) choice).setTextColor(selected ? Color.WHITE : color("#496257"));
                 choice.setBackground(bg(selected ? "#286B55" : "#FFFFFF", 12));
             }
@@ -891,23 +894,24 @@ public class MainActivity extends Activity {
         heading.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout headingText = vertical();
         headingText.addView(text("SELECTED TEMPLATE", 10, color("#2E8060"), true));
-        headingText.addView(text(templateLabel(mode) + " routine", 18, color("#18372E"), true));
+        String previewKey = planPreviewMode == null ? mode : planPreviewMode;
+        headingText.addView(text(templateLabel(previewKey) + " routine", 18, color("#18372E"), true));
         heading.addView(headingText, new LinearLayout.LayoutParams(0, -2, 1));
         planTemplatePreview.addView(heading);
 
-        TextView hint = text("This is the saved " + templateLabel(mode).toLowerCase(Locale.ROOT) + " template combined with shared blocks. Save changes in Edit templates; use Apply template to date to replace this date's saved schedule.", 11, color("#687A70"), false);
+        TextView hint = text("This is the saved " + templateLabel(previewKey).toLowerCase(Locale.ROOT) + " template combined with shared blocks. Save changes in Edit templates; use Apply template to date to replace this date's saved schedule.", 11, color("#687A70"), false);
         hint.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
         hintLp.topMargin = dp(4);
         hintLp.bottomMargin = dp(8);
         planTemplatePreview.addView(hint, hintLp);
 
-        ArrayList<Block> preview = getCombinedTemplateBlocks(mode);
+        ArrayList<Block> preview = getCombinedTemplateBlocks(previewKey);
         Collections.sort(preview, Comparator.comparingInt(b -> mins(b.start)));
         if (preview.isEmpty()) {
             LinearLayout empty = surfaceCard();
             empty.addView(text("No blocks in this template yet", 14, color("#18372E"), true));
-            empty.addView(text("Use Edit templates to add shared or " + templateLabel(mode).toLowerCase(Locale.ROOT) + "-specific blocks.", 11, color("#687A70"), false));
+            empty.addView(text("Use Edit templates to add shared or " + templateLabel(previewKey).toLowerCase(Locale.ROOT) + "-specific blocks.", 11, color("#687A70"), false));
             planTemplatePreview.addView(empty);
             return;
         }
@@ -928,7 +932,7 @@ public class MainActivity extends Activity {
             TextView title = text(block.title, 13, color("#18372E"), true);
             title.setMaxLines(3);
             details.addView(title);
-            String source = "common".equals(block.templateOwner) ? "SHARED · LOCKED" : templateLabel(mode).toUpperCase(Locale.ROOT) + " · TEMPLATE";
+            String source = "common".equals(block.templateOwner) ? "SHARED · LOCKED" : templateLabel(previewKey).toUpperCase(Locale.ROOT) + " · TEMPLATE";
             TextView meta = text(source + "  •  " + fmt(Math.max(0, mins(block.end) - mins(block.start))), 9, color("#687A70"), false);
             LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
             metaLp.topMargin = dp(3);
@@ -5275,6 +5279,11 @@ public class MainActivity extends Activity {
             b.setContentDescription(item + " day");
             b.setOnClickListener(v -> chooseMode(modeKey));
         }
+        homeApplyTemplateButton = secondaryButton("Apply selected template", () -> confirmApplySelectedTemplate(mode));
+        LinearLayout.LayoutParams applyLp = new LinearLayout.LayoutParams(-1, dp(40));
+        applyLp.topMargin = dp(7);
+        wrapper.addView(homeApplyTemplateButton, applyLp);
+        homeApplyTemplateButton.setVisibility(View.GONE);
     }
 
     private void buildCurrentCard() {
@@ -5451,6 +5460,11 @@ public class MainActivity extends Activity {
         }
         View headerMode = root.findViewWithTag("modeHeader");
         if (headerMode instanceof TextView) ((TextView) headerMode).setText(modeLabel.toUpperCase(Locale.US));
+        if (homeApplyTemplateButton != null) {
+            boolean mismatch = !scheduleMatchesTemplate(mode);
+            homeApplyTemplateButton.setText("Apply " + modeLabel + " template to this date");
+            homeApplyTemplateButton.setVisibility(mismatch ? View.VISIBLE : View.GONE);
+        }
 
         Block current = null, next = null;
         boolean viewingToday = selectedDateKey.equals(todayKey());
@@ -6612,22 +6626,62 @@ public class MainActivity extends Activity {
                 content, "Return to today", () -> switchPage("home"));
     }
 
-    private void chooseMode(String key) {
-        if (mode.equals(key)) {
-            setPlanDayScheduleExpanded(false);
-            renderPlanPage();
-            return;
-        }
-        setPlanDayScheduleExpanded(false);
-        mode = key;
-        SharedPreferences.Editor editor = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
-        if (selectedDateKey.equals(todayKey())) editor.putString(MODE_KEY, mode);
-        editor.apply();
-        debugLog("Day type changed without replacing blocks: date=" + selectedDateKey + " mode=" + mode);
-        render();
+    private void choosePlanPreviewMode(String key) {
+        planPreviewMode = key;
         renderPlanPage();
-        renderOfficePage();
-        Toast.makeText(this, templateLabel(mode) + " day type selected. Use Apply saved routine if you want to replace the timeline.", Toast.LENGTH_LONG).show();
+    }
+
+    private void chooseMode(String key) {
+        // On Today, day-type selection means switching the live date to that reusable
+        // routine. Confirm first because date-specific blocks not in the template are removed.
+        if (key.equals(mode) && scheduleMatchesTemplate(key)) return;
+        confirmApplySelectedTemplate(key);
+    }
+
+    private boolean scheduleMatchesTemplate(String key) {
+        ArrayList<Block> expected = getCombinedTemplateBlocks(key);
+        if (blocks.size() != expected.size()) return false;
+        boolean[] matched = new boolean[blocks.size()];
+        for (Block source : expected) {
+            boolean found = false;
+            for (int i = 0; i < blocks.size(); i++) {
+                if (matched[i]) continue;
+                Block actual = blocks.get(i);
+                if (source.start.equals(actual.start) && source.end.equals(actual.end)
+                        && source.title != null && source.title.equalsIgnoreCase(actual.title == null ? "" : actual.title)) {
+                    matched[i] = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return false;
+        }
+        return true;
+    }
+
+    private void confirmApplySelectedTemplate(String key) {
+        String label = key.equals("office") ? "Office" : key.equals("weekend") ? "Weekend" : "WFH";
+        new AlertDialog.Builder(this)
+                .setTitle("Apply " + label + " template to this date?")
+                .setMessage("This replaces the selected date's timeline with the shared routine plus the " + label
+                        + "-specific routine. Blocks that do not belong to that template (including date-only additions) will be removed. "
+                        + "Matching blocks keep their completion and focus history.")
+                .setPositiveButton("Apply template", (d, w) -> {
+                    mode = key;
+                    planPreviewMode = key;
+                    SharedPreferences.Editor editor = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
+                    if (selectedDateKey.equals(todayKey())) editor.putString(MODE_KEY, mode);
+                    editor.apply();
+                    loadTemplate(key);
+                    setPlanDayScheduleExpanded(true);
+                    render();
+                    renderPlanPage();
+                    renderOfficePage();
+                    Toast.makeText(this, label + " template applied to " +
+                            (selectedDateKey.equals(todayKey()) ? "today." : selectedDateKey + "."), Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Keep current schedule", null)
+                .show();
     }
 
     private android.app.Dialog showFullScreenViewer(String eyebrow, String title, String subtitle,
@@ -7371,7 +7425,10 @@ public class MainActivity extends Activity {
                 .setMessage("Your current timeline will be replaced with the shared routine plus your saved " + label + "-specific routine. Day-specific blocks take priority when a time or activity conflicts.")
                 .setPositiveButton("Load", (d, w) -> {
                     mode = key;
-                    getPrefs().edit().putString(modeKey(selectedDateKey), mode).putString(MODE_KEY, mode).apply();
+                    planPreviewMode = key;
+                    SharedPreferences.Editor selection = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
+                    if (selectedDateKey.equals(todayKey())) selection.putString(MODE_KEY, mode);
+                    selection.apply();
                     loadTemplate(key);
                     setPlanDayScheduleExpanded(true);
                     renderPlanPage();
@@ -7745,12 +7802,14 @@ public class MainActivity extends Activity {
             String applyMode;
             if (!"common".equals(key)) {
                 mode = key;
+                planPreviewMode = key;
                 applyMode = key;
                 SharedPreferences.Editor selection = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
                 if (selectedDateKey.equals(todayKey())) selection.putString(MODE_KEY, mode);
                 selection.apply();
             } else {
                 applyMode = mode;
+                planPreviewMode = applyMode;
             }
             loadTemplate(applyMode);
             setPlanDayScheduleExpanded(true);
@@ -8139,13 +8198,35 @@ public class MainActivity extends Activity {
 
 
     private void loadTemplate(String key) {
-        blocks.clear();
+        ArrayList<Block> previous = new ArrayList<>(blocks);
+        ArrayList<Block> replacement = new ArrayList<>();
         for (Block source : getCombinedTemplateBlocks(key)) {
-            Block dailyCopy = new Block(System.currentTimeMillis() + blocks.size(),
-                    source.start, source.end, source.title, source.priority, source.rigidity, "pending");
-            dailyCopy.templateOwner = source.templateOwner == null ? key : source.templateOwner;
-            blocks.add(dailyCopy);
+            Block matching = null;
+            for (int i = 0; i < previous.size(); i++) {
+                Block candidate = previous.get(i);
+                if (source.start.equals(candidate.start) && source.end.equals(candidate.end)
+                        && source.title != null && source.title.equalsIgnoreCase(candidate.title == null ? "" : candidate.title)) {
+                    matching = candidate;
+                    previous.remove(i);
+                    break;
+                }
+            }
+            if (matching == null) {
+                matching = new Block(System.currentTimeMillis() + replacement.size(),
+                        source.start, source.end, source.title, source.priority, source.rigidity, "pending");
+            } else {
+                // Keep progress/focus history for blocks that still exist in the applied template.
+                matching.start = source.start;
+                matching.end = source.end;
+                matching.title = source.title;
+                matching.priority = source.priority;
+                matching.rigidity = source.rigidity;
+            }
+            matching.templateOwner = source.templateOwner == null ? key : source.templateOwner;
+            replacement.add(matching);
         }
+        blocks.clear();
+        blocks.addAll(replacement);
         save();
     }
 
