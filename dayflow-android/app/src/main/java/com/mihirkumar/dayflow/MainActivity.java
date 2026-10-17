@@ -7764,7 +7764,30 @@ public class MainActivity extends Activity {
         if (adding) {
             int start = 360;
             for (Block b : template) start = Math.max(start, mins(b.end));
-            int end = Math.min(1439, start + 30);
+            int end;
+            if (!"common".equals(key)) {
+                ArrayList<Block> occupiedBlocks = new ArrayList<>(getTemplateBlocks("common"));
+                occupiedBlocks.addAll(template);
+                boolean foundFreeSlot = false;
+                for (int proposedStart = start; proposedStart + 30 <= 1439; proposedStart += 15) {
+                    boolean occupied = false;
+                    for (Block existing : occupiedBlocks) {
+                        if (proposedStart < mins(existing.end) && mins(existing.start) < proposedStart + 30) {
+                            occupied = true;
+                            break;
+                        }
+                    }
+                    if (!occupied) {
+                        start = proposedStart;
+                        foundFreeSlot = true;
+                        break;
+                    }
+                }
+                // If the day is fully occupied, leave validation to the save guard.
+                end = foundFreeSlot ? start + 30 : Math.min(1439, start + 30);
+            } else {
+                end = Math.min(1439, start + 30);
+            }
             original = new Block(System.currentTimeMillis(), toTime(start), toTime(end),
                     "New block", "flexible", "pending");
         } else {
