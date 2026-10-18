@@ -5262,27 +5262,35 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams wrapperLp = new LinearLayout.LayoutParams(-1, -2);
         wrapperLp.bottomMargin = dp(14);
         root.addView(wrapper, wrapperLp);
-        modeView = text("DAY TYPE", 10, color("#687A70"), true);
+
+        // Calendar classification is automatic; WFH/WFO is the separate work arrangement.
+        modeView = text("WEEKDAY", 10, color("#687A70"), true);
         wrapper.addView(modeView);
+        TextView arrangementLabel = text("WORK ARRANGEMENT", 10, color("#687A70"), true);
+        LinearLayout.LayoutParams arrangementLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        arrangementLabelLp.topMargin = dp(8);
+        wrapper.addView(arrangementLabel, arrangementLabelLp);
+
         LinearLayout row = horizontal();
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(42));
         rp.topMargin = dp(6);
         wrapper.addView(row, rp);
-        String[] modes = {"WFH", "Office", "Weekend"};
-        for (String item : modes) {
-            String modeKey = item.toLowerCase(Locale.US);
-            Button b = chip(item);
+        String[][] options = {{"WFH", "wfh"}, {"WFO", "office"}};
+        for (String[] option : options) {
+            String modeKey = option[1];
+            Button b = chip(option[0]);
             b.setTag("mode-chip-" + modeKey);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1);
             if (row.getChildCount() > 0) lp.leftMargin = dp(6);
             row.addView(b, lp);
-            b.setContentDescription(item + " day");
+            b.setContentDescription(option[0] + " work arrangement");
             b.setOnClickListener(v -> chooseMode(modeKey));
         }
+
         todayRoutineEditButton = secondaryButton("Modify & Save Today's Routine", this::openTodayRoutineEditor);
-        LinearLayout.LayoutParams applyLp = new LinearLayout.LayoutParams(-1, dp(44));
-        applyLp.topMargin = dp(7);
-        wrapper.addView(todayRoutineEditButton, applyLp);
+        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(-1, dp(44));
+        editLp.topMargin = dp(7);
+        wrapper.addView(todayRoutineEditButton, editLp);
         todayRoutineEditButton.setVisibility(View.VISIBLE);
     }
 
@@ -5448,12 +5456,15 @@ public class MainActivity extends Activity {
         else date += "  •  Planned";
         dateView.setText(date);
 
-        String modeLabel = mode.equals("office") ? "Office" : mode.equals("weekend") ? "Weekend" : "WFH";
-        modeView.setText("DAY TYPE");
-        for (String key : new String[]{"wfh", "office", "weekend"}) {
+        String modeLabel = mode.equals("office") ? "WFO" : mode.equals("weekend") ? "Weekend routine" : "WFH";
+        if (modeView != null) {
+            modeView.setText(isWeekendDate(selectedDateKey) ? "WEEKEND" : "WEEKDAY");
+        }
+        for (String key : new String[]{"wfh", "office"}) {
             View modeChoice = root.findViewWithTag("mode-chip-" + key);
             if (modeChoice instanceof Button) {
-                boolean selectedMode = mode.equals(key);
+                boolean selectedMode = ("wfh".equals(key) && "wfh".equals(mode))
+                        || ("office".equals(key) && "office".equals(mode));
                 ((Button) modeChoice).setTextColor(selectedMode ? Color.WHITE : color("#496257"));
                 modeChoice.setBackground(bg(selectedMode ? "#286B55" : "#FFFFFF", 12));
             }
@@ -6635,9 +6646,10 @@ public class MainActivity extends Activity {
     }
 
     private void chooseMode(String key) {
-        if (key == null || key.equals(mode)) return;
-        // Today day-type chips only change the date's classification. They must never
-        // apply a reusable template or discard date-specific blocks.
+        if (!"wfh".equals(key) && !"office".equals(key)) return;
+        if (key.equals(mode)) return;
+        // WFH/WFO changes only the work-arrangement setting for this date. It never
+        // replaces date-specific blocks and never changes a reusable routine template.
         mode = key;
         SharedPreferences.Editor selection = getPrefs().edit()
                 .putString(modeKey(selectedDateKey), mode);
@@ -6646,8 +6658,18 @@ public class MainActivity extends Activity {
         render();
         renderOfficePage();
         Toast.makeText(this,
-                "Day type changed. This date's schedule and all saved templates are unchanged.",
+                ("office".equals(mode) ? "WFO" : "WFH")
+                        + " selected. The saved routine and reusable templates are unchanged.",
                 Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean isWeekendDate(String dateKey) {
+        Date selected = parseDateKey(dateKey);
+        if (selected == null) return false;
+        Calendar day = Calendar.getInstance();
+        day.setTime(selected);
+        int weekday = day.get(Calendar.DAY_OF_WEEK);
+        return weekday == Calendar.SATURDAY || weekday == Calendar.SUNDAY;
     }
 
     /**
