@@ -6684,13 +6684,46 @@ public class MainActivity extends Activity {
 
         LinearLayout content = vertical();
         content.setPadding(dp(16), dp(8), dp(16), dp(16));
-        LinearLayout protection = surfaceCard();
-        protection.addView(text("DATE-ONLY CHANGES", 10, color("#2E8060"), true));
-        protection.addView(text("Changes here are saved only to "
-                + (editingDate.equals(todayKey()) ? "today" : editingDate)
-                + ". Shared, WFH, Office and Weekend templates will not be changed.",
+        Calendar dayCalendar = parseDateKey(editingDate) == null
+                ? Calendar.getInstance() : Calendar.getInstance();
+        Date parsedEditingDate = parseDateKey(editingDate);
+        if (parsedEditingDate != null) dayCalendar.setTime(parsedEditingDate);
+        int dayOfWeek = dayCalendar.get(Calendar.DAY_OF_WEEK);
+        boolean isWeekendDate = dayOfWeek == Calendar.SATURDAY || dayOfWeek == Calendar.SUNDAY;
+        String dayKind = isWeekendDate ? "WEEKEND" : "WEEKDAY";
+        final String[] selectedWorkMode = { "office".equals(mode) ? "office" : "wfh" };
+
+        LinearLayout dayCard = surfaceCard();
+        dayCard.addView(text(dayKind, 10, color("#2E8060"), true));
+        dayCard.addView(text(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault())
+                .format(dayCalendar.getTime()), 18, color("#18372E"), true));
+        dayCard.addView(text("Choose how this date is organised. This is separate from the day classification.",
                 12, color("#687A70"), false));
-        content.addView(protection);
+        LinearLayout workModeRow = horizontal();
+        LinearLayout.LayoutParams workModeLp = new LinearLayout.LayoutParams(-1, dp(42));
+        workModeLp.topMargin = dp(10);
+        dayCard.addView(workModeRow, workModeLp);
+        String[][] workModes = {{"Work from home", "wfh"}, {"Work from office", "office"}};
+        for (String[] choice : workModes) {
+            boolean chosen = choice[1].equals(selectedWorkMode[0]);
+            Button modeButton = chosen
+                    ? primaryButton(choice[0], () -> {})
+                    : secondaryButton(choice[0], () -> {});
+            modeButton.setTextSize(12);
+            LinearLayout.LayoutParams modeLp = new LinearLayout.LayoutParams(0, dp(40), 1);
+            if (workModeRow.getChildCount() > 0) modeLp.leftMargin = dp(6);
+            workModeRow.addView(modeButton, modeLp);
+            modeButton.setOnClickListener(v -> {
+                selectedWorkMode[0] = choice[1];
+                for (int i = 0; i < workModeRow.getChildCount(); i++) {
+                    Button child = (Button) workModeRow.getChildAt(i);
+                    boolean active = workModes[i][1].equals(selectedWorkMode[0]);
+                    child.setTextColor(active ? Color.WHITE : color("#496257"));
+                    child.setBackground(bg(active ? "#286B55" : "#FFFFFF", 12));
+                }
+            });
+        }
+        content.addView(dayCard);
 
         LinearLayout draftRows = vertical();
         LinearLayout.LayoutParams rowsLp = new LinearLayout.LayoutParams(-1, -2);
@@ -6709,7 +6742,7 @@ public class MainActivity extends Activity {
         showFullScreenViewer("DATE-ONLY EDITOR", editorTitle,
                 "Edit, add or remove blocks. Nothing is committed until you tap Save, and no reusable template is modified.",
                 content, editingDate.equals(todayKey()) ? "Save Today's Routine" : "Save This Date's Routine",
-                () -> saveTodayRoutineDraft(draft, editingDate));
+                () -> saveTodayRoutineDraft(draft, editingDate, selectedWorkMode[0]));
         renderTodayRoutineDraftRows(draftRows, draft);
     }
 
@@ -6906,7 +6939,7 @@ public class MainActivity extends Activity {
                 });
     }
 
-    private void saveTodayRoutineDraft(ArrayList<Block> draft, String editingDate) {
+    private void saveTodayRoutineDraft(ArrayList<Block> draft, String editingDate, String selectedWorkMode) {
         // Never commit a stale draft over another date if navigation changed while editing.
         if (!editingDate.equals(selectedDateKey)) {
             Toast.makeText(this, "The selected date changed. Reopen the editor to save safely.",
@@ -6938,7 +6971,11 @@ public class MainActivity extends Activity {
         blocks.clear();
         Collections.sort(draft, Comparator.comparingInt(b -> mins(b.start)));
         for (Block block : draft) blocks.add(block);
-        save(); // Writes only blocksKey(editingDate), never template_common/wfh/office/weekend.
+        mode = "office".equals(selectedWorkMode) ? "office" : "wfh";
+        getPrefs().edit().putString(modeKey(editingDate), mode)
+                .apply();
+        if (editingDate.equals(todayKey())) getPrefs().edit().putString(MODE_KEY, mode).apply();
+        save(); // Writes only this date's blocks and mode; reusable templates remain untouched.
         Toast.makeText(this, editingDate.equals(todayKey())
                 ? "Today's routine saved. Templates were not changed."
                 : "This date's routine saved. Templates were not changed.",
