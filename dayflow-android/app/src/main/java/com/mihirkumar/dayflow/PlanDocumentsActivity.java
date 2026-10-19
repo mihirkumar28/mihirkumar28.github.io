@@ -58,7 +58,7 @@ public class PlanDocumentsActivity extends Activity {
         page.addView(label("DAYFLOW  /  OFFLINE LIBRARY", 10, Color.parseColor("#65C5A0"), true));
         TextView h = label("Plans & Documents", 28, Color.parseColor("#F2F7F3"), true);
         h.setPadding(0, dp(4), 0, dp(7)); page.addView(h);
-        TextView note = label("The Roadmap and this library share one structured plan catalog. Original PDFs open in the built-in offline reader; concise summaries remain available as a fallback.", 13, Color.parseColor("#9AABA0"), false);
+        TextView note = label("The Roadmap and this library share one structured plan catalog. The original PDF reader is ready, but the original PDF archive is not bundled yet; concise summaries work offline.", 13, Color.parseColor("#9AABA0"), false);
         note.setLineSpacing(dp(3), 1f); note.setPadding(0, 0, 0, dp(18)); page.addView(note);
 
         for (PlanCatalog.Document document : PlanCatalog.documents()) {
