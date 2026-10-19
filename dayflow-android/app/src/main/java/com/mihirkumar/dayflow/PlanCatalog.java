@@ -86,7 +86,15 @@ final class PlanCatalog {
                             if (!sourceId.isEmpty()) sourceIds.add(sourceId);
                         }
                     }
-                    goals.add(new Goal(id, track, title, detail, sourceIds,
+                    JSONArray previousJson = goalJson.optJSONArray("previousDetails");
+                    ArrayList<String> previousDetails = new ArrayList<>();
+                    if (previousJson != null) {
+                        for (int k = 0; k < previousJson.length(); k++) {
+                            String previous = previousJson.optString(k, "");
+                            if (!previous.isEmpty()) previousDetails.add(previous);
+                        }
+                    }
+                    goals.add(new Goal(id, track, title, detail, sourceIds, previousDetails,
                             goalJson.optString("provenance", "curated"),
                             goalJson.optBoolean("editableByUser", true)));
                 }
@@ -238,12 +246,13 @@ final class PlanCatalog {
 
     static final class Goal {
         final String id, track, title, detail, provenance;
-        final List<String> sourceIds;
+        final List<String> sourceIds, previousDetails;
         final boolean editableByUser;
         Goal(String id, String track, String title, String detail, List<String> sourceIds,
-             String provenance, boolean editableByUser) {
+             List<String> previousDetails, String provenance, boolean editableByUser) {
             this.id = id; this.track = track; this.title = title; this.detail = detail;
             this.sourceIds = Collections.unmodifiableList(new ArrayList<>(sourceIds));
+            this.previousDetails = Collections.unmodifiableList(new ArrayList<>(previousDetails));
             this.provenance = provenance; this.editableByUser = editableByUser;
         }
     }
