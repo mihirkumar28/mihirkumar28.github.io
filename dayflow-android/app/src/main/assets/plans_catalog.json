@@ -1,0 +1,688 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-19",
+  "authorityNote": "Canonical structured data used by the Roadmap UI and Plans & Documents summaries. Prepared from source-aligned plan content. This asset does not parse PDF bytes at runtime; update it deliberately when authoritative source plans change. Original PDFs are not yet bundled in this version.",
+  "sourceDocuments": [
+    {
+      "id": "unified_master",
+      "title": "Unified Master Execution Plan",
+      "subtitle": "October 2026 – January 2028 · Combined execution system",
+      "filename": "Unified_Master_Execution_Plan_Oct2026_to_Jan2028_REVISED.pdf",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    },
+    {
+      "id": "upsc_gs_monthly",
+      "title": "UPSC 2027 Prelims GS Monthly Plan",
+      "subtitle": "Monthly General Studies subject execution plan",
+      "filename": "UPSC_2027_Prelims_GS_Monthly_Plan.pdf",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    },
+    {
+      "id": "job_switch_master",
+      "title": "2027 Job Switch — EM 6–9 Month Master Plan",
+      "subtitle": "Career transition roadmap and staged preparation",
+      "filename": "2027_Job_Switch_EM_6_9_Month_Master_Plan.pdf",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    },
+    {
+      "id": "em_interview_readiness",
+      "title": "2027 Job Switch — EM Interview Readiness Plan",
+      "subtitle": "Focused technical, system-design, leadership and interview preparation",
+      "filename": "2027_Job_Switch_6_9_Month_EM_Interview_Readiness_Plan.pdf",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    }
+  ],
+  "months": [
+    {
+      "key": "2026-10",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Prelims GS: Polity I + II",
+          "detail": "October 2026 · Primary source: Vajiram Yellow Books Polity I + II (about 584 pages). Complete one static pass; make concise Constitution, institutions and governance notes; solve PYQs after major topics. Plan roughly 12–13 hours/week for static reading and 3–4 hours/week for PYQs/revision; keep current affairs integrated rather than creating a separate block.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper I: Linear Algebra foundations",
+          "detail": "Start with the December 2022 IMS notes as the conceptual spine. Cover vector spaces and subspaces, basis/dimension, linear transformations, matrices and rank. Keep a proof/problem error log and measure progress by mastered topics, worked problems and PYQs rather than page count.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 1: Java/JVM baseline + DSA reset",
+          "detail": "Core Java/OOP, collections, generics, exceptions, streams and JVM/memory basics. DSA: arrays, strings, hashing, two pointers and sliding window. Deliverables: 20–25 timed problems, 3 evidence-based EM stories and one Java debugging lab; record the starting baseline.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Other",
+          "title": "DayFlow: Offline PDF plans library",
+          "detail": "October 2026 · Make the four saved plan PDFs accessible inside DayFlow from More → Plans & Documents, without an internet connection. Progress as of 19 October 2026: the native library screen, manifest registration and More-menu entry are committed; the Android GitHub Actions build passed for commit 867db1167218718a7650d08cff208d6dffe1d8f7. This completes the first UI/navigation milestone only: the screen still displays concise reading copies, not the original PDF files. Remaining work: bundle the original Unified Master Execution Plan, UPSC 2027 Prelims GS Monthly Plan, 2027 EM 6/9-Month Master Plan and 2027 EM Interview Readiness Plan as local app assets; update each entry to open its original PDF; then build and test all four in airplane mode. Keep this goal open until original-file access and offline verification pass.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2026-11",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Prelims GS: Modern, Ancient and Medieval History",
+          "detail": "November 2026 · Primary sources: Vajiram Modern History (about 296 pages), Ancient History (about 140) and Medieval History (about 103), approximately 539 pages combined. Build chronology/theme notes and use PYQs to identify examinable causes, outcomes, movements and contributors; avoid elaborate note-making.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper I: Calculus and remaining Linear Algebra",
+          "detail": "Continue linear transformations, eigenvalues/eigenvectors and matrix methods; build limits, continuity, differentiability, mean-value results and single-variable integration. Attempt selected problems without looking at worked solutions; retain difficult proofs for spaced revision.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 2: Concurrency + LLD",
+          "detail": "Threads, executors, locks, atomics, Java Memory Model and CompletableFuture; object-oriented design, SOLID, testability and code review. Deliverables: 25–30 cumulative timed problems, a concurrency lab, 4 LLD drills and 3 additional EM stories.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2026-12",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Prelims GS: Environment + Art & Culture",
+          "detail": "December 2026 · Primary sources: Vajiram Environment & Ecology (about 307 pages) and NEXT IAS Art & Culture (about 184), approximately 491 pages combined. Keep factual material in compact revision sheets; connect ecology, biodiversity and conservation concepts to PYQs and current events.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper I: Analytic Geometry + Ordinary Differential Equations",
+          "detail": "Cover lines, planes and standard curves/surfaces, followed by first- and higher-order ordinary differential equations and standard solution methods. Maintain a worked-problem/error log and revisit prerequisites whenever solutions fail.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 3: Spring + SQL + HLD foundation",
+          "detail": "Spring Boot DI, REST, validation, transactions and JPA/Hibernate; PostgreSQL and SQL tuning; CAP, consistency, caching and queues. Deliverables: one deployable service slice, 4 HLD drills, a SQL tuning set and 8 total core EM stories.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-01",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Prelims GS: Physical/World + Indian Geography",
+          "detail": "January 2027 · Primary source: NEXT IAS Physical & World Geography (about 211 pages) plus Indian Geography & Disaster Management (about 382), approximately 593 pages. Prioritise concepts, maps and diagrams. This is the heaviest month by page count; keep notes short and use topic-wise PYQs.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper I: Dynamics and Statics",
+          "detail": "Cover motion, work and energy, equilibrium, forces, potential energy and standard dynamics/statics problem types. Practise derivations and timed numerical questions; integrate these with previously studied Calculus rather than treating them as isolated formulas.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 4: Messaging + reliability + production thinking",
+          "detail": "Kafka/RabbitMQ/Redis; retries, ordering, idempotency, observability, SLOs, incident/postmortem reasoning and target-role calibration. Deliverables: one async workflow, 2 incident drills, 2 external calibration interviews/mocks and a company-role matrix.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-02",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Prelims GS: Indian Economy",
+          "detail": "February 2027 · Primary source: NEXT IAS Indian Economy (about 467 pages). Study mechanisms rather than terminology alone: concept → mechanism → Indian application → PYQ. Consolidate budgeting, growth, inclusion, agriculture and related economic institutions with mixed practice.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper I: Vector Analysis + integration of Paper I",
+          "detail": "Cover grad, div, curl, line/surface/volume integrals and the major integral theorems. Consolidate Linear Algebra, Calculus, Analytic Geometry, ODE, Dynamics/Statics and Vector Analysis; identify syllabus gaps before moving into Paper II.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 5: Tier 3/4 interview conversion",
+          "detail": "Practise harder coding, mixed HLD/LLD, architecture trade-offs, working React/TypeScript breadth and mixed EM rounds. Deliverables: 2 full mock loops, 10–12 strong leadership stories, 60–80 cumulative timed problems and 8–10 design cases.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-03",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Prelims GS: General Science + Science & Technology",
+          "detail": "March 2027 · Primary sources: NEXT IAS General Science (about 135 pages) and Science & Technology (about 231), approximately 366 pages. Finish the static source set by 31 March; use remaining time for cumulative PYQs, revision and backlog clearance. The page counts are edition-dependent planning figures.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper I closure + Paper II Algebra foundations",
+          "detail": "Audit every Paper I unit against the UPSC syllabus, attempt representative PYQs and close high-impact gaps. Begin Paper II Algebra: groups/rings and core algebraic structures, notation and standard proofs. Update the error log from timed work.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 6: Tier 3/4 readiness gate + controlled applications",
+          "detail": "Reduce new learning and use simulated coding, design, behavioural and manager rounds to test readiness. Deliverables: 3–4 complete mocks across formats, scored weak-area list, resume/role positioning and a factual EM story bank. Apply selectively when readiness gates are met; the calendar alone does not establish readiness.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-04",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Prelims conversion: static revision + PYQs",
+          "detail": "April 2027 · No new static-source pages planned. Cycle through Polity, History, Environment/Art & Culture, Geography, Economy and Science/S&T using active recall, PYQs and the error log. Revise current-affairs links and prioritise the weakest subjects.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "CSE Revision & Tests",
+          "title": "Prelims test conversion: GS mocks, CSAT and MCQs",
+          "detail": "April target from the saved plan: 6–8 GS mocks, 4–6 CSAT tests and approximately 700–900 GS MCQs/PYQs. Review every wrong answer and distinguish knowledge gaps, misreading, elimination errors and time-pressure errors; adjust targets to actual performance.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper II: Algebra + Real Analysis",
+          "detail": "Develop the first-pass checklist for groups/rings and real analysis, including sequences, series, convergence, continuity and standard proof techniques. Continue problem practice and retain a realistic recurring Maths block alongside Prelims-specific GS.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 7: Architecture depth + domain-aware design",
+          "detail": "Deepen distributed consistency, resilience, partitioning and multi-region trade-offs where role-relevant. Practise architecture decisions, ADRs, standards and technical-debt prioritisation; use actual target-role JDs to select domain-specific design drills.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-05",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Prelims final revision: rapid recall + weak areas",
+          "detail": "May 1–22, 2027 · No new static reading. Use short revision loops, PYQs, current-affairs consolidation and the error log. Prioritise recall speed, accuracy and recovery from repeated mistakes over making new notes.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "CSE Revision & Tests",
+          "title": "Final Prelims simulations · exam target 23 May 2027",
+          "detail": "Saved-plan target for 1–22 May: 4–5 GS mocks and 2–3 CSAT mocks, with final rapid revision and exam simulations. Complete and review each mock; protect sleep and logistics in the final days. The source plan lists UPSC CSE Prelims for 23 May 2027.",
+          "sourceIds": [
+            "unified_master",
+            "upsc_gs_monthly"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper II: Complex Analysis + Linear Programming",
+          "detail": "Cover analytic functions, Cauchy results, singularities/residues and standard contour-integration questions; build the LP checklist for simplex, duality and related methods. These topics are in the longer CSE optional plan, not in the Prelims GS PDF.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 8: Tier 1/2 design + leadership evidence",
+          "detail": "Use target-company playbooks and harder system-design cases to test architecture depth, reliability, migration choices and domain understanding. Refine hiring, coaching, conflict, delivery-risk and stakeholder stories using real evidence; do not invent metrics.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-06",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Mains GS-I: history, culture, society and geography",
+          "detail": "June 2027 · Resume the wider Mains-oriented syllabus after the Prelims phase. Map Indian culture, modern/post-independence history, world history, society and geography against the official syllabus. Build concise topic sheets and begin structured answer practice; distinguish this phase from the completed Prelims static pass.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper II: Partial Differential Equations",
+          "detail": "Cover standard PDE methods, canonical forms and representative problem types. Build a topic checklist, solve selected previous-year questions, and revisit Calculus/ODE prerequisites where errors recur.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Month 9: final interview-readiness evidence",
+          "detail": "Polish the resume and capstone/project deep-dives; complete 4–6 realistic mocks across coding, design and behavioural/manager rounds. Produce a scored gap list and a role-specific preparation plan. Judge readiness by repeatable performance, not by month completion alone.",
+          "sourceIds": [
+            "job_switch_master",
+            "em_interview_readiness"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-07",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Mains GS-II: Constitution, governance, social justice + IR",
+          "detail": "July 2027 · Work through Constitution/polity, governance, accountability, welfare and social-justice themes, India’s neighbourhood and international relations. Practise concise, structured Mains answers and connect institutions, current affairs and case examples.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper II: Numerical Analysis",
+          "detail": "Cover interpolation, numerical integration, numerical solutions of equations and ODE methods from the selected syllabus/source. Practise representative questions and track method selection, numerical accuracy and time.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Interview execution: applications + feedback-led repairs",
+          "detail": "Extension beyond the saved nine-month study plan. Track target roles/applications, debrief real interviews and mocks, and use the highest-impact observed gap to choose weekly coding/design/leadership drills. Keep Java/JVM, DSA and architecture warm rather than restarting the curriculum.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-08",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Mains GS-III: economy, agriculture, S&T, environment + security",
+          "detail": "August 2027 · Cover economic development, agriculture, science and technology, environment/biodiversity, disaster management and internal security. Use issue-based notes and practise answers that link concepts, evidence, government action and trade-offs.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper II: Computer Programming",
+          "detail": "Cover number systems, Boolean logic, algorithms/flowcharts and the listed programming fundamentals. Practise explaining algorithm steps and solving syllabus-aligned questions; treat this as one part of Paper II, not a substitute for mathematical problem practice.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Interview conversion: targeted company loops",
+          "detail": "Extension beyond the saved nine-month study plan. Prepare for actual openings using their role requirements; maintain a lightweight log of coding, design and leadership feedback. Spend time on recurring weaknesses, not on adding technologies without a target-role reason.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-09",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Mains GS-IV: ethics, probity + Essay practice",
+          "detail": "September 2027 · Cover ethics, values, attitude, emotional intelligence, probity, public-service dilemmas and case studies. Practise essay outlines and full answers under time limits; keep separate examples and concepts easy to recall.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper I: timed sectional tests + PYQ repair",
+          "detail": "Attempt timed Paper I sections covering Linear Algebra, Calculus, Analytic Geometry, ODE, Dynamics/Statics and Vector Analysis. Review solution structure, accuracy and time; re-solve missed questions without the original solution.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Target-switch readiness review",
+          "detail": "Extension beyond the saved nine-month study plan. Evaluate real interview outcomes, role fit and compensation constraints; maintain company-specific preparation where active processes exist. Decide the next cycle from evidence rather than extending preparation indefinitely.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-10",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Mains GS-I/II consolidation + answer writing",
+          "detail": "October 2027 · Revisit History, Culture, Geography, Society, Constitution, Governance, Social Justice and IR. Use PYQs to select high-frequency themes, practise timed answers and repair weak content/structure.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper II: Mechanics + Fluid Dynamics",
+          "detail": "Cover Lagrangian/Hamiltonian mechanics, continuity and standard fluid-flow concepts from the selected syllabus. Record essential assumptions and derivation steps; practise representative problems and identify remaining coverage gaps.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Role-specific system-design and leadership refresh",
+          "detail": "Extension beyond the saved nine-month study plan. Refresh design cases and leadership examples for live target roles; prioritise repeatable interview performance, role-specific gaps and lessons from feedback.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-11",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Mains GS-III/IV consolidation + Essay",
+          "detail": "November 2027 · Revise economy, agriculture, S&T, environment, security, ethics and probity. Practise timed GS-III/IV answers, ethics case studies and essay outlines; keep an error log of factual, analytical and structural weaknesses.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Paper II sectional tests + PYQ gap closure",
+          "detail": "Attempt timed sections across Algebra, Real/Complex Analysis, Linear Programming, PDE, Numerical Analysis, Computer Programming, Mechanics and Fluid Dynamics. Re-solve incorrect questions and target the three largest recurring weaknesses.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Focused gap closure from actual interview evidence",
+          "detail": "Extension beyond the saved nine-month study plan. Review the interview log and repair the most frequent high-impact failures in coding, architecture or leadership communication. Avoid broad new study unless target roles consistently require it.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2027-12",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "Full CSE syllabus audit + mixed tests",
+          "detail": "December 2027 · Audit tracked GS topics and the broader Mains syllabus, complete mixed PYQ/test sets and revise the weakest areas. Schedule any remaining first-pass work explicitly for the January checkpoint rather than treating unchecked topics as complete.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "Mixed Paper I/II PYQs + first-pass closure",
+          "detail": "Attempt mixed timed questions from both papers, consolidate formula/result sheets and close high-priority syllabus gaps. Compare topic mastery, solved PYQs and the error log; do not equate reading a topic with exam readiness.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Career pipeline review + targeted preparation",
+          "detail": "Extension beyond the saved nine-month study plan. Review job-search results, interviews and offer fit; refresh the target-company list and maintain only the preparation that supports real opportunities. Keep documented ownership and impact examples factual.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    },
+    {
+      "key": "2028-01",
+      "goals": [
+        {
+          "track": "General Studies",
+          "title": "1 January checkpoint: verify CSE syllabus coverage",
+          "detail": "By 1 January 2028, audit every tracked GS and Mains syllabus item against actual coverage. Name unresolved topics explicitly, review test/PYQ evidence and set the next revision schedule. This checkpoint measures coverage; it does not automatically mark topics complete.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Maths Optional",
+          "title": "1 January checkpoint: verify Paper I + II first pass",
+          "detail": "Audit both Maths Optional papers against the syllabus and the IMS-note plan. List topics mastered, topics needing revision, PYQs attempted and unresolved problem types; schedule remaining work explicitly. Use performance evidence, not page counts alone.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        },
+        {
+          "track": "Software Interview Prep",
+          "title": "Career roadmap reset from outcomes",
+          "detail": "Extension beyond the saved nine-month study plan. Review target roles, actual interview performance, compensation/role fit and the portfolio. Choose the next cycle based on evidence—continued search, targeted upskilling or a revised timeline—without treating completion of the checklist as an offer guarantee.",
+          "sourceIds": [
+            "unified_master"
+          ],
+          "provenance": "curated_from_saved_plan",
+          "editableByUser": true
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "id": "unified_master",
+      "title": "Unified Master Execution Plan",
+      "subtitle": "October 2026 – January 2028 · Combined execution system",
+      "filename": "Unified_Master_Execution_Plan_Oct2026_to_Jan2028_REVISED.pdf",
+      "content": "MASTER EXECUTION PLAN | OCT 2026 – JAN 2028\n\nPURPOSE\nCoordinate UPSC CSE preparation, software-career progression, health, and DayFlow in one execution system. Review progress regularly and adjust based on evidence rather than adding complexity.\n\nUPSC CSE\nKeep General Studies and Maths Optional as distinct study tracks. Use monthly subject targets, practice questions, revision, and progress tracking. The dedicated GS monthly plan is the source for month-by-month subject assignments.\n\nSOFTWARE CAREER\nPrepare for an engineering-management transition using a staged 6–9 month plan. Build interview readiness through system design, technical depth, leadership examples, and structured practice. Use the dedicated interview-readiness plan for the focused preparation track.\n\nHEALTH AND REVIEW\nReview weekly averages and adherence. Every four weeks review weight trend, waist, training tolerance, sleep, and relevant medical guidance. Reassess body-composition estimates every 8–12 weeks if useful, using a consistent method and allowing for measurement error. If adherence is poor, simplify the plan before making it stricter.\n\nDAYFLOW RULES\nIdentify weekday versus weekend and allow WFH/WFO switching. “Modify & Save Today’s Routine” edits only the selected date, never a reusable template. Distinguish fixed and flexible blocks. Track planned versus actual time and commute with minimal taps. Progress percentages must use the same source of truth as the detailed progress view. During March–May 2027, prioritize correctness blockers over cosmetic redesigns or new features.\n\nREVIEW CADENCE\nWeekly: review 7-day weight average, exercise, adherence, hunger/energy, and study load. Every four weeks: review weight trend, waist, training tolerance, sleep, and medical guidance. Every 8–12 weeks: review body-composition estimates if useful.\n\nThis is a concise offline reading copy. The original master PDF contains the complete tables, monthly detail, and references.",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    },
+    {
+      "id": "upsc_gs_monthly",
+      "title": "UPSC 2027 Prelims GS Monthly Plan",
+      "subtitle": "Monthly General Studies subject execution plan",
+      "filename": "UPSC_2027_Prelims_GS_Monthly_Plan.pdf",
+      "content": "UPSC 2027 PRELIMS | GENERAL STUDIES MONTHLY PLAN\n\nOCTOBER 2026 — POLITY\nPrimary source: Vajiram Polity I + II. Listed source volume: 584 pages. Complete the main polity source once and use previous-year questions immediately after major constitutional topics.\n\nNOVEMBER 2026 — HISTORY\nPrimary source: Vajiram Modern (296 pages), Ancient (140 pages), and Medieval (103 pages); 539 pages total. Avoid over-noting. Build chronology and themes, then use PYQs to distinguish examinable material from low-return detail.\n\nDECEMBER 2026 — ENVIRONMENT + ART & CULTURE\nPrimary source: Vajiram Environment (307 pages) and NEXT Art & Culture (184 pages); 491 pages total. Compress factual material into short revision sheets.\n\nEXECUTION PRINCIPLES\nUse the source plan’s monthly assignments as the schedule of record. Pair reading with PYQs, keep notes concise, and reserve time for revision and factual consolidation. Do not silently substitute a different source or monthly subject sequence.\n\nThis offline copy preserves the opening monthly entries available in the source extract. The original PDF contains the remaining monthly assignments and detailed execution notes.",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    },
+    {
+      "id": "job_switch_master",
+      "title": "2027 Job Switch — EM 6–9 Month Master Plan",
+      "subtitle": "Career transition roadmap and staged preparation",
+      "filename": "2027_Job_Switch_EM_6_9_Month_Master_Plan.pdf",
+      "content": "2027 JOB SWITCH | ENGINEERING MANAGEMENT | 6–9 MONTH MASTER PLAN\n\nOBJECTIVE\nPrepare for a software engineering management opportunity through a staged plan while keeping UPSC preparation and daily execution sustainable. The master plan coordinates career preparation with the wider October 2026–January 2028 execution timeline.\n\nSTAGED TARGET\nAround month 6: begin interviewing for Tier 3 and Tier 4 target companies to measure readiness and identify gaps. Around month 9: aim to be a stronger candidate for Tier 1 and Tier 2 targets.\n\nPREPARATION TRACKS\nBuild evidence for technical depth, system design, architecture decisions, difficult debugging, production ownership, project execution, people leadership, and behavioral interviews. Use practice interviews and review weak areas rather than relying on preparation hours alone.\n\nALIGNMENT\nKeep the company shortlist aligned with compensation goals and preparation constraints. Evaluate roles against actual scope and experience; do not assume an Engineering Manager title or compensation level is guaranteed.\n\nThis is a concise offline reading copy. The original master PDF contains the full roadmap, company tiers, and detailed scheduling.",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    },
+    {
+      "id": "em_interview_readiness",
+      "title": "2027 Job Switch — EM Interview Readiness Plan",
+      "subtitle": "Focused technical, system-design, leadership and interview preparation",
+      "filename": "2027_Job_Switch_6_9_Month_EM_Interview_Readiness_Plan.pdf",
+      "content": "2027 JOB SWITCH | ENGINEERING MANAGEMENT INTERVIEW READINESS\n\nPURPOSE\nA focused plan for preparing for engineering-management interviews over a 6–9 month window. Use it alongside the job-switch master plan; it is the interview-preparation track, not a replacement for the wider roadmap.\n\nCORE PREPARATION\n• System design and architecture trade-offs.\n• Technical depth and difficult debugging.\n• Production ownership, reliability, and incident reasoning.\n• Project execution, prioritization, and cross-functional collaboration.\n• Leadership, conflict resolution, feedback, and behavioral examples.\n• Mock interviews, review of gaps, and repeated practice.\n\nREADINESS CHECKPOINTS\nUse Tier 3/4 interviews as a diagnostic checkpoint around month 6. Use the evidence to close gaps before targeting Tier 1/2 roles around month 9. Assess readiness from interview performance and feedback, not calendar time alone.\n\nThis is a concise offline reading copy. Consult the original interview-readiness PDF for the complete schedule, exercises, and detailed checkpoints.",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    }
+  ]
+}
