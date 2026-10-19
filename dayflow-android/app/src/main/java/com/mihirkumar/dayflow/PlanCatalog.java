@@ -8,6 +8,7 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +26,7 @@ final class PlanCatalog {
     private static volatile boolean initialized;
     private static int schemaVersion;
     private static int sourcePlanVersion;
+    private static String catalogFingerprint = "";
     private static String authorityNote = "";
     private static List<Month> months = Collections.emptyList();
     private static List<Document> documents = Collections.emptyList();
@@ -117,6 +119,7 @@ final class PlanCatalog {
             schemaVersion = parsedSchemaVersion;
             sourcePlanVersion = parsedSourcePlanVersion;
             authorityNote = root.optString("authorityNote", "");
+            catalogFingerprint = sha256(jsonText);
             months = Collections.unmodifiableList(parsedMonths);
             documents = Collections.unmodifiableList(parsedDocuments);
             initialized = true;
@@ -136,6 +139,7 @@ final class PlanCatalog {
     static boolean isInitialized() { return initialized; }
     static int schemaVersion() { ensureInitialized(); return schemaVersion; }
     static int sourcePlanVersion() { ensureInitialized(); return sourcePlanVersion; }
+    static String catalogFingerprint() { ensureInitialized(); return catalogFingerprint; }
     static String authorityNote() { ensureInitialized(); return authorityNote; }
 
     static int monthCount() {
@@ -192,6 +196,23 @@ final class PlanCatalog {
 
     static String snapshot(String month, String track, String title, String detail) {
         return safe(month) + "|#DAYFLOW#|" + safe(track) + "|#DAYFLOW#|" + safe(title) + "|#DAYFLOW#|" + safe(detail);
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            char[] hex = "0123456789abcdef".toCharArray();
+            char[] output = new char[digest.length * 2];
+            for (int i = 0; i < digest.length; i++) {
+                int b = digest[i] & 0xff;
+                output[i * 2] = hex[b >>> 4];
+                output[i * 2 + 1] = hex[b & 0x0f];
+            }
+            return new String(output);
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 is unavailable on this device.", e);
+        }
     }
 
     private static String safe(String value) { return value == null ? "" : value; }
