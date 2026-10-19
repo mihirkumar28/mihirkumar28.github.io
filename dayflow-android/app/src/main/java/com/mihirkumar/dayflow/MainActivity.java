@@ -4997,6 +4997,22 @@ public class MainActivity extends Activity {
                     String actual = PlanCatalog.snapshot(linked.month, linked.track, linked.title, linked.target);
                     if (linked.sourcePlanSnapshot != null && !linked.sourcePlanSnapshot.isEmpty()
                             && linked.sourcePlanSnapshot.equals(actual)) {
+                        if (linked.done && !expected.equals(linked.sourcePlanSnapshot)) {
+                            // A completed record belongs to the old plan scope. Preserve it and
+                            // create a fresh open record for the revised source target.
+                            linked.sourcePlanId = "";
+                            linked.sourcePlanSnapshot = "";
+                            if (linked.title != null && !linked.title.endsWith(" · previous plan")) {
+                                linked.title += " · previous plan";
+                            }
+                            MonthlyGoal revised = new MonthlyGoal(nextId++, month.key, sourceGoal.track,
+                                    sourceGoal.title, sourceGoal.detail, false);
+                            revised.sourcePlanId = sourceGoal.id;
+                            revised.sourcePlanSnapshot = expected;
+                            goals.add(revised);
+                            changed = true;
+                            continue;
+                        }
                         if (!month.key.equals(linked.month) || !sourceGoal.track.equals(linked.track)
                                 || !sourceGoal.title.equals(linked.title) || !sourceGoal.detail.equals(linked.target)
                                 || !expected.equals(linked.sourcePlanSnapshot)) {
