@@ -5,7 +5,7 @@ on:
     branches:
       - pdf-transfer
     paths:
-      - "pdf-transfer/chunk-*.txt"
+      - "pdf-transfer/ready.txt"
 
 permissions:
   contents: write
