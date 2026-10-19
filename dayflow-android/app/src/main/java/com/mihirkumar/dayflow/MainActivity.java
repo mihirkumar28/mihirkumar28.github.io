@@ -68,7 +68,8 @@ public class MainActivity extends Activity {
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
     private static final String MONTHLY_GOALS_KEY = "monthlyGoals";
     private static final String MONTHLY_PLAN_MIGRATION_KEY = "monthlyGoalsSourcePlanMigrationVersion";
-    private static final int MONTHLY_PLAN_MIGRATION_VERSION = 3;
+    private static final String PDF_LIBRARY_ROADMAP_GOAL_MIGRATION_KEY = "pdfLibraryRoadmapGoalMigration_v1";
+    private static final int MONTHLY_PLAN_MIGRATION_VERSION = 2;
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
     private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v1";
     private static final String ROADMAP_MONTH_SLOTS_KEY_PREFIX = "roadmapMonthSlots_v1_";
@@ -4907,6 +4908,7 @@ public class MainActivity extends Activity {
             persistMonthlyGoals(seedDefaultMonthlyGoals());
         }
         reconcileMonthlyGoalsWithSourcePlans();
+        ensurePdfLibraryRoadmapGoal();
     }
 
     /**
@@ -4969,6 +4971,37 @@ public class MainActivity extends Activity {
         prefs.edit().putInt(MONTHLY_PLAN_MIGRATION_KEY, MONTHLY_PLAN_MIGRATION_VERSION).apply();
         debugLog("Monthly roadmap plans reconciled (source-plan version "
                 + MONTHLY_PLAN_MIGRATION_VERSION + ") without deleting existing goal history.");
+    }
+
+    /**
+     * Adds the new offline PDF-library goal without rerunning the broader roadmap
+     * migration. This avoids duplicating any existing user-edited monthly goals.
+     */
+    private void ensurePdfLibraryRoadmapGoal() {
+        SharedPreferences prefs = getPrefs();
+        if (prefs.getBoolean(PDF_LIBRARY_ROADMAP_GOAL_MIGRATION_KEY, false)) return;
+
+        String month = "2026-10";
+        String[] row = RoadmapMonthlyPlan.findGoal(month, "Other");
+        if (row == null || row.length < 3) return;
+
+        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+        for (MonthlyGoal goal : goals) {
+            if (month.equals(goal.month) && row[0].equals(goal.track) && row[1].equals(goal.title)) {
+                prefs.edit().putBoolean(PDF_LIBRARY_ROADMAP_GOAL_MIGRATION_KEY, true).apply();
+                return;
+            }
+        }
+
+        long nextId = System.currentTimeMillis();
+        for (MonthlyGoal goal : goals) nextId = Math.max(nextId, goal.id + 1L);
+        goals.add(new MonthlyGoal(nextId, month, row[0], row[1], row[2], false));
+        if (!persistMonthlyGoalsRaw(goals)) {
+            debugLog("PDF-library roadmap goal migration failed; will retry at next launch.");
+            return;
+        }
+        prefs.edit().putBoolean(PDF_LIBRARY_ROADMAP_GOAL_MIGRATION_KEY, true).apply();
+        debugLog("Added October 2026 offline PDF-library roadmap goal.");
     }
 
     private String monthlyGoalFingerprint(String track, String title, String target) {
