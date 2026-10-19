@@ -1,0 +1,61 @@
+name: Assemble bundled DayFlow plan PDFs
+
+on:
+  push:
+    branches:
+      - bundle-pdfs-final
+    paths:
+      - "pdf-transfer/ready.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Reconstruct and verify every original PDF
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s pdf-transfer/ready.txt
+          test "$(find pdf-transfer -maxdepth 1 -name 'part-*.txt' | wc -l)" -eq 57
+          cat pdf-transfer/part-*.txt | base64 --decode > dayflow-android/app/src/main/assets/plan_pdfs.zip
+          unzip -tq dayflow-android/app/src/main/assets/plan_pdfs.zip
+          python3 - <<'PY'
+          import zipfile
+          path = "dayflow-android/app/src/main/assets/plan_pdfs.zip"
+          expected = {
+              "Unified_Master_Execution_Plan_Oct2026_to_Jan2028_REVISED.pdf": 589977,
+              "UPSC_2027_Prelims_GS_Monthly_Plan.pdf": 34385,
+              "2027_Job_Switch_EM_6_9_Month_Master_Plan.pdf": 386204,
+              "2027_Job_Switch_6_9_Month_EM_Interview_Readiness_Plan.pdf": 75211,
+          }
+          with zipfile.ZipFile(path) as z:
+              if len(z.namelist()) != 4:
+                  raise SystemExit(f"Expected exactly 4 files, found {len(z.namelist())}")
+              if set(z.namelist()) != set(expected):
+                  raise SystemExit("Archive filenames do not match the four authoritative plan PDFs: " + repr(z.namelist()))
+              for name, size in expected.items():
+                  data = z.read(name)
+                  if not data.startswith(b"%PDF-"):
+                      raise SystemExit("Invalid PDF header: " + name)
+                  if len(data) != size:
+                      raise SystemExit(f"Wrong byte count for {name}: {len(data)} != {size}")
+                  print(f"PASS {name}: {len(data)} bytes")
+          PY
+      - name: Commit only the verified offline archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf pdf-transfer
+          rm -f .github/workflows/assemble-plan-pdfs.yml
+          git add -A dayflow-android/app/src/main/assets/plan_pdfs.zip pdf-transfer .github/workflows/assemble-plan-pdfs.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "[skip ci] Bundle original plan PDFs for offline reading"
+          git push origin HEAD:bundle-pdfs-final
