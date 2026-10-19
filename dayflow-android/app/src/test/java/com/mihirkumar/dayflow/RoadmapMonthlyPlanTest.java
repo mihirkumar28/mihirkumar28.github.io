@@ -1,9 +1,34 @@
 package com.mihirkumar.dayflow;
 
+import org.junit.Before;
 import org.junit.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import static org.junit.Assert.*;
 
 public class RoadmapMonthlyPlanTest {
+    @Before public void loadCanonicalCatalog() throws Exception {
+        Path path = Paths.get("app/src/main/assets/plans_catalog.json");
+        if (!Files.isRegularFile(path)) path = Paths.get("src/main/assets/plans_catalog.json");
+        assertTrue("Expected bundled plan catalog at " + path, Files.isRegularFile(path));
+        RoadmapMonthlyPlan.initializeFromJson(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
+    }
+
+    @Test public void sharedCatalogContainsRoadmapAndDocumentSummaries() {
+        assertEquals(1, PlanCatalog.sourcePlanVersion());
+        assertEquals(16, PlanCatalog.months().size());
+        int goals = 0;
+        for (PlanCatalog.Month month : PlanCatalog.months()) goals += month.goals.size();
+        assertEquals(51, goals);
+        assertEquals(4, PlanCatalog.documents().size());
+        assertFalse(PlanCatalog.documents().get(0).originalPdfBundled);
+        assertEquals("unified_master", PlanCatalog.documents().get(0).id);
+        assertTrue(PlanCatalog.findGoalById("general-studies-prelims-gs-polity-i-ii").sourceIds
+                .contains("upsc_gs_monthly"));
+    }
     @Test public void coversPlannedMonthRange() {
         assertEquals(16, RoadmapMonthlyPlan.monthCount());
         assertEquals("2026-10", RoadmapMonthlyPlan.monthKeyAt(0));
