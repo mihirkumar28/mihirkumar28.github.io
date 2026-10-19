@@ -33,20 +33,23 @@ public class RoadmapMonthlyPlanTest {
     }
 
     @Test public void allOriginalPdfAssetsAreBundledAndValid() throws Exception {
-        Path base = Paths.get("app/src/main/assets/plans");
-        if (!Files.isDirectory(base)) base = Paths.get("src/main/assets/plans");
-        assertTrue("Expected bundled PDF directory at " + base, Files.isDirectory(base));
-        for (PlanCatalog.Document document : PlanCatalog.documents()) {
-            assertTrue("Catalog must mark original PDF bundled: " + document.filename,
-                    document.originalPdfBundled);
-            Path pdf = base.resolve(document.filename);
-            assertTrue("Missing bundled PDF: " + pdf, Files.isRegularFile(pdf));
-            assertTrue("PDF unexpectedly small: " + pdf, Files.size(pdf) > 5000);
-            byte[] header = new byte[5];
-            try (java.io.InputStream in = Files.newInputStream(pdf)) {
-                assertEquals(5, in.read(header));
+        Path bundle = Paths.get("app/src/main/assets/plan_pdfs.zip");
+        if (!Files.isRegularFile(bundle)) bundle = Paths.get("src/main/assets/plan_pdfs.zip");
+        assertTrue("Expected original PDF archive at " + bundle, Files.isRegularFile(bundle));
+        assertTrue("PDF archive unexpectedly small", Files.size(bundle) > 100000);
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(bundle.toFile())) {
+            for (PlanCatalog.Document document : PlanCatalog.documents()) {
+                assertTrue("Catalog must mark original PDF bundled: " + document.filename,
+                        document.originalPdfBundled);
+                java.util.zip.ZipEntry entry = zip.getEntry(document.filename);
+                assertNotNull("Missing original PDF in archive: " + document.filename, entry);
+                assertTrue("Original PDF unexpectedly small: " + document.filename, entry.getSize() > 5000);
+                byte[] header = new byte[5];
+                try (java.io.InputStream in = zip.getInputStream(entry)) {
+                    assertEquals(5, in.read(header));
+                }
+                assertEquals("%PDF-", new String(header, StandardCharsets.US_ASCII));
             }
-            assertEquals("%PDF-", new String(header, StandardCharsets.US_ASCII));
         }
     }
 
