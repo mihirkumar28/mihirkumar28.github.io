@@ -19,6 +19,7 @@ public class RoadmapMonthlyPlanTest {
 
     @Test public void sharedCatalogContainsRoadmapAndDocumentSummaries() {
         assertEquals(1, PlanCatalog.sourcePlanVersion());
+        assertEquals(64, PlanCatalog.catalogFingerprint().length());
         assertEquals(16, PlanCatalog.months().size());
         int goals = 0;
         for (PlanCatalog.Month month : PlanCatalog.months()) goals += month.goals.size();
@@ -28,6 +29,7 @@ public class RoadmapMonthlyPlanTest {
         assertEquals("unified_master", PlanCatalog.documents().get(0).id);
         assertTrue(PlanCatalog.findGoalById("general-studies-prelims-gs-polity-i-ii").sourceIds
                 .contains("upsc_gs_monthly"));
+        assertEquals(1, PlanCatalog.findGoalById("other-dayflow-offline-pdf-plans-library").previousDetails.size());
     }
     @Test public void coversPlannedMonthRange() {
         assertEquals(16, RoadmapMonthlyPlan.monthCount());
