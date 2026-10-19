@@ -44,7 +44,15 @@ public class PlanDocumentsActivity extends Activity {
         sub.setPadding(0, dp(5), 0, dp(12)); sub.setLineSpacing(dp(2), 1f); card.addView(sub);
         Button b = new Button(this); b.setText(originalPdfBundled ? "Open original PDF" : "Read offline copy"); b.setAllCaps(false);
         b.setTextSize(13); b.setTextColor(Color.WHITE); b.setBackground(bg("#23845F"));
-        b.setOnClickListener(v -> {\n            if (originalPdfBundled) {\n                Intent intent = new Intent(this, OfflinePdfViewerActivity.class);\n                intent.putExtra(OfflinePdfViewerActivity.EXTRA_FILENAME, filename);\n                intent.putExtra(OfflinePdfViewerActivity.EXTRA_TITLE, title);\n                startActivity(intent);\n            } else {\n                open(title, filename, body);\n            }\n        }); card.addView(b, new LinearLayout.LayoutParams(-1, dp(44)));
+        b.setOnClickListener(v -> {
+            if (originalPdfBundled) {
+                Intent intent = new Intent(this, OfflinePdfViewerActivity.class);
+                intent.putExtra(OfflinePdfViewerActivity.EXTRA_FILENAME, filename);\n                intent.putExtra(OfflinePdfViewerActivity.EXTRA_TITLE, title);
+                startActivity(intent);
+            } else {
+                open(title, filename, body);
+            }
+        }); card.addView(b, new LinearLayout.LayoutParams(-1, dp(44)));
     }
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
