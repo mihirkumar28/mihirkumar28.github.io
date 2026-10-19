@@ -68,6 +68,7 @@ public class MainActivity extends Activity {
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
     private static final String MONTHLY_GOALS_KEY = "monthlyGoals";
     private static final String MONTHLY_PLAN_MIGRATION_KEY = "monthlyGoalsSourcePlanMigrationVersion";
+    private static final String MONTHLY_PLAN_SOURCE_REVISION_KEY = "monthlyGoalsAppliedSourcePlanRevision";
     private static final String PDF_LIBRARY_ROADMAP_GOAL_MIGRATION_KEY = "pdfLibraryRoadmapGoalMigration_v1";
     private static final int MONTHLY_PLAN_MIGRATION_VERSION = 2;
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
@@ -205,6 +206,8 @@ public class MainActivity extends Activity {
         // Structured execution metadata shown directly beneath each roadmap goal.
         String source, pages, estimatedTime;
         String originalMonth, lifecycleStatus;
+        // Stable catalog link plus last canonical snapshot; local edits are preserved.
+        String sourcePlanId, sourcePlanSnapshot;
         long completedAt, parentGoalId;
         int sortOrder;
         boolean done;
@@ -219,6 +222,8 @@ public class MainActivity extends Activity {
             this.source = "";
             this.pages = "";
             this.estimatedTime = "";
+            this.sourcePlanId = "";
+            this.sourcePlanSnapshot = "";
             this.done = done;
             this.originalMonth = month;
             this.lifecycleStatus = done ? MonthlyGoalLifecycle.COMPLETED : MonthlyGoalLifecycle.ACTIVE;
@@ -273,6 +278,7 @@ public class MainActivity extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        PlanCatalog.initialize(this);
         Window window = getWindow();
         window.setStatusBarColor(color("#0D1512"));
         window.setNavigationBarColor(Color.WHITE);
@@ -4773,6 +4779,8 @@ public class MainActivity extends Activity {
                 goal.source = item.optString("source", "");
                 goal.pages = item.optString("pages", "");
                 goal.estimatedTime = item.optString("estimatedTime", "");
+                goal.sourcePlanId = item.optString("sourcePlanId", "");
+                goal.sourcePlanSnapshot = item.optString("sourcePlanSnapshot", "");
                 if (goal.source.trim().isEmpty()) goal.source = inferGoalSource(goal.target, goal.track);
                 if (goal.pages.trim().isEmpty()) goal.pages = inferGoalPages(goal.target, goal.track);
                 if (goal.estimatedTime.trim().isEmpty()) goal.estimatedTime = inferGoalEstimatedTime(goal.target, goal.track);
@@ -4803,6 +4811,8 @@ public class MainActivity extends Activity {
                         ? inferGoalPages(goal.target, goal.track) : goal.pages);
                 item.put("estimatedTime", goal.estimatedTime == null || goal.estimatedTime.trim().isEmpty()
                         ? inferGoalEstimatedTime(goal.target, goal.track) : goal.estimatedTime);
+                item.put("sourcePlanId", goal.sourcePlanId == null ? "" : goal.sourcePlanId);
+                item.put("sourcePlanSnapshot", goal.sourcePlanSnapshot == null ? "" : goal.sourcePlanSnapshot);
                 item.put("done", goal.done);
                 item.put("sortOrder", goal.sortOrder);
                 item.put("originalMonth", goal.originalMonth == null ? goal.month : goal.originalMonth);
@@ -4918,59 +4928,128 @@ public class MainActivity extends Activity {
      */
     private void reconcileMonthlyGoalsWithSourcePlans() {
         SharedPreferences prefs = getPrefs();
-        if (prefs.getInt(MONTHLY_PLAN_MIGRATION_KEY, 0) >= MONTHLY_PLAN_MIGRATION_VERSION) return;
 
-        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
-        HashSet<String> legacyStarterFingerprints = new HashSet<>();
-        for (MonthlyGoal legacy : seedDefaultMonthlyGoals()) {
-            legacyStarterFingerprints.add(monthlyGoalFingerprint(legacy.track, legacy.title, legacy.target));
-        }
-
-        boolean changed = false;
-        for (MonthlyGoal goal : goals) {
-            if (!legacyStarterFingerprints.contains(
-                    monthlyGoalFingerprint(goal.track, goal.title, goal.target))) continue;
-            String[] planned = RoadmapMonthlyPlan.findGoal(goal.month, goal.track);
-            if (planned == null) continue;
-            // A completed old goal proves completion of its old scope, not the new source-plan scope.
-            // Keep that completed record intact; the missing source-plan goal is added below.
-            if (goal.done) continue;
-            if (!planned[1].equals(goal.title) || !planned[2].equals(goal.target == null ? "" : goal.target)) {
-                goal.title = planned[1];
-                goal.target = planned[2];
-                // Preserve its ID and date; it remains open under the revised target.
-                changed = true;
+        // Keep the legacy migration non-destructive: only exact generic starter rows
+        // are renamed, and completed rows retain their history.
+        if (prefs.getInt(MONTHLY_PLAN_MIGRATION_KEY, 0) < MONTHLY_PLAN_MIGRATION_VERSION) {
+            ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+            HashSet<String> legacyStarterFingerprints = new HashSet<>();
+            for (MonthlyGoal legacy : seedDefaultMonthlyGoals()) {
+                legacyStarterFingerprints.add(monthlyGoalFingerprint(legacy.track, legacy.title, legacy.target));
             }
-        }
-
-        long nextId = System.currentTimeMillis();
-        for (MonthlyGoal goal : goals) nextId = Math.max(nextId, goal.id + 1L);
-        for (int i = 0; i < RoadmapMonthlyPlan.monthCount(); i++) {
-            String monthKey = RoadmapMonthlyPlan.monthKeyAt(i);
-            for (String[] row : RoadmapMonthlyPlan.rowsForMonth(monthKey)) {
-                boolean plannedGoalExists = false;
-                for (MonthlyGoal existing : goals) {
-                    if (monthKey.equals(existing.month)
-                            && row[0].equals(existing.track)
-                            && row[1].equals(existing.title)) {
-                        plannedGoalExists = true;
-                        break;
+            boolean changed = false;
+            for (MonthlyGoal goal : goals) {
+                if (!legacyStarterFingerprints.contains(
+                        monthlyGoalFingerprint(goal.track, goal.title, goal.target))) continue;
+                String[] planned = RoadmapMonthlyPlan.findGoal(goal.month, goal.track);
+                if (planned == null || goal.done) continue;
+                if (!planned[1].equals(goal.title) || !planned[2].equals(goal.target == null ? "" : goal.target)) {
+                    goal.title = planned[1];
+                    goal.target = planned[2];
+                    changed = true;
+                }
+            }
+            long nextId = System.currentTimeMillis();
+            for (MonthlyGoal goal : goals) nextId = Math.max(nextId, goal.id + 1L);
+            for (int i = 0; i < RoadmapMonthlyPlan.monthCount(); i++) {
+                String monthKey = RoadmapMonthlyPlan.monthKeyAt(i);
+                for (String[] row : RoadmapMonthlyPlan.rowsForMonth(monthKey)) {
+                    boolean exists = false;
+                    for (MonthlyGoal existing : goals) {
+                        if (monthKey.equals(existing.month) && row[0].equals(existing.track)
+                                && row[1].equals(existing.title)) { exists = true; break; }
+                    }
+                    if (!exists) {
+                        goals.add(new MonthlyGoal(nextId++, monthKey, row[0], row[1], row[2], false));
+                        changed = true;
                     }
                 }
-                if (!plannedGoalExists) {
-                    goals.add(new MonthlyGoal(nextId++, monthKey, row[0], row[1], row[2], false));
+            }
+            if (changed && !persistMonthlyGoalsRaw(goals)) {
+                debugLog("Monthly roadmap plan migration failed; will retry at next launch.");
+                return;
+            }
+            prefs.edit().putInt(MONTHLY_PLAN_MIGRATION_KEY, MONTHLY_PLAN_MIGRATION_VERSION).apply();
+        }
+        syncMonthlyGoalsToSourceCatalog();
+    }
+
+    private void syncMonthlyGoalsToSourceCatalog() {
+        SharedPreferences prefs = getPrefs();
+        int revision = PlanCatalog.sourcePlanVersion();
+        if (prefs.getInt(MONTHLY_PLAN_SOURCE_REVISION_KEY, 0) >= revision) return;
+
+        ArrayList<MonthlyGoal> goals = readMonthlyGoals();
+        long nextId = System.currentTimeMillis();
+        for (MonthlyGoal goal : goals) nextId = Math.max(nextId, goal.id + 1L);
+        boolean changed = false;
+
+        for (PlanCatalog.Month month : PlanCatalog.months()) {
+            for (PlanCatalog.Goal sourceGoal : month.goals) {
+                String expected = PlanCatalog.snapshot(month.key, sourceGoal.track, sourceGoal.title, sourceGoal.detail);
+                MonthlyGoal linked = null;
+                for (MonthlyGoal goal : goals) {
+                    if (sourceGoal.id.equals(goal.sourcePlanId)) { linked = goal; break; }
+                }
+                if (linked != null) {
+                    String actual = PlanCatalog.snapshot(linked.month, linked.track, linked.title, linked.target);
+                    if (linked.sourcePlanSnapshot != null && !linked.sourcePlanSnapshot.isEmpty()
+                            && linked.sourcePlanSnapshot.equals(actual)) {
+                        if (!month.key.equals(linked.month) || !sourceGoal.track.equals(linked.track)
+                                || !sourceGoal.title.equals(linked.title) || !sourceGoal.detail.equals(linked.target)
+                                || !expected.equals(linked.sourcePlanSnapshot)) {
+                            linked.month = month.key;
+                            linked.track = sourceGoal.track;
+                            linked.title = sourceGoal.title;
+                            linked.target = sourceGoal.detail;
+                            linked.sourcePlanSnapshot = expected;
+                            changed = true;
+                        }
+                    }
+                    // A mismatch is a deliberate user override/move; do not overwrite it.
+                    continue;
+                }
+
+                MonthlyGoal candidate = null;
+                for (MonthlyGoal goal : goals) {
+                    if ((goal.sourcePlanId == null || goal.sourcePlanId.isEmpty())
+                            && month.key.equals(goal.month) && sourceGoal.track.equals(goal.track)
+                            && sourceGoal.title.equals(goal.title)) { candidate = goal; break; }
+                }
+                if (candidate == null) {
+                    MonthlyGoal onlyCandidate = null;
+                    int candidateCount = 0;
+                    for (MonthlyGoal goal : goals) {
+                        if ((goal.sourcePlanId == null || goal.sourcePlanId.isEmpty())
+                                && month.key.equals(goal.month) && sourceGoal.track.equals(goal.track)) {
+                            onlyCandidate = goal;
+                            candidateCount++;
+                        }
+                    }
+                    // A single user-renamed row is linked without altering the custom text.
+                    if (candidateCount == 1) candidate = onlyCandidate;
+                }
+                if (candidate != null) {
+                    candidate.sourcePlanId = sourceGoal.id;
+                    candidate.sourcePlanSnapshot = expected;
+                    changed = true;
+                } else {
+                    MonthlyGoal added = new MonthlyGoal(nextId++, month.key, sourceGoal.track,
+                            sourceGoal.title, sourceGoal.detail, false);
+                    added.sourcePlanId = sourceGoal.id;
+                    added.sourcePlanSnapshot = expected;
+                    goals.add(added);
                     changed = true;
                 }
             }
         }
 
         if (changed && !persistMonthlyGoalsRaw(goals)) {
-            debugLog("Monthly roadmap plan migration failed; will retry at next launch.");
+            debugLog("Structured plan sync failed; it will retry on the next launch.");
             return;
         }
-        prefs.edit().putInt(MONTHLY_PLAN_MIGRATION_KEY, MONTHLY_PLAN_MIGRATION_VERSION).apply();
-        debugLog("Monthly roadmap plans reconciled (source-plan version "
-                + MONTHLY_PLAN_MIGRATION_VERSION + ") without deleting existing goal history.");
+        prefs.edit().putInt(MONTHLY_PLAN_SOURCE_REVISION_KEY, revision).apply();
+        debugLog("Roadmap synchronized with structured plan catalog revision " + revision + ".");
     }
 
     /**
