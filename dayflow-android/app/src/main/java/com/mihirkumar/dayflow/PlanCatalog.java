@@ -191,7 +191,7 @@ final class PlanCatalog {
     }
 
     static String snapshot(String month, String track, String title, String detail) {
-        return safe(month) + "\u001f" + safe(track) + "\u001f" + safe(title) + "\u001f" + safe(detail);
+        return safe(month) + "|#DAYFLOW#|" + safe(track) + "|#DAYFLOW#|" + safe(title) + "|#DAYFLOW#|" + safe(detail);
     }
 
     private static String safe(String value) { return value == null ? "" : value; }
