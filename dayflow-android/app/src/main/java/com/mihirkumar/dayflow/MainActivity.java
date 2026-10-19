@@ -68,7 +68,7 @@ public class MainActivity extends Activity {
     private static final String INTERVIEW_TARGET_KEY = "softwareInterviewTarget";
     private static final String MONTHLY_GOALS_KEY = "monthlyGoals";
     private static final String MONTHLY_PLAN_MIGRATION_KEY = "monthlyGoalsSourcePlanMigrationVersion";
-    private static final int MONTHLY_PLAN_MIGRATION_VERSION = 2;
+    private static final int MONTHLY_PLAN_MIGRATION_VERSION = 3;
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
     private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v1";
     private static final String ROADMAP_MONTH_SLOTS_KEY_PREFIX = "roadmapMonthSlots_v1_";
