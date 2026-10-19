@@ -14,10 +14,14 @@ public class RoadmapMonthlyPlanTest {
     }
 
     @Test public void includesAllOctoberTracks() {
-        assertEquals(3, RoadmapMonthlyPlan.rowsForMonth("2026-10").length);
+        assertEquals(4, RoadmapMonthlyPlan.rowsForMonth("2026-10").length);
         assertNotNull(RoadmapMonthlyPlan.findGoal("2026-10", "General Studies"));
         assertNotNull(RoadmapMonthlyPlan.findGoal("2026-10", "Maths Optional"));
         assertNotNull(RoadmapMonthlyPlan.findGoal("2026-10", "Software Interview Prep"));
+        String[] pdfGoal = RoadmapMonthlyPlan.findGoal("2026-10", "Other");
+        assertNotNull(pdfGoal);
+        assertTrue(pdfGoal[1].contains("Offline PDF"));
+        assertTrue(pdfGoal[2].contains("airplane mode"));
     }
 
     @Test public void gsSequenceMatchesSavedPrelimsPlan() {
