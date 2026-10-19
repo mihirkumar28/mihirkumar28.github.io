@@ -1307,6 +1307,7 @@ public class MainActivity extends Activity {
     private void renderMorePage() {
         if(moreContent==null)return;moreContent.removeAllViews();
         addMoreRow("Focus & screen time","Actual focus sessions and phone-use history","↗",()->switchPage("progress"));
+        addMoreRow("Plans & Documents","Read your study and career plans offline","↗",()->startActivity(new Intent(MainActivity.this, PlanDocumentsActivity.class)));
         addMoreRow("Edit shared routine","Blocks inherited by WFH, office and weekend days","↗",()->openTemplateEditor("common"));
         addMoreRow("Edit WFH routine","Change WFH-specific blocks alongside the shared routine","↗",()->openTemplateEditor("wfh"));
         addMoreRow("Edit office routine","Change office-specific blocks alongside the shared routine","↗",()->openTemplateEditor("office"));
