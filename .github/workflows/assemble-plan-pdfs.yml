@@ -1,0 +1,61 @@
+name: Assemble offline plan PDFs
+
+on:
+  push:
+    branches:
+      - pdf-transfer
+    paths:
+      - "pdf-transfer/chunk-*.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout transfer branch
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: true
+
+      - name: Rebuild and validate original PDF archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d pdf-transfer
+          cat pdf-transfer/chunk-*.txt | base64 --decode > dayflow-android/app/src/main/assets/plan_pdfs.zip
+          unzip -tq dayflow-android/app/src/main/assets/plan_pdfs.zip
+          python3 - <<'PY'
+          import zipfile
+          p = "dayflow-android/app/src/main/assets/plan_pdfs.zip"
+          expected = [
+              "Unified_Master_Execution_Plan_Oct2026_to_Jan2028_REVISED.pdf",
+              "UPSC_2027_Prelims_GS_Monthly_Plan.pdf",
+              "2027_Job_Switch_EM_6_9_Month_Master_Plan.pdf",
+              "2027_Job_Switch_6_9_Month_EM_Interview_Readiness_Plan.pdf",
+          ]
+          with zipfile.ZipFile(p) as z:
+              names = set(z.namelist())
+              missing = [name for name in expected if name not in names]
+              if missing:
+                  raise SystemExit("Missing PDF entries: " + ", ".join(missing))
+              for name in expected:
+                  data = z.read(name)
+                  if not data.startswith(b"%PDF-"):
+                      raise SystemExit("Invalid PDF header: " + name)
+                  if len(data) < 5000:
+                      raise SystemExit("Unexpectedly small PDF: " + name)
+                  print(f"Verified {name}: {len(data)} bytes")
+          PY
+
+      - name: Commit archive and remove transfer chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf pdf-transfer
+          git add -A pdf-transfer dayflow-android/app/src/main/assets/plan_pdfs.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bundle original PDF plans for offline reading"
+          git push origin HEAD:pdf-transfer
