@@ -5232,6 +5232,8 @@ public class MainActivity extends Activity {
                         ? inferGoalPages(goal.target, goal.track) : goal.pages);
                 item.put("estimatedTime", goal.estimatedTime == null || goal.estimatedTime.trim().isEmpty()
                         ? inferGoalEstimatedTime(goal.target, goal.track) : goal.estimatedTime);
+                item.put("sourcePlanId", goal.sourcePlanId == null ? "" : goal.sourcePlanId);
+                item.put("sourcePlanSnapshot", goal.sourcePlanSnapshot == null ? "" : goal.sourcePlanSnapshot);
                 item.put("done", goal.done);
                 item.put("sortOrder", goal.sortOrder);
                 item.put("originalMonth", goal.originalMonth == null ? goal.month : goal.originalMonth);
