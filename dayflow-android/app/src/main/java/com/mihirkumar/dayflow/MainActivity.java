@@ -69,6 +69,7 @@ public class MainActivity extends Activity {
     private static final String MONTHLY_GOALS_KEY = "monthlyGoals";
     private static final String MONTHLY_PLAN_MIGRATION_KEY = "monthlyGoalsSourcePlanMigrationVersion";
     private static final String MONTHLY_PLAN_SOURCE_REVISION_KEY = "monthlyGoalsAppliedSourcePlanRevision";
+    private static final String MONTHLY_PLAN_CATALOG_FINGERPRINT_KEY = "monthlyGoalsAppliedCatalogFingerprint";
     private static final String PDF_LIBRARY_ROADMAP_GOAL_MIGRATION_KEY = "pdfLibraryRoadmapGoalMigration_v1";
     private static final int MONTHLY_PLAN_MIGRATION_VERSION = 2;
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
@@ -4977,7 +4978,8 @@ public class MainActivity extends Activity {
     private void syncMonthlyGoalsToSourceCatalog() {
         SharedPreferences prefs = getPrefs();
         int revision = PlanCatalog.sourcePlanVersion();
-        if (prefs.getInt(MONTHLY_PLAN_SOURCE_REVISION_KEY, 0) >= revision) return;
+        String catalogFingerprint = PlanCatalog.catalogFingerprint();
+        if (catalogFingerprint.equals(prefs.getString(MONTHLY_PLAN_CATALOG_FINGERPRINT_KEY, ""))) return;
 
         ArrayList<MonthlyGoal> goals = readMonthlyGoals();
         long nextId = System.currentTimeMillis();
@@ -5048,7 +5050,8 @@ public class MainActivity extends Activity {
             debugLog("Structured plan sync failed; it will retry on the next launch.");
             return;
         }
-        prefs.edit().putInt(MONTHLY_PLAN_SOURCE_REVISION_KEY, revision).apply();
+        prefs.edit().putInt(MONTHLY_PLAN_SOURCE_REVISION_KEY, revision)
+                .putString(MONTHLY_PLAN_CATALOG_FINGERPRINT_KEY, catalogFingerprint).apply();
         debugLog("Roadmap synchronized with structured plan catalog revision " + revision + ".");
     }
 
