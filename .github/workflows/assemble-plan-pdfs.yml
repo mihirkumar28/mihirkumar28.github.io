@@ -1,0 +1,87 @@
+name: Assemble offline plan PDFs
+
+on:
+  push:
+    branches:
+      - offline-pdf-assets
+    paths:
+      - "pdf-transfer/ready.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout transfer branch
+        uses: actions/checkout@v4
+
+      - name: Reassemble and validate exact original PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f pdf-transfer/ready.txt
+          cat pdf-transfer/chunk-*.b64 | tr -d '\r\n' | base64 --decode > /tmp/dayflow-pdfs.zip
+          unzip -tq /tmp/dayflow-pdfs.zip
+          python3 - <<'PY'
+          import zipfile
+          p = "/tmp/dayflow-pdfs.zip"
+          expected = [
+              "Unified_Master_Execution_Plan_Oct2026_to_Jan2028_REVISED.pdf",
+              "UPSC_2027_Prelims_GS_Monthly_Plan.pdf",
+              "2027_Job_Switch_EM_6_9_Month_Master_Plan.pdf",
+              "2027_Job_Switch_6_9_Month_EM_Interview_Readiness_Plan.pdf",
+          ]
+          with zipfile.ZipFile(p) as z:
+              names = set(z.namelist())
+              missing = [name for name in expected if name not in names]
+              if missing:
+                  raise SystemExit("Missing PDF entries: " + ", ".join(missing))
+              for name in expected:
+                  data = z.read(name)
+                  if not data.startswith(b"%PDF-"):
+                      raise SystemExit("Invalid PDF header: " + name)
+                  if len(data) < 5000:
+                      raise SystemExit("Unexpectedly small PDF: " + name)
+                  print(f"Verified {name}: {len(data)} bytes")
+          PY
+
+      - name: Check out main for the final app asset
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: mainrepo
+
+      - name: Install validated archive and update canonical catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/dayflow-pdfs.zip mainrepo/dayflow-android/app/src/main/assets/plan_pdfs.zip
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("mainrepo/dayflow-android/app/src/main/assets/plans_catalog.json")
+          data = json.loads(p.read_text())
+          data["sourcePlanVersion"] = max(3, int(data.get("sourcePlanVersion", 1)))
+          data["updatedAt"] = "2026-10-20"
+          data["authorityNote"] = "Canonical structured data for the Roadmap UI and Plans & Documents summaries. Original source PDFs are bundled as plan_pdfs.zip and extracted into app cache only when opened. The Roadmap uses structured catalog data, not runtime PDF parsing. Update and validate this catalog deliberately against authoritative source plans when they change."
+          for doc in data.get("documents", []):
+              doc["originalPdfBundled"] = True
+              doc["sourceKind"] = "bundled_original_pdf"
+          for doc in data.get("sourceDocuments", []):
+              doc["originalPdfBundled"] = True
+              doc["sourceKind"] = "bundled_original_pdf"
+          for month in data.get("months", []):
+              for goal in month.get("goals", []):
+                  if goal.get("id") == "other-dayflow-offline-pdf-plans-library":
+                      goal["detail"] = "October 2026 · The four original plan PDFs are now bundled inside the Android app as plan_pdfs.zip and are opened offline from More → Plans & Documents in the built-in PDF reader. The Roadmap and summaries share plans_catalog.json; the Roadmap does not parse PDF bytes. Automated archive checks validate all four originals. Remaining validation is an on-device smoke test confirming each document renders in airplane mode."
+                      goal["provenance"] = "implementation_status"
+          p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+          PY
+          cd mainrepo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dayflow-android/app/src/main/assets/plan_pdfs.zip dayflow-android/app/src/main/assets/plans_catalog.json
+          git commit -m "Bundle original plan PDFs for offline DayFlow reading"
+          git push origin HEAD:main
