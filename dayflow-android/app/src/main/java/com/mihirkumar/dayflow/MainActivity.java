@@ -5048,6 +5048,13 @@ public class MainActivity extends Activity {
                     if (candidateCount == 1) candidate = onlyCandidate;
                 }
                 if (candidate != null) {
+                    // The prior catalog text is recorded explicitly for this migration only.
+                    // Refresh this field if it matches that known prior version; preserve other edits.
+                    if (month.key.equals(candidate.month) && sourceGoal.track.equals(candidate.track)
+                            && sourceGoal.title.equals(candidate.title)
+                            && sourceGoal.previousDetails.contains(candidate.target)) {
+                        candidate.target = sourceGoal.detail;
+                    }
                     candidate.sourcePlanId = sourceGoal.id;
                     candidate.sourcePlanSnapshot = expected;
                     changed = true;
