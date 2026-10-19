@@ -24,7 +24,9 @@ final class RoadmapMonthlyPlan {
             {"Maths Optional", "Paper I: Linear Algebra foundations",
                 "Start with the December 2022 IMS notes as the conceptual spine. Cover vector spaces and subspaces, basis/dimension, linear transformations, matrices and rank. Keep a proof/problem error log and measure progress by mastered topics, worked problems and PYQs rather than page count."},
             {"Software Interview Prep", "Month 1: Java/JVM baseline + DSA reset",
-                "Core Java/OOP, collections, generics, exceptions, streams and JVM/memory basics. DSA: arrays, strings, hashing, two pointers and sliding window. Deliverables: 20–25 timed problems, 3 evidence-based EM stories and one Java debugging lab; record the starting baseline."}
+                "Core Java/OOP, collections, generics, exceptions, streams and JVM/memory basics. DSA: arrays, strings, hashing, two pointers and sliding window. Deliverables: 20–25 timed problems, 3 evidence-based EM stories and one Java debugging lab; record the starting baseline."},
+            {"Other", "DayFlow: Offline PDF plans library",
+                "October 2026 · Make the four saved plan PDFs accessible inside DayFlow from More → Plans & Documents, without an internet connection. Current implementation: the library screen and navigation exist, but the screen shows concise reading copies rather than the original PDFs. Remaining work: bundle the original Unified Master Execution Plan, UPSC 2027 Prelims GS Monthly Plan, 2027 EM 6/9-Month Master Plan and 2027 EM Interview Readiness Plan as local app assets; update each entry to open its original PDF; build the APK and verify all four open in airplane mode. Keep this goal open until original-file access and offline verification pass."}
         },
         {
             {"General Studies", "Prelims GS: Modern, Ancient and Medieval History",
