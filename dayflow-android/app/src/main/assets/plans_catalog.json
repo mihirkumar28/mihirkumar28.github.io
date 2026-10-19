@@ -49,7 +49,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-prelims-gs-polity-i-ii"
         },
         {
           "track": "Maths Optional",
@@ -59,7 +60,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-i-linear-algebra-foundations"
         },
         {
           "track": "Software Interview Prep",
@@ -70,7 +72,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-1-java-jvm-baseline-dsa-reset"
         },
         {
           "track": "Other",
@@ -80,7 +83,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "other-dayflow-offline-pdf-plans-library"
         }
       ]
     },
@@ -96,7 +100,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-prelims-gs-modern-ancient-and-medieval-history"
         },
         {
           "track": "Maths Optional",
@@ -106,7 +111,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-i-calculus-and-remaining-linear-algebra"
         },
         {
           "track": "Software Interview Prep",
@@ -117,7 +123,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-2-concurrency-lld"
         }
       ]
     },
@@ -133,7 +140,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-prelims-gs-environment-art-culture"
         },
         {
           "track": "Maths Optional",
@@ -143,7 +151,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-i-analytic-geometry-ordinary-differential-equations"
         },
         {
           "track": "Software Interview Prep",
@@ -154,7 +163,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-3-spring-sql-hld-foundation"
         }
       ]
     },
@@ -170,7 +180,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-prelims-gs-physical-world-indian-geography"
         },
         {
           "track": "Maths Optional",
@@ -180,7 +191,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-i-dynamics-and-statics"
         },
         {
           "track": "Software Interview Prep",
@@ -191,7 +203,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-4-messaging-reliability-production-thinking"
         }
       ]
     },
@@ -207,7 +220,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-prelims-gs-indian-economy"
         },
         {
           "track": "Maths Optional",
@@ -217,7 +231,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-i-vector-analysis-integration-of-paper-i"
         },
         {
           "track": "Software Interview Prep",
@@ -228,7 +243,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-5-tier-3-4-interview-conversion"
         }
       ]
     },
@@ -244,7 +260,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-prelims-gs-general-science-science-technology"
         },
         {
           "track": "Maths Optional",
@@ -254,7 +271,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-i-closure-paper-ii-algebra-foundations"
         },
         {
           "track": "Software Interview Prep",
@@ -265,7 +283,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-6-tier-3-4-readiness-gate-controlled-applications"
         }
       ]
     },
@@ -281,7 +300,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-prelims-conversion-static-revision-pyqs"
         },
         {
           "track": "CSE Revision & Tests",
@@ -292,7 +312,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "cse-revision-tests-prelims-test-conversion-gs-mocks-csat-and-mcqs"
         },
         {
           "track": "Maths Optional",
@@ -302,7 +323,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-ii-algebra-real-analysis"
         },
         {
           "track": "Software Interview Prep",
@@ -313,7 +335,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-7-architecture-depth-domain-aware-design"
         }
       ]
     },
@@ -329,7 +352,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-prelims-final-revision-rapid-recall-weak-areas"
         },
         {
           "track": "CSE Revision & Tests",
@@ -340,7 +364,8 @@
             "upsc_gs_monthly"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "cse-revision-tests-final-prelims-simulations-exam-target-23-may-2027"
         },
         {
           "track": "Maths Optional",
@@ -350,7 +375,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-ii-complex-analysis-linear-programming"
         },
         {
           "track": "Software Interview Prep",
@@ -361,7 +387,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-8-tier-1-2-design-leadership-evidence"
         }
       ]
     },
@@ -376,7 +403,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-mains-gs-i-history-culture-society-and-geography"
         },
         {
           "track": "Maths Optional",
@@ -386,7 +414,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-ii-partial-differential-equations"
         },
         {
           "track": "Software Interview Prep",
@@ -397,7 +426,8 @@
             "em_interview_readiness"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-month-9-final-interview-readiness-evidence"
         }
       ]
     },
@@ -412,7 +442,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-mains-gs-ii-constitution-governance-social-justice-ir"
         },
         {
           "track": "Maths Optional",
@@ -422,7 +453,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-ii-numerical-analysis"
         },
         {
           "track": "Software Interview Prep",
@@ -432,7 +464,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-interview-execution-applications-feedback-led-repairs"
         }
       ]
     },
@@ -447,7 +480,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-mains-gs-iii-economy-agriculture-s-t-environment-security"
         },
         {
           "track": "Maths Optional",
@@ -457,7 +491,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-ii-computer-programming"
         },
         {
           "track": "Software Interview Prep",
@@ -467,7 +502,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-interview-conversion-targeted-company-loops"
         }
       ]
     },
@@ -482,7 +518,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-mains-gs-iv-ethics-probity-essay-practice"
         },
         {
           "track": "Maths Optional",
@@ -492,7 +529,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-i-timed-sectional-tests-pyq-repair"
         },
         {
           "track": "Software Interview Prep",
@@ -502,7 +540,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-target-switch-readiness-review"
         }
       ]
     },
@@ -517,7 +556,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-mains-gs-i-ii-consolidation-answer-writing"
         },
         {
           "track": "Maths Optional",
@@ -527,7 +567,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-ii-mechanics-fluid-dynamics"
         },
         {
           "track": "Software Interview Prep",
@@ -537,7 +578,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-role-specific-system-design-and-leadership-refresh"
         }
       ]
     },
@@ -552,7 +594,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-mains-gs-iii-iv-consolidation-essay"
         },
         {
           "track": "Maths Optional",
@@ -562,7 +605,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-paper-ii-sectional-tests-pyq-gap-closure"
         },
         {
           "track": "Software Interview Prep",
@@ -572,7 +616,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-focused-gap-closure-from-actual-interview-evidence"
         }
       ]
     },
@@ -587,7 +632,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-full-cse-syllabus-audit-mixed-tests"
         },
         {
           "track": "Maths Optional",
@@ -597,7 +643,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-mixed-paper-i-ii-pyqs-first-pass-closure"
         },
         {
           "track": "Software Interview Prep",
@@ -607,7 +654,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-career-pipeline-review-targeted-preparation"
         }
       ]
     },
@@ -622,7 +670,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "general-studies-1-january-checkpoint-verify-cse-syllabus-coverage"
         },
         {
           "track": "Maths Optional",
@@ -632,7 +681,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "maths-optional-1-january-checkpoint-verify-paper-i-ii-first-pass"
         },
         {
           "track": "Software Interview Prep",
@@ -642,7 +692,8 @@
             "unified_master"
           ],
           "provenance": "curated_from_saved_plan",
-          "editableByUser": true
+          "editableByUser": true,
+          "id": "software-interview-prep-career-roadmap-reset-from-outcomes"
         }
       ]
     }
@@ -684,5 +735,6 @@
       "sourceKind": "condensed_reading_copy",
       "originalPdfBundled": false
     }
-  ]
+  ],
+  "sourcePlanVersion": 1
 }
