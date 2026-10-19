@@ -55,12 +55,32 @@ public class OfflinePdfViewerActivity extends Activity {
             return;
         }
         try {
-            File local = new File(getCacheDir(), filename);
-            try (InputStream in = getAssets().open("plans/" + filename);
+            String safeName = new File(filename).getName();
+            if (!safeName.equals(filename)) throw new IllegalArgumentException("Invalid PDF filename.");
+            File local = new File(getCacheDir(), safeName);
+            boolean found = false;
+            try (java.util.zip.ZipInputStream in =
+                         new java.util.zip.ZipInputStream(getAssets().open("plan_pdfs.zip"));
                  FileOutputStream out = new FileOutputStream(local, false)) {
-                byte[] buffer = new byte[8192];
-                int n;
-                while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+                java.util.zip.ZipEntry entry;
+                while ((entry = in.getNextEntry()) != null) {
+                    if (safeName.equals(entry.getName())) {
+                        byte[] buffer = new byte[8192];
+                        int n;
+                        while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+                        found = true;
+                        in.closeEntry();
+                        break;
+                    }
+                    in.closeEntry();
+                }
+            }
+            if (!found || local.length() < 5) throw new java.io.IOException("PDF not found in bundled archive: " + safeName);
+            try (InputStream check = new java.io.FileInputStream(local)) {
+                byte[] header = new byte[5];
+                if (check.read(header) != 5 || !"%PDF-".equals(new String(header, java.nio.charset.StandardCharsets.US_ASCII))) {
+                    throw new java.io.IOException("Bundled document is not a valid PDF: " + safeName);
+                }
             }
             descriptor = ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY);
             renderer = new PdfRenderer(descriptor);
