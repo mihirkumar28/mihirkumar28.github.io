@@ -47,7 +47,8 @@ public class PlanDocumentsActivity extends Activity {
         b.setOnClickListener(v -> {
             if (originalPdfBundled) {
                 Intent intent = new Intent(this, OfflinePdfViewerActivity.class);
-                intent.putExtra(OfflinePdfViewerActivity.EXTRA_FILENAME, filename);\n                intent.putExtra(OfflinePdfViewerActivity.EXTRA_TITLE, title);
+                intent.putExtra(OfflinePdfViewerActivity.EXTRA_FILENAME, filename);
+                intent.putExtra(OfflinePdfViewerActivity.EXTRA_TITLE, title);
                 startActivity(intent);
             } else {
                 open(title, filename, body);
