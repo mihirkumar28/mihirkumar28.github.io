@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-19",
-  "authorityNote": "Canonical structured data used by the Roadmap UI and Plans & Documents summaries. Original PDF files are not yet bundled in this APK; the four cards currently open concise offline reading copies. The Roadmap uses this structured catalog and does not parse PDF bytes. Increment sourcePlanVersion and validate the catalog whenever an authoritative source plan changes.",
+  "updatedAt": "2026-10-21",
+  "authorityNote": "Canonical structured data used by the DayFlow Roadmap UI and Plans & Documents summaries. Monthly Roadmap goals live in this catalog; the app does not parse PDF bytes to generate goals. The Software Interview Prep track follows the 39-week Technical Interview Readiness Spoon-Fed Plan at 13.5 hours/week, with technical readiness as the sole scope of this track.",
   "sourceDocuments": [
     {
       "id": "unified_master",
@@ -32,6 +32,14 @@
       "title": "2027 Job Switch — EM Interview Readiness Plan",
       "subtitle": "Focused technical, system-design, leadership and interview preparation",
       "filename": "2027_Job_Switch_6_9_Month_EM_Interview_Readiness_Plan.pdf",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
+    },
+    {
+      "id": "technical_interview_readiness",
+      "title": "Technical Interview Readiness — Spoon-Fed Plan",
+      "subtitle": "39 weeks · 13.5 hours/week · 351-hour six-month gate · 526.5-hour nine-month gate",
+      "filename": "Technical_Interview_Readiness_Spoon_Fed_Plan.pdf",
       "sourceKind": "condensed_reading_copy",
       "originalPdfBundled": false
     }
@@ -65,20 +73,19 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 1: Java/JVM baseline + DSA reset",
-          "detail": "Core Java/OOP, collections, generics, exceptions, streams and JVM/memory basics. DSA: arrays, strings, hashing, two pointers and sliding window. Deliverables: 20–25 timed problems, 3 evidence-based EM stories and one Java debugging lab; record the starting baseline.",
+          "title": "Weeks 1–4: coding + Java baseline + first system design",
+          "detail": "13.5 h/week. W1: timed coding baseline; arrays/hash maps; Java collections, equals/hashCode and immutability; HLD answer template. W2: strings, frequency maps and two pointers; requirements, estimates, APIs/data model; SQL SELECT/WHERE/GROUP BY. W3: sorting/sliding window; Spring Boot REST skeleton; typed agent-tool loop; AWS IAM/least privilege. W4: binary search; OS process/thread basics; SQL joins; VPC/subnets/security groups. Outputs: baseline/error log, URL-shortener design, tested health-endpoint API and capstone scope/safety non-goals. Gate: solve two unseen array/hash-map problems in 60 minutes and design the URL shortener without notes.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-1-java-jvm-baseline-dsa-reset"
         },
         {
           "track": "Other",
-          "title": "DayFlow: Offline PDF plans library",
-          "detail": "October 2026 · Bundle the four authoritative plan PDFs inside DayFlow under assets/plans/ and open them from More → Plans & Documents using the built-in offline reader. The Roadmap and document summaries share plans_catalog.json, so the PDF viewer does not drive or parse monthly goals. The reader, library navigation and activity registration are committed; CI will validate all four PDF assets and the Android release build. Keep this goal open only for a physical-device smoke test confirming all four documents render in airplane mode.",
+          "title": "DayFlow: Bundle and verify offline plan PDFs",
+          "detail": "October 2026 · Keep the five source plan PDFs available from More → Plans & Documents with the built-in offline reader: Unified Master Execution Plan, UPSC GS Monthly Plan, Job Switch Master Plan, the previous EM interview plan and Technical Interview Readiness — Spoon-Fed Plan. The Roadmap is driven by plans_catalog.json, not by parsing PDF bytes. Do not mark this goal complete until all five originals are packaged, each entry opens the correct file, and all render in airplane mode on a physical device.",
           "sourceIds": [
             "unified_master"
           ],
@@ -119,13 +126,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 2: Concurrency + LLD",
-          "detail": "Threads, executors, locks, atomics, Java Memory Model and CompletableFuture; object-oriented design, SOLID, testability and code review. Deliverables: 25–30 cumulative timed problems, a concurrency lab, 4 LLD drills and 3 additional EM stories.",
+          "title": "Weeks 5–8: concurrency + trees + backend persistence",
+          "detail": "W5 linked lists, JVM/GC concepts and PostgreSQL CRUD. W6 stacks/queues, executors/synchronization, tests for invalid input/concurrency. W7 recursion/tree traversals, composition, caching/consistency. W8 trees/BST, SOLID, retries/timeouts/idempotency, SQL joins/subqueries, RDS and retrieval grounding. Outputs: tested CRUD API, migrations, one rate-limiter HLD. Gate: solve 3/4 representative tree problems and run integration tests from a clean DB.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-2-concurrency-lld"
         }
@@ -159,13 +165,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 3: Spring + SQL + HLD foundation",
-          "detail": "Spring Boot DI, REST, validation, transactions and JPA/Hibernate; PostgreSQL and SQL tuning; CAP, consistency, caching and queues. Deliverables: one deployable service slice, 4 HLD drills, a SQL tuning set and 8 total core EM stories.",
+          "title": "Weeks 9–13: heaps, graphs, SQL depth + first technical mock",
+          "detail": "W9 heaps/top-K/greedy, CTEs/windows, CloudWatch and request IDs. W10 BFS/DFS/components, sharding/hot keys, citations/abstention. W11 topological sort/shortest path, OS scheduling/deadlocks, rate limiting. W12 selected 1-D DP, virtual memory, EXPLAIN/indexes. W13 mixed review and 45-min coding + 45-min HLD mock; recap IAM/VPC/EC2/S3/RDS and agent validation/stopping rules. Outputs: SQL drill, observable request path and top-five technical weakness list. Gate: complete mock without notes and choose next work from actual misses.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-3-spring-sql-hld-foundation"
         }
@@ -199,13 +204,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 4: Messaging + reliability + production thinking",
-          "detail": "Kafka/RabbitMQ/Redis; retries, ordering, idempotency, observability, SLOs, incident/postmortem reasoning and target-role calibration. Deliverables: one async workflow, 2 incident drills, 2 external calibration interviews/mocks and a company-role matrix.",
+          "title": "Weeks 14–17: LLD + HLD + distributed systems depth",
+          "detail": "W14 class responsibilities, interfaces, composition, SOLID and testability. W15 messaging/chat HLD: delivery semantics, queues, retries, deduplication and idempotency. W16 feed/recommendation HLD: freshness, ranking, caching and evaluation; create 20 fixed agent-evaluation cases. W17 TCP/DNS/HTTP/TLS, timeouts, consensus/Paxos at interview depth; distinguish replication, partitioning and consensus. Outputs: two blank-page designs, one tested LLD implementation and concise trade-off notes. Use InterviewReady Advanced only for material not already mastered in Simplified.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-4-messaging-reliability-production-thinking"
         }
@@ -239,13 +243,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 5: Tier 3/4 interview conversion",
-          "detail": "Practise harder coding, mixed HLD/LLD, architecture trade-offs, working React/TypeScript breadth and mixed EM rounds. Deliverables: 2 full mock loops, 10–12 strong leadership stories, 60–80 cumulative timed problems and 8–10 design cases.",
+          "title": "Weeks 18–21: AWS reliability + AI security + capstone",
+          "detail": "W18 deployment/reliability, IAM, network boundaries, RDS resilience, CloudWatch, backups and cost. W19 agent state/workflows, prompt injection, tool poisoning, least privilege, approval gates and sandboxing. W20 integrate one vertical slice: task → approved-file retrieval → structured proposal, with unsafe actions blocked. W21 benchmark 30–50 fixed cases, inspect traces, measure failures/latency/cost where feasible, and run a second coding/design mock. Outputs: reproducible tests, threat model, evaluation record and runbook draft.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-5-tier-3-4-interview-conversion"
         }
@@ -279,13 +282,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 6: Tier 3/4 readiness gate + controlled applications",
-          "detail": "Reduce new learning and use simulated coding, design, behavioural and manager rounds to test readiness. Deliverables: 3–4 complete mocks across formats, scored weak-area list, resume/role positioning and a factual EM story bank. Apply selectively when readiness gates are met; the calendar alone does not establish readiness.",
+          "title": "Weeks 22–26: consolidate core skills + six-month readiness gate",
+          "detail": "Planned effort to this gate: 351 hours. W22 consolidate arrays/strings/sliding-window/binary-search. W23 trees/graphs plus an HLD with failure modes. W24 timed SQL and targeted OS/networking/DBMS. W25 full technical rehearsal: coding, HLD, LLD, backend deep-dive, AWS/operations and AI security. W26 final scorecard and capstone walkthrough. Gate: timed coding; independent HLD/LLD; Java/Spring explanation; SQL/core-CS recall; AWS deploy/security/monitor/rollback explanation; bounded agent with retrieval grounding, fixed evaluation and security controls. Apply when demonstrated gates are met; otherwise fix the highest-impact gap instead of restarting every course.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-6-tier-3-4-readiness-gate-controlled-applications"
         }
@@ -331,13 +333,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 7: Architecture depth + domain-aware design",
-          "detail": "Deepen distributed consistency, resilience, partitioning and multi-region trade-offs where role-relevant. Practise architecture decisions, ADRs, standards and technical-debt prioritisation; use actual target-role JDs to select domain-specific design drills.",
+          "title": "Weeks 27–30: targeted gap repair",
+          "detail": "Use mock/error-log evidence, not the whole syllabus. W27 targeted TUF coding patterns; re-solve misses after 48 hours. W28 redo two HLDs from blank pages with estimates, APIs/data models, bottlenecks, failure modes, observability and trade-offs. W29 Java/Spring deep dive: transactions, persistence, concurrency, security, testing, performance and root-cause analysis. W30 AWS scenarios: database outage, bad deployment, high latency, recovery, rollback and cost/security. Outputs: coding post-mortem, two recorded designs, seeded-bug investigation and operations tabletop.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-7-architecture-depth-domain-aware-design"
         }
@@ -383,13 +384,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 8: Tier 1/2 design + leadership evidence",
-          "detail": "Use target-company playbooks and harder system-design cases to test architecture depth, reliability, migration choices and domain understanding. Refine hiring, coaching, conflict, delivery-risk and stakeholder stories using real evidence; do not invent metrics.",
+          "title": "Weeks 31–34: agent evaluation/security + harder coding/HLD",
+          "detail": "W31 improve fixed evaluation cases, traces, regression tests, failure taxonomy and cost/latency observations. W32 test prompt injection, tool poisoning, path traversal, secret leakage, excessive permissions and unbounded loops. W33 harder company-relevant coding and a timed mock. W34 study two unique InterviewReady Advanced case studies matched to target JDs; explain them from first principles, including bottlenecks and failures. Outputs: benchmark comparison, security report, coding score and two case-study walkthroughs.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-8-tier-1-2-design-leadership-evidence"
         }
@@ -422,13 +422,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Month 9: final interview-readiness evidence",
-          "detail": "Polish the resume and capstone/project deep-dives; complete 4–6 realistic mocks across coding, design and behavioural/manager rounds. Produce a scored gap list and a role-specific preparation plan. Judge readiness by repeatable performance, not by month completion alone.",
+          "title": "Weeks 35–39: LLD + company alignment + full technical mocks",
+          "detail": "Planned effort to this gate: 526.5 hours. W35 timed LLD/machine-coding exercise with tests and extension points. W36 map 3–5 target JDs to coding, backend, HLD/LLD, databases, AWS/operations and AI requirements. W37 technical mock loop A across coding, HLD, LLD, backend, cloud and AI/agentic depth. W38 repeat with unseen questions/different design and repair critical failures. W39 final scorecard, architecture diagram, test/evaluation evidence, project walkthrough and runbook. Decide applications or remediation from observed performance, not course completion.",
           "sourceIds": [
-            "job_switch_master",
-            "em_interview_readiness"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-month-9-final-interview-readiness-evidence"
         }
@@ -461,12 +460,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Interview execution: applications + feedback-led repairs",
-          "detail": "Extension beyond the saved nine-month study plan. Track target roles/applications, debrief real interviews and mocks, and use the highest-impact observed gap to choose weekly coding/design/leadership drills. Keep Java/JVM, DSA and architecture warm rather than restarting the curriculum.",
+          "title": "Technical interview execution: applications + feedback-led repairs",
+          "detail": "Track target roles and interview outcomes. After each interview, classify gaps across coding, HLD/LLD, backend, databases, cloud/operations or AI. Pick weekly practice from recurring evidence. Keep Java/JVM, DSA, design and production reasoning warm; add a course only for a named gap.",
           "sourceIds": [
-            "unified_master"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-interview-execution-applications-feedback-led-repairs"
         }
@@ -499,12 +498,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Interview conversion: targeted company loops",
-          "detail": "Extension beyond the saved nine-month study plan. Prepare for actual openings using their role requirements; maintain a lightweight log of coding, design and leadership feedback. Spend time on recurring weaknesses, not on adding technologies without a target-role reason.",
+          "title": "Target-company technical loops",
+          "detail": "Match technical preparation to active job descriptions. Rotate timed coding, independent HLD/LLD, Java/Spring and database deep-dives, cloud/production scenarios and capstone/agent walkthrough. Record score, time, hints and failed follow-ups; pick the three highest-value gaps for the next week.",
           "sourceIds": [
-            "unified_master"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-interview-conversion-targeted-company-loops"
         }
@@ -537,12 +536,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Target-switch readiness review",
-          "detail": "Extension beyond the saved nine-month study plan. Evaluate real interview outcomes, role fit and compensation constraints; maintain company-specific preparation where active processes exist. Decide the next cycle from evidence rather than extending preparation indefinitely.",
+          "title": "Technical readiness review from real outcomes",
+          "detail": "Review actual interview results, technical feedback and role fit. Track coding accuracy/time, design quality, backend reasoning, SQL/core-CS recall, operations scenarios and capstone questions. Decide whether to continue applications, repair a specific skill or narrow target roles; set a finite next checkpoint.",
           "sourceIds": [
-            "unified_master"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-target-switch-readiness-review"
         }
@@ -575,12 +574,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Role-specific system-design and leadership refresh",
-          "detail": "Extension beyond the saved nine-month study plan. Refresh design cases and leadership examples for live target roles; prioritise repeatable interview performance, role-specific gaps and lessons from feedback.",
+          "title": "Role-specific coding + system-design refresh",
+          "detail": "Use active job descriptions and interview feedback to choose a limited set of coding patterns and system designs. Reproduce solutions from scratch, practise follow-up changes and refresh Java/Spring, databases, reliability and cost trade-offs only where role-relevant.",
           "sourceIds": [
-            "unified_master"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-role-specific-system-design-and-leadership-refresh"
         }
@@ -613,12 +612,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Focused gap closure from actual interview evidence",
-          "detail": "Extension beyond the saved nine-month study plan. Review the interview log and repair the most frequent high-impact failures in coding, architecture or leadership communication. Avoid broad new study unless target roles consistently require it.",
+          "title": "Focused gap closure from technical interview evidence",
+          "detail": "Repair the most frequent, highest-impact technical failures. Prefer deliberate practice and retests over broad new courses. Check improvement across multiple unseen problems/designs and technical follow-ups.",
           "sourceIds": [
-            "unified_master"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-focused-gap-closure-from-actual-interview-evidence"
         }
@@ -651,12 +650,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Career pipeline review + targeted preparation",
-          "detail": "Extension beyond the saved nine-month study plan. Review job-search results, interviews and offer fit; refresh the target-company list and maintain only the preparation that supports real opportunities. Keep documented ownership and impact examples factual.",
+          "title": "Technical pipeline review + targeted preparation",
+          "detail": "Review roles, interview feedback and remaining technical-fit gaps. Refresh only topics needed by active opportunities; maintain coding/design fluency and keep project claims factual. Do not add technologies without a target-role reason.",
           "sourceIds": [
-            "unified_master"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-career-pipeline-review-targeted-preparation"
         }
@@ -689,12 +688,12 @@
         },
         {
           "track": "Software Interview Prep",
-          "title": "Career roadmap reset from outcomes",
-          "detail": "Extension beyond the saved nine-month study plan. Review target roles, actual interview performance, compensation/role fit and the portfolio. Choose the next cycle based on evidence—continued search, targeted upskilling or a revised timeline—without treating completion of the checklist as an offer guarantee.",
+          "title": "Career roadmap reset from technical outcomes",
+          "detail": "Use applications, scores, feedback and role requirements to define the next technical cycle. Record strengths and gaps across coding, HLD/LLD, Java/backend, databases, cloud/operations and AI/agentic work. Set a finite checkpoint; checklist completion is not an offer guarantee.",
           "sourceIds": [
-            "unified_master"
+            "technical_interview_readiness"
           ],
-          "provenance": "curated_from_saved_plan",
+          "provenance": "curated_from_technical_interview_readiness_plan",
           "editableByUser": true,
           "id": "software-interview-prep-career-roadmap-reset-from-outcomes"
         }
@@ -737,7 +736,16 @@
       "content": "2027 JOB SWITCH | ENGINEERING MANAGEMENT INTERVIEW READINESS\n\nPURPOSE\nA focused plan for preparing for engineering-management interviews over a 6–9 month window. Use it alongside the job-switch master plan; it is the interview-preparation track, not a replacement for the wider roadmap.\n\nCORE PREPARATION\n• System design and architecture trade-offs.\n• Technical depth and difficult debugging.\n• Production ownership, reliability, and incident reasoning.\n• Project execution, prioritization, and cross-functional collaboration.\n• Leadership, conflict resolution, feedback, and behavioral examples.\n• Mock interviews, review of gaps, and repeated practice.\n\nREADINESS CHECKPOINTS\nUse Tier 3/4 interviews as a diagnostic checkpoint around month 6. Use the evidence to close gaps before targeting Tier 1/2 roles around month 9. Assess readiness from interview performance and feedback, not calendar time alone.\n\nThis is a concise offline reading copy. Consult the original interview-readiness PDF for the complete schedule, exercises, and detailed checkpoints.",
       "sourceKind": "condensed_reading_copy",
       "originalPdfBundled": false
+    },
+    {
+      "id": "technical_interview_readiness",
+      "title": "Technical Interview Readiness — Spoon-Fed Plan",
+      "subtitle": "39 weeks · 13.5 hours/week · 351-hour six-month gate · 526.5-hour nine-month gate",
+      "filename": "Technical_Interview_Readiness_Spoon_Fed_Plan.pdf",
+      "content": "TECHNICAL INTERVIEW READINESS — SPOON-FED EXECUTION PLAN\n\nPURPOSE\nTechnical interview workstream only. Course completion is not the goal: choose modules based on interview value and measured gaps.\n\nTIME BUDGET\n13.5 hours/week: three WFH blocks × 1.5h, two WFO blocks × 1.5h, two weekend blocks × 3h. This is 351 hours over 26 weeks and 526.5 hours over 39 weeks. Preserve protected UPSC study time.\n\nFIXED WEEKLY BLOCKS\n• WFH 1: TUF coding 60 min + Java/backend 30 min.\n• WFH 2: AI/agentic roadmap 60 min + capstone/evaluation/security 30 min.\n• WFH 3: backend/capstone 60 min + coding error-log review 30 min.\n• WFO 1: OS/networking/DBMS/SQL 45 min + timed recall/questions 45 min.\n• WFO 2: InterviewReady system design 75 min + notes from memory 15 min.\n• Weekend 1: AWS 75 min + backend/capstone 75 min + tests/docs 30 min.\n• Weekend 2: TUF coding 75 min + HLD/LLD 60 min + AI evaluation/security or technical mock 45 min.\nEvery block must produce solved problems, tests, a design, an evaluation result, an operations note or a logged weakness—not passive watching alone.\n\nMONTH 1 / WEEKS 1–4\nArrays/hash maps, strings/two pointers, sorting/sliding window, binary search; Java collections/OOP/immutability; HLD framework; SQL basics; OS process/thread basics; Spring Boot health endpoint; agent loop and IAM. Outputs: baseline, URL-shortener design, tested API and capstone safety scope.\n\nMONTH 2 / WEEKS 5–8\nLinked lists, stacks/queues, concurrency, recursion/trees/BST; JVM/GC; PostgreSQL CRUD, validation, migrations, integration tests; joins/subqueries, cache/consistency, retries/idempotency; RDS and retrieval grounding. Output: running tested API and rate-limiter HLD.\n\nMONTH 3 / WEEKS 9–13\nHeaps/greedy, graph BFS/DFS/topological sort, selected 1-D DP; SQL CTEs/windows/EXPLAIN/indexes; OS virtual memory; observability, sharding and grounded retrieval; first coding + HLD simulation. Output: observable API, SQL drill and top-five weakness list.\n\nMONTH 4 / WEEKS 14–17\nLLD/SOLID, messaging/chat HLD, feed/recommendation HLD, TCP/DNS/HTTP/TLS and interview-level consensus. Use Advanced for gaps only; add a fixed agent evaluation set. Output: two blank-page designs and a tested LLD implementation.\n\nMONTH 5 / WEEKS 18–21\nAWS reliability/deployment; agent state, prompt injection/tool poisoning/least privilege/sandboxing; integrated capstone vertical slice; 30–50 fixed evaluation cases; second technical mock. Output: reproducible tests, threat model, evaluation record and runbook draft.\n\nMONTH 6 / WEEKS 22–26\nConsolidate coding; trees/graphs; timed SQL and targeted OS/networking/DBMS; full technical rehearsal; final readiness gate. Require timed coding, independent HLD/LLD, Java/backend explanation, SQL/core-CS recall, AWS operations explanation and a bounded tested/evaluated agent. Apply when gates are met or target the highest-impact gaps.\n\nMONTH 7 / WEEKS 27–30\nTargeted coding repair; redo HLD from blank pages; backend deep dive in transactions, persistence, concurrency, security, testing and performance; AWS incident/rollback/recovery scenarios.\n\nMONTH 8 / WEEKS 31–34\nAgent evaluation and security regression; adversarial tests; harder company-relevant coding; two unique Advanced case studies matched to target JDs.\n\nMONTH 9 / WEEKS 35–39\nTimed LLD/machine coding; map 3–5 target JDs to technical evidence; two technical mock loops across coding, HLD, LLD, backend, cloud/operations and AI; final scorecard, architecture diagram, tests, evaluation evidence and runbook.\n\nRESOURCE RULES\nTUF Pinnacle: selected DSA order—arrays/hash maps/strings, two pointers/sliding window, binary search, linked lists/stacks/queues, trees/BST, heaps/greedy, graphs, selected DP. Do not chase all 474 A2Z problems. Prioritize OS processes/threads/synchronization/deadlocks/memory; TCP/DNS/HTTP/TLS/timeouts; DB indexes/transactions/isolation/recovery/query optimization.\nInterviewReady Simplified: primary first pass for requirements/estimates, APIs/data model, database/cache/networking, replication/consistency, queues, rate limiting, security, observability and trade-offs. Reproduce selected designs from a blank page.\nInterviewReady Advanced: gap-driven only; unique distributed-system/NoSQL/migration/tracing concepts and relevant case studies.\nAI/agentic: typed tools and bounded loops → validation/stopping rules → retrieval/grounding → state/idempotency → fixed eval/traces → prompt injection/tool poisoning/least privilege/sandboxing/approval. Defer fine-tuning or GPU serving unless target JDs require it.\nAWS: IAM, VPC/subnets/security groups, EC2, S3, RDS, CloudWatch, resilience, backups, access control, cost and deployment/rollback. Keep Kubernetes/Terraform introductory unless target JDs demand depth.\nCapstone: scoped Repository Reliability Platform + bounded engineering task agent, approved-file retrieval, structured proposal, isolated test execution, diff/evidence review, human approval before side effects, Docker/logs/traces and AWS where practical. Choose Kafka OR RabbitMQ only if justified; Redis only for a demonstrated need.\n\nWEEKLY MEASUREMENT\nRecord independent coding solves/time/hints, design gaps, backend/test artefacts, AWS scenario demonstrated and AI eval/security changes. Choose no more than three next remediation items. Course completion percentages are not readiness evidence.",
+      "sourceKind": "condensed_reading_copy",
+      "originalPdfBundled": false
     }
   ],
-  "sourcePlanVersion": 2
+  "sourcePlanVersion": 3
 }
