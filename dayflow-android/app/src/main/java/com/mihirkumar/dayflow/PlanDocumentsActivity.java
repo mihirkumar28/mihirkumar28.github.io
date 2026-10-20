@@ -43,10 +43,13 @@ public class PlanDocumentsActivity extends Activity {
         card.addView(label(title, 16, Color.parseColor("#18372E"), true));
         TextView sub = label(detail, 12, Color.parseColor("#687A70"), false);
         sub.setPadding(0, dp(5), 0, dp(12)); sub.setLineSpacing(dp(2), 1f); card.addView(sub);
-        Button b = new Button(this); b.setText(originalPdfBundled ? "Open original PDF" : "Read offline copy"); b.setAllCaps(false);
+        Button b = new Button(this);
+        b.setText(originalPdfBundled ? "Open original PDF"
+                : (offlinePdfCopyBundled ? "Open offline PDF copy" : "Read offline copy"));
+        b.setAllCaps(false);
         b.setTextSize(13); b.setTextColor(Color.WHITE); b.setBackground(bg("#23845F"));
         b.setOnClickListener(v -> {
-            if (originalPdfBundled) {
+            if (originalPdfBundled || offlinePdfCopyBundled) {
                 Intent intent = new Intent(this, OfflinePdfViewerActivity.class);
                 intent.putExtra(OfflinePdfViewerActivity.EXTRA_FILENAME, filename);
                 intent.putExtra(OfflinePdfViewerActivity.EXTRA_TITLE, title);
@@ -68,12 +71,18 @@ public class PlanDocumentsActivity extends Activity {
         page.addView(label("DAYFLOW  /  OFFLINE LIBRARY", 10, Color.parseColor("#65C5A0"), true));
         TextView h = label("Plans & Documents", 28, Color.parseColor("#F2F7F3"), true);
         h.setPadding(0, dp(4), 0, dp(7)); page.addView(h);
-        TextView note = label("The Roadmap and this library share one structured plan catalog. The original PDF reader is ready, but the original PDF archive is not bundled yet; concise summaries work offline.", 13, Color.parseColor("#9AABA0"), false);
+        TextView note = label("Offline PDF reading copies are generated from the bundled catalog and open without a network connection. They are condensed copies, not the original source PDFs; the original-PDF milestone remains open.", 13, Color.parseColor("#9AABA0"), false);
         note.setLineSpacing(dp(3), 1f); note.setPadding(0, 0, 0, dp(18)); page.addView(note);
 
         for (PlanCatalog.Document document : PlanCatalog.documents()) {
             String detail = document.subtitle;
-            if (!document.originalPdfBundled) detail += " · summary only";
+            if (document.originalPdfBundled) {
+                // The original source PDF is embedded in the archive.
+            } else if (document.offlinePdfCopyBundled) {
+                detail += " · offline PDF reading copy";
+            } else {
+                detail += " · summary only";
+            }
             add(page, document.title, detail, document.filename, document.content,
                     document.offlinePdfCopyBundled, document.originalPdfBundled);
         }
