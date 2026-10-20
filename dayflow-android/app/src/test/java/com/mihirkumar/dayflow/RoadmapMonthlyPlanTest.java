@@ -79,7 +79,7 @@ public class RoadmapMonthlyPlanTest {
         assertTrue(RoadmapMonthlyPlan.findGoal("2027-03", "Software Interview Prep")[1].contains("six-month readiness gate"));
         assertTrue(RoadmapMonthlyPlan.findGoal("2027-06", "Software Interview Prep")[1].contains("Weeks 35–39"));
         assertTrue(RoadmapMonthlyPlan.findGoal("2027-07", "Software Interview Prep")[1].contains("feedback-led repairs"));
-        assertTrue(RoadmapMonthlyPlan.findGoal("2028-01", "Software Interview Prep")[2].contains("actual outcomes"));
+        assertTrue(RoadmapMonthlyPlan.findGoal("2028-01", "Software Interview Prep")[2].contains("applications, scores, feedback and role requirements"));
         assertTrue(PlanCatalog.sourcePlanVersion() >= 3);
     }
 
