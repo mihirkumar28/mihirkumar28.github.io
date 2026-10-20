@@ -84,7 +84,7 @@
         },
         {
           "track": "Other",
-          "title": "DayFlow: Bundle and verify offline plan PDFs",
+          "title": "DayFlow: Offline PDF plans library — bundle and verify",
           "detail": "October 2026 · Keep the five source plan PDFs available from More → Plans & Documents with the built-in offline reader: Unified Master Execution Plan, UPSC GS Monthly Plan, Job Switch Master Plan, the previous EM interview plan and Technical Interview Readiness — Spoon-Fed Plan. The Roadmap is driven by plans_catalog.json, not by parsing PDF bytes. Do not mark this goal complete until all five originals are packaged, each entry opens the correct file, and all render in airplane mode on a physical device.",
           "sourceIds": [
             "unified_master"
