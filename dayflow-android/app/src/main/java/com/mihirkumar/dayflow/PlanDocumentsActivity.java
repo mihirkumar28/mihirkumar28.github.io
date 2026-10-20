@@ -35,7 +35,8 @@ public class PlanDocumentsActivity extends Activity {
         copy.setLineSpacing(dp(4), 1.05f); box.addView(copy); sc.addView(box);
         new AlertDialog.Builder(this).setView(sc).setPositiveButton("Close", null).show();
     }
-    private void add(LinearLayout parent, String title, String detail, String filename, String body, boolean originalPdfBundled) {
+    private void add(LinearLayout parent, String title, String detail, String filename, String body,
+                     boolean offlinePdfCopyBundled, boolean originalPdfBundled) {
         LinearLayout card = new LinearLayout(this); card.setOrientation(1);
         card.setPadding(dp(15), dp(14), dp(15), dp(13)); card.setBackground(bg("#FFFFFF"));
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.bottomMargin = dp(10); parent.addView(card, cp);
@@ -73,7 +74,8 @@ public class PlanDocumentsActivity extends Activity {
         for (PlanCatalog.Document document : PlanCatalog.documents()) {
             String detail = document.subtitle;
             if (!document.originalPdfBundled) detail += " · summary only";
-            add(page, document.title, detail, document.filename, document.content, document.originalPdfBundled);
+            add(page, document.title, detail, document.filename, document.content,
+                    document.offlinePdfCopyBundled, document.originalPdfBundled);
         }
 
         Button back = new Button(this); back.setText("Back to DayFlow"); back.setAllCaps(false);

@@ -116,6 +116,7 @@ final class PlanCatalog {
                         requiredString(docJson, "filename"),
                         requiredString(docJson, "content"),
                         docJson.optString("sourceKind", "condensed_reading_copy"),
+                        docJson.optBoolean("offlinePdfCopyBundled", false),
                         docJson.optBoolean("originalPdfBundled", false)));
             }
             if (parsedMonths.size() != 16) {
@@ -259,11 +260,13 @@ final class PlanCatalog {
 
     static final class Document {
         final String id, title, subtitle, filename, content, sourceKind;
-        final boolean originalPdfBundled;
+        final boolean offlinePdfCopyBundled, originalPdfBundled;
         Document(String id, String title, String subtitle, String filename, String content,
-                 String sourceKind, boolean originalPdfBundled) {
+                 String sourceKind, boolean offlinePdfCopyBundled, boolean originalPdfBundled) {
             this.id = id; this.title = title; this.subtitle = subtitle; this.filename = filename;
-            this.content = content; this.sourceKind = sourceKind; this.originalPdfBundled = originalPdfBundled;
+            this.content = content; this.sourceKind = sourceKind;
+            this.offlinePdfCopyBundled = offlinePdfCopyBundled;
+            this.originalPdfBundled = originalPdfBundled;
         }
     }
 }

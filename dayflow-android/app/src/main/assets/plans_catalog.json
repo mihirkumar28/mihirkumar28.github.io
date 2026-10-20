@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-10-21",
-  "authorityNote": "Canonical structured data used by the DayFlow Roadmap UI and Plans & Documents summaries. Monthly Roadmap goals live in this catalog; the app does not parse PDF bytes to generate goals. The Software Interview Prep track follows the 39-week Technical Interview Readiness Spoon-Fed Plan at 13.5 hours/week, with technical readiness as the sole scope of this track.",
+  "authorityNote": "Canonical structured data used by the DayFlow Roadmap UI and Plans & Documents summaries. Monthly Roadmap goals live in this catalog; the app does not parse PDF bytes to generate goals. The Software Interview Prep track follows the 39-week Technical Interview Readiness Spoon-Fed Plan at 13.5 hours/week, with technical readiness as the sole scope of this track. Offline PDF reading copies are generated from the canonical document summaries during the Android build; these are not replacements for the original source PDFs, which remain a separate open library milestone.",
   "sourceDocuments": [
     {
       "id": "unified_master",
@@ -9,7 +9,8 @@
       "subtitle": "October 2026 – January 2028 · Combined execution system",
       "filename": "Unified_Master_Execution_Plan_Oct2026_to_Jan2028_REVISED.pdf",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     },
     {
       "id": "upsc_gs_monthly",
@@ -17,7 +18,8 @@
       "subtitle": "Monthly General Studies subject execution plan",
       "filename": "UPSC_2027_Prelims_GS_Monthly_Plan.pdf",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     },
     {
       "id": "job_switch_master",
@@ -25,7 +27,8 @@
       "subtitle": "Career transition roadmap and staged preparation",
       "filename": "2027_Job_Switch_EM_6_9_Month_Master_Plan.pdf",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     },
     {
       "id": "em_interview_readiness",
@@ -33,7 +36,8 @@
       "subtitle": "Focused technical, system-design, leadership and interview preparation",
       "filename": "2027_Job_Switch_6_9_Month_EM_Interview_Readiness_Plan.pdf",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     },
     {
       "id": "technical_interview_readiness",
@@ -41,7 +45,8 @@
       "subtitle": "39 weeks · 13.5 hours/week · 351-hour six-month gate · 526.5-hour nine-month gate",
       "filename": "Technical_Interview_Readiness_Spoon_Fed_Plan.pdf",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     }
   ],
   "months": [
@@ -708,7 +713,8 @@
       "filename": "Unified_Master_Execution_Plan_Oct2026_to_Jan2028_REVISED.pdf",
       "content": "MASTER EXECUTION PLAN | OCT 2026 – JAN 2028\n\nPURPOSE\nCoordinate UPSC CSE preparation, software-career progression, health, and DayFlow in one execution system. Review progress regularly and adjust based on evidence rather than adding complexity.\n\nUPSC CSE\nKeep General Studies and Maths Optional as distinct study tracks. Use monthly subject targets, practice questions, revision, and progress tracking. The dedicated GS monthly plan is the source for month-by-month subject assignments.\n\nSOFTWARE CAREER\nPrepare for an engineering-management transition using a staged 6–9 month plan. Build interview readiness through system design, technical depth, leadership examples, and structured practice. Use the dedicated interview-readiness plan for the focused preparation track.\n\nHEALTH AND REVIEW\nReview weekly averages and adherence. Every four weeks review weight trend, waist, training tolerance, sleep, and relevant medical guidance. Reassess body-composition estimates every 8–12 weeks if useful, using a consistent method and allowing for measurement error. If adherence is poor, simplify the plan before making it stricter.\n\nDAYFLOW RULES\nIdentify weekday versus weekend and allow WFH/WFO switching. “Modify & Save Today’s Routine” edits only the selected date, never a reusable template. Distinguish fixed and flexible blocks. Track planned versus actual time and commute with minimal taps. Progress percentages must use the same source of truth as the detailed progress view. During March–May 2027, prioritize correctness blockers over cosmetic redesigns or new features.\n\nREVIEW CADENCE\nWeekly: review 7-day weight average, exercise, adherence, hunger/energy, and study load. Every four weeks: review weight trend, waist, training tolerance, sleep, and medical guidance. Every 8–12 weeks: review body-composition estimates if useful.\n\nThis is a concise offline reading copy. The original master PDF contains the complete tables, monthly detail, and references.",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     },
     {
       "id": "upsc_gs_monthly",
@@ -717,7 +723,8 @@
       "filename": "UPSC_2027_Prelims_GS_Monthly_Plan.pdf",
       "content": "UPSC 2027 PRELIMS | GENERAL STUDIES MONTHLY PLAN\n\nOCTOBER 2026 — POLITY\nPrimary source: Vajiram Polity I + II. Listed source volume: 584 pages. Complete the main polity source once and use previous-year questions immediately after major constitutional topics.\n\nNOVEMBER 2026 — HISTORY\nPrimary source: Vajiram Modern (296 pages), Ancient (140 pages), and Medieval (103 pages); 539 pages total. Avoid over-noting. Build chronology and themes, then use PYQs to distinguish examinable material from low-return detail.\n\nDECEMBER 2026 — ENVIRONMENT + ART & CULTURE\nPrimary source: Vajiram Environment (307 pages) and NEXT Art & Culture (184 pages); 491 pages total. Compress factual material into short revision sheets.\n\nEXECUTION PRINCIPLES\nUse the source plan’s monthly assignments as the schedule of record. Pair reading with PYQs, keep notes concise, and reserve time for revision and factual consolidation. Do not silently substitute a different source or monthly subject sequence.\n\nThis offline copy preserves the opening monthly entries available in the source extract. The original PDF contains the remaining monthly assignments and detailed execution notes.",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     },
     {
       "id": "job_switch_master",
@@ -726,7 +733,8 @@
       "filename": "2027_Job_Switch_EM_6_9_Month_Master_Plan.pdf",
       "content": "2027 JOB SWITCH | ENGINEERING MANAGEMENT | 6–9 MONTH MASTER PLAN\n\nOBJECTIVE\nPrepare for a software engineering management opportunity through a staged plan while keeping UPSC preparation and daily execution sustainable. The master plan coordinates career preparation with the wider October 2026–January 2028 execution timeline.\n\nSTAGED TARGET\nAround month 6: begin interviewing for Tier 3 and Tier 4 target companies to measure readiness and identify gaps. Around month 9: aim to be a stronger candidate for Tier 1 and Tier 2 targets.\n\nPREPARATION TRACKS\nBuild evidence for technical depth, system design, architecture decisions, difficult debugging, production ownership, project execution, people leadership, and behavioral interviews. Use practice interviews and review weak areas rather than relying on preparation hours alone.\n\nALIGNMENT\nKeep the company shortlist aligned with compensation goals and preparation constraints. Evaluate roles against actual scope and experience; do not assume an Engineering Manager title or compensation level is guaranteed.\n\nThis is a concise offline reading copy. The original master PDF contains the full roadmap, company tiers, and detailed scheduling.",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     },
     {
       "id": "em_interview_readiness",
@@ -735,7 +743,8 @@
       "filename": "2027_Job_Switch_6_9_Month_EM_Interview_Readiness_Plan.pdf",
       "content": "2027 JOB SWITCH | ENGINEERING MANAGEMENT INTERVIEW READINESS\n\nPURPOSE\nA focused plan for preparing for engineering-management interviews over a 6–9 month window. Use it alongside the job-switch master plan; it is the interview-preparation track, not a replacement for the wider roadmap.\n\nCORE PREPARATION\n• System design and architecture trade-offs.\n• Technical depth and difficult debugging.\n• Production ownership, reliability, and incident reasoning.\n• Project execution, prioritization, and cross-functional collaboration.\n• Leadership, conflict resolution, feedback, and behavioral examples.\n• Mock interviews, review of gaps, and repeated practice.\n\nREADINESS CHECKPOINTS\nUse Tier 3/4 interviews as a diagnostic checkpoint around month 6. Use the evidence to close gaps before targeting Tier 1/2 roles around month 9. Assess readiness from interview performance and feedback, not calendar time alone.\n\nThis is a concise offline reading copy. Consult the original interview-readiness PDF for the complete schedule, exercises, and detailed checkpoints.",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     },
     {
       "id": "technical_interview_readiness",
@@ -744,8 +753,9 @@
       "filename": "Technical_Interview_Readiness_Spoon_Fed_Plan.pdf",
       "content": "TECHNICAL INTERVIEW READINESS — SPOON-FED EXECUTION PLAN\n\nPURPOSE\nTechnical interview workstream only. Course completion is not the goal: choose modules based on interview value and measured gaps.\n\nTIME BUDGET\n13.5 hours/week: three WFH blocks × 1.5h, two WFO blocks × 1.5h, two weekend blocks × 3h. This is 351 hours over 26 weeks and 526.5 hours over 39 weeks. Preserve protected UPSC study time.\n\nFIXED WEEKLY BLOCKS\n• WFH 1: TUF coding 60 min + Java/backend 30 min.\n• WFH 2: AI/agentic roadmap 60 min + capstone/evaluation/security 30 min.\n• WFH 3: backend/capstone 60 min + coding error-log review 30 min.\n• WFO 1: OS/networking/DBMS/SQL 45 min + timed recall/questions 45 min.\n• WFO 2: InterviewReady system design 75 min + notes from memory 15 min.\n• Weekend 1: AWS 75 min + backend/capstone 75 min + tests/docs 30 min.\n• Weekend 2: TUF coding 75 min + HLD/LLD 60 min + AI evaluation/security or technical mock 45 min.\nEvery block must produce solved problems, tests, a design, an evaluation result, an operations note or a logged weakness—not passive watching alone.\n\nMONTH 1 / WEEKS 1–4\nArrays/hash maps, strings/two pointers, sorting/sliding window, binary search; Java collections/OOP/immutability; HLD framework; SQL basics; OS process/thread basics; Spring Boot health endpoint; agent loop and IAM. Outputs: baseline, URL-shortener design, tested API and capstone safety scope.\n\nMONTH 2 / WEEKS 5–8\nLinked lists, stacks/queues, concurrency, recursion/trees/BST; JVM/GC; PostgreSQL CRUD, validation, migrations, integration tests; joins/subqueries, cache/consistency, retries/idempotency; RDS and retrieval grounding. Output: running tested API and rate-limiter HLD.\n\nMONTH 3 / WEEKS 9–13\nHeaps/greedy, graph BFS/DFS/topological sort, selected 1-D DP; SQL CTEs/windows/EXPLAIN/indexes; OS virtual memory; observability, sharding and grounded retrieval; first coding + HLD simulation. Output: observable API, SQL drill and top-five weakness list.\n\nMONTH 4 / WEEKS 14–17\nLLD/SOLID, messaging/chat HLD, feed/recommendation HLD, TCP/DNS/HTTP/TLS and interview-level consensus. Use Advanced for gaps only; add a fixed agent evaluation set. Output: two blank-page designs and a tested LLD implementation.\n\nMONTH 5 / WEEKS 18–21\nAWS reliability/deployment; agent state, prompt injection/tool poisoning/least privilege/sandboxing; integrated capstone vertical slice; 30–50 fixed evaluation cases; second technical mock. Output: reproducible tests, threat model, evaluation record and runbook draft.\n\nMONTH 6 / WEEKS 22–26\nConsolidate coding; trees/graphs; timed SQL and targeted OS/networking/DBMS; full technical rehearsal; final readiness gate. Require timed coding, independent HLD/LLD, Java/backend explanation, SQL/core-CS recall, AWS operations explanation and a bounded tested/evaluated agent. Apply when gates are met or target the highest-impact gaps.\n\nMONTH 7 / WEEKS 27–30\nTargeted coding repair; redo HLD from blank pages; backend deep dive in transactions, persistence, concurrency, security, testing and performance; AWS incident/rollback/recovery scenarios.\n\nMONTH 8 / WEEKS 31–34\nAgent evaluation and security regression; adversarial tests; harder company-relevant coding; two unique Advanced case studies matched to target JDs.\n\nMONTH 9 / WEEKS 35–39\nTimed LLD/machine coding; map 3–5 target JDs to technical evidence; two technical mock loops across coding, HLD, LLD, backend, cloud/operations and AI; final scorecard, architecture diagram, tests, evaluation evidence and runbook.\n\nRESOURCE RULES\nTUF Pinnacle: selected DSA order—arrays/hash maps/strings, two pointers/sliding window, binary search, linked lists/stacks/queues, trees/BST, heaps/greedy, graphs, selected DP. Do not chase all 474 A2Z problems. Prioritize OS processes/threads/synchronization/deadlocks/memory; TCP/DNS/HTTP/TLS/timeouts; DB indexes/transactions/isolation/recovery/query optimization.\nInterviewReady Simplified: primary first pass for requirements/estimates, APIs/data model, database/cache/networking, replication/consistency, queues, rate limiting, security, observability and trade-offs. Reproduce selected designs from a blank page.\nInterviewReady Advanced: gap-driven only; unique distributed-system/NoSQL/migration/tracing concepts and relevant case studies.\nAI/agentic: typed tools and bounded loops → validation/stopping rules → retrieval/grounding → state/idempotency → fixed eval/traces → prompt injection/tool poisoning/least privilege/sandboxing/approval. Defer fine-tuning or GPU serving unless target JDs require it.\nAWS: IAM, VPC/subnets/security groups, EC2, S3, RDS, CloudWatch, resilience, backups, access control, cost and deployment/rollback. Keep Kubernetes/Terraform introductory unless target JDs demand depth.\nCapstone: scoped Repository Reliability Platform + bounded engineering task agent, approved-file retrieval, structured proposal, isolated test execution, diff/evidence review, human approval before side effects, Docker/logs/traces and AWS where practical. Choose Kafka OR RabbitMQ only if justified; Redis only for a demonstrated need.\n\nWEEKLY MEASUREMENT\nRecord independent coding solves/time/hints, design gaps, backend/test artefacts, AWS scenario demonstrated and AI eval/security changes. Choose no more than three next remediation items. Course completion percentages are not readiness evidence.",
       "sourceKind": "condensed_reading_copy",
-      "originalPdfBundled": false
+      "originalPdfBundled": false,
+      "offlinePdfCopyBundled": true
     }
   ],
-  "sourcePlanVersion": 3
+  "sourcePlanVersion": 4
 }

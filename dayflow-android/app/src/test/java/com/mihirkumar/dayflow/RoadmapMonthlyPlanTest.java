@@ -26,6 +26,9 @@ public class RoadmapMonthlyPlanTest {
         assertEquals(51, goals);
         assertEquals(5, PlanCatalog.documents().size());
         assertNotNull(PlanCatalog.documents().stream().filter(d -> d.id.equals("technical_interview_readiness")).findFirst().orElse(null));
+        assertTrue(PlanCatalog.documents().stream().allMatch(d -> d.offlinePdfCopyBundled));
+        assertTrue(PlanCatalog.documents().stream().noneMatch(d -> d.originalPdfBundled));
+        assertTrue(PlanCatalog.sourcePlanVersion() >= 4);
         assertFalse(PlanCatalog.documents().get(0).originalPdfBundled);
         assertEquals("unified_master", PlanCatalog.documents().get(0).id);
         assertTrue(PlanCatalog.findGoalById("general-studies-prelims-gs-polity-i-ii").sourceIds
