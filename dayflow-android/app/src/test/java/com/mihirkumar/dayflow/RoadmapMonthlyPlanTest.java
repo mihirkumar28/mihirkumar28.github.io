@@ -24,7 +24,8 @@ public class RoadmapMonthlyPlanTest {
         int goals = 0;
         for (PlanCatalog.Month month : PlanCatalog.months()) goals += month.goals.size();
         assertEquals(51, goals);
-        assertEquals(4, PlanCatalog.documents().size());
+        assertEquals(5, PlanCatalog.documents().size());
+        assertNotNull(PlanCatalog.documents().stream().filter(d -> d.id.equals("technical_interview_readiness")).findFirst().orElse(null));
         assertFalse(PlanCatalog.documents().get(0).originalPdfBundled);
         assertEquals("unified_master", PlanCatalog.documents().get(0).id);
         assertTrue(PlanCatalog.findGoalById("general-studies-prelims-gs-polity-i-ii").sourceIds
@@ -63,13 +64,23 @@ public class RoadmapMonthlyPlanTest {
         assertTrue(RoadmapMonthlyPlan.findGoal("2027-05", "CSE Revision & Tests")[2].contains("23 May 2027"));
     }
 
-    @Test public void softwarePlanIsNineMonthsThenLabelsExtension() {
-        for (int i = 0; i < 9; i++) {
-            assertNotNull(RoadmapMonthlyPlan.findGoal(RoadmapMonthlyPlan.monthKeyAt(i), "Software Interview Prep"));
+    @Test public void softwarePlanIsTechnicalOnlyAcrossNineMonthsAndExtension() {
+        for (int i = 0; i < 16; i++) {
+            String[] goal = RoadmapMonthlyPlan.findGoal(RoadmapMonthlyPlan.monthKeyAt(i), "Software Interview Prep");
+            assertNotNull("Missing software-prep goal for " + RoadmapMonthlyPlan.monthKeyAt(i), goal);
+            assertFalse(goal[1] + " " + goal[2], goal[1].toLowerCase().contains("leadership"));
+            String lower = (goal[1] + " " + goal[2]).toLowerCase();
+            assertFalse(lower, lower.contains("manager round"));
+            assertFalse(lower, lower.contains("behavioural"));
+            assertFalse(lower, lower.contains("behavioral"));
+            assertFalse(lower, lower.contains("leadership stor"));
         }
-        assertTrue(RoadmapMonthlyPlan.findGoal("2027-03", "Software Interview Prep")[1].contains("Tier 3/4"));
-        assertTrue(RoadmapMonthlyPlan.findGoal("2027-06", "Software Interview Prep")[1].contains("Month 9"));
-        assertTrue(RoadmapMonthlyPlan.findGoal("2027-07", "Software Interview Prep")[2].contains("Extension beyond"));
+        assertTrue(RoadmapMonthlyPlan.findGoal("2026-10", "Software Interview Prep")[1].contains("Weeks 1–4"));
+        assertTrue(RoadmapMonthlyPlan.findGoal("2027-03", "Software Interview Prep")[1].contains("six-month readiness gate"));
+        assertTrue(RoadmapMonthlyPlan.findGoal("2027-06", "Software Interview Prep")[1].contains("Weeks 35–39"));
+        assertTrue(RoadmapMonthlyPlan.findGoal("2027-07", "Software Interview Prep")[1].contains("feedback-led repairs"));
+        assertTrue(RoadmapMonthlyPlan.findGoal("2028-01", "Software Interview Prep")[2].contains("actual outcomes"));
+        assertTrue(PlanCatalog.sourcePlanVersion() >= 3);
     }
 
     @Test public void defensiveCopiesAndInvalidMonths() {
