@@ -13,7 +13,10 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-/** Offline reading copies of the user's study and career plans, bundled with the APK. */
+/**
+ * Opens generated offline PDF reading copies bundled with the APK.
+ * These condensed copies are explicitly distinct from the original source PDFs.
+ */
 public class PlanDocumentsActivity extends Activity {
     private int dp(float v) { return (int)(v * getResources().getDisplayMetrics().density + 0.5f); }
     private TextView label(String s, int size, int c, boolean bold) {
