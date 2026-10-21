@@ -83,7 +83,6 @@ jobs:
             cd dayflow-android
             adb shell settings put global airplane_mode_on 1
             adb shell svc wifi disable
-            adb shell svc data disable
             gradle :app:connectedDebugAndroidTest
 
       - name: Verify persistent release key
