@@ -73,6 +73,18 @@ jobs:
       - name: Run attendance regression tests
         run: gradle :app:testDebugUnitTest
 
+      - name: Verify offline PDF library in Android emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          emulator-options: -no-window -no-audio -no-boot-anim
+          script: |
+            cd dayflow-android
+            adb shell settings put global airplane_mode_on 1
+            adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true
+            gradle :app:connectedDebugAndroidTest
+
       - name: Verify persistent release key
         if: env.DAYFLOW_SIGNED == 'true'
         env:
