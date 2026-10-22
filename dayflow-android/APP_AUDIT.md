@@ -51,3 +51,16 @@
 - This repository uses native Android views and locally persisted SharedPreferences.
 - A successful Gradle build is not equivalent to device-level UI verification.
 - Do not replace the application wholesale or migrate storage/UI frameworks as a first step.
+
+
+## Today tab remediation — 2026-10-22
+
+Source changes on `fix/today-tab-usability`:
+
+- [x] Distinguish an empty plan, active task, upcoming task, fully completed plan and unfinished/missed blocks.
+- [x] Show an apply-routine action for an empty day, and don't label an empty schedule as complete.
+- [x] Keep weekday/weekend routine defaults separate from WFH/WFO arrangement; add migration handling for legacy `weekend` mode values.
+- [x] Separate per-day block completion, planned duration, tracked focus time, study actual-vs-planned time and global UPSC syllabus progress.
+- [x] Make the timeline heading follow the selected date and make Today-screen controls at least 48dp where updated.
+- [x] Add pure JVM tests for Today state resolution, legacy arrangement normalization and date-type template defaults.
+- [ ] Confirm CI unit tests/build results and verify the rendered screen on-device at narrow widths and enlarged accessibility text.
