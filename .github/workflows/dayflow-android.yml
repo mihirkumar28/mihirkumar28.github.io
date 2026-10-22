@@ -79,16 +79,19 @@ jobs:
       - name: Run attendance regression tests
         run: gradle :app:testDebugUnitTest
 
+      # Keep device verification on PR/manual runs; avoid a second slow emulator boot after merge.
       - name: Verify offline PDF library in Android emulator
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           emulator-options: -no-window -no-audio -no-boot-anim
+          working-directory: dayflow-android
           script: |
             adb shell settings put global airplane_mode_on 1
             adb shell svc wifi disable
-            cd dayflow-android && gradle :app:connectedDebugAndroidTest
+            gradle :app:connectedDebugAndroidTest
 
       - name: Verify persistent release key
         if: env.DAYFLOW_SIGNED == 'true'
