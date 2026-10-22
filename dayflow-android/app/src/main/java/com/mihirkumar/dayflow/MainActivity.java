@@ -5390,7 +5390,7 @@ public class MainActivity extends Activity {
         dateView.setGravity(Gravity.CENTER);
         dateView.setContentDescription("Selected day. Tap to choose a date.");
         dateView.setOnClickListener(v -> openDatePicker());
-        nav.addView(dateView, new LinearLayout.LayoutParams(0, -2, 1));
+        nav.addView(dateView, new LinearLayout.LayoutParams(0, -1, 1));
 
         Button next = actionButton("›", color("#496257"), "#EAF0E9");
         next.setTextSize(24);
@@ -5740,7 +5740,7 @@ public class MainActivity extends Activity {
                     gap.setPadding(dp(8), 0, dp(8), 0);
                     TextView gapText = text("＋  " + fmtShort(mins(b.start) - lastEnd) + " free  •  Add", 11, color("#91A197"), false);
                     gapText.setGravity(Gravity.CENTER);
-                    gap.addView(gapText, new LinearLayout.LayoutParams(-1, dp(32)));
+                    gap.addView(gapText, new LinearLayout.LayoutParams(-1, dp(48)));
                     gap.setOnClickListener(v -> openAddDialogAt(gapStart));
                     timeline.addView(gap);
                 }
@@ -5846,8 +5846,8 @@ public class MainActivity extends Activity {
 
         if (state == DayFlowScreenRules.TodayState.EMPTY) {
             currentTitle.setText("No plan for today");
-            currentTime.setText("Add a block or choose a saved routine.");
-            currentCountdown.setText("Ready when you are");
+            currentTime.setText("Add a block or apply a routine.");
+            currentCountdown.setText("Ready");
             if (doneButton != null) doneButton.setVisibility(View.GONE);
             if (focusButton != null) focusButton.setVisibility(View.GONE);
             configureTodaySecondaryActions(true);
