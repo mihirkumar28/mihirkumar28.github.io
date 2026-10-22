@@ -5566,7 +5566,7 @@ public class MainActivity extends Activity {
 
         Button history = actionButton("History", color("#DCE7DF"), "#263A31");
         history.setTextSize(11);
-        titleRow.addView(history, new LinearLayout.LayoutParams(dp(76), dp(34)));
+        titleRow.addView(history, new LinearLayout.LayoutParams(dp(76), dp(48)));
         history.setOnClickListener(v -> showAttendanceHistory());
         officeCard.addView(titleRow);
 
@@ -5595,7 +5595,7 @@ public class MainActivity extends Activity {
         });
 
         commuteAction = actionButton("Start commute", color("#DCE7DF"), "#263A31");
-        LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, dp(38));
+        LinearLayout.LayoutParams cmp = new LinearLayout.LayoutParams(-1, dp(48));
         cmp.topMargin = dp(7);
         officeCard.addView(commuteAction, cmp);
         commuteAction.setOnClickListener(v -> {
@@ -5924,21 +5924,27 @@ public class MainActivity extends Activity {
         View rowView = root.findViewWithTag("currentSecondaryActions");
         if (!(rowView instanceof LinearLayout)) return;
         LinearLayout row = (LinearLayout) rowView;
-        row.setVisibility(View.VISIBLE);
+        if (row.getVisibility() != View.VISIBLE) row.setVisibility(View.VISIBLE);
 
         View doneView = root.findViewWithTag("currentDone");
         View recoveryView = root.findViewWithTag("recoveryButton");
         if (doneView != null) {
             LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) doneView.getLayoutParams();
-            params.width = 0;
-            params.weight = 1f;
-            doneView.setLayoutParams(params);
+            if (params.width != 0 || params.weight != 1f) {
+                params.width = 0;
+                params.weight = 1f;
+                doneView.setLayoutParams(params);
+            }
         }
         if (recoveryView != null) {
             LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) recoveryView.getLayoutParams();
-            params.width = recoveryOnly ? -1 : 0;
-            params.weight = recoveryOnly ? 0f : 1f;
-            recoveryView.setLayoutParams(params);
+            int desiredWidth = recoveryOnly ? -1 : 0;
+            float desiredWeight = recoveryOnly ? 0f : 1f;
+            if (params.width != desiredWidth || params.weight != desiredWeight) {
+                params.width = desiredWidth;
+                params.weight = desiredWeight;
+                recoveryView.setLayoutParams(params);
+            }
         }
     }
 
