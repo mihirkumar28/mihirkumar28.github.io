@@ -6,6 +6,12 @@ on:
     paths:
       - "dayflow-android/**"
       - ".github/workflows/dayflow-android.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "dayflow-android/**"
+      - ".github/workflows/dayflow-android.yml"
   workflow_dispatch:
 
 permissions:
