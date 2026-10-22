@@ -5473,6 +5473,7 @@ public class MainActivity extends Activity {
         focusAction.setOnClickListener(v -> toggleFocusCurrent());
 
         LinearLayout secondaryActions = horizontal();
+        secondaryActions.setTag("currentSecondaryActions");
         LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(-1, dp(48));
         secondaryLp.topMargin = dp(7);
         card.addView(secondaryActions, secondaryLp);
@@ -5524,7 +5525,7 @@ public class MainActivity extends Activity {
         LinearLayout metrics = horizontal();
         metrics.setGravity(Gravity.TOP);
         LinearLayout plannedMetric = vertical();
-        plannedMetric.addView(text("PLANNED", 9, color("#687A70"), true));
+        plannedMetric.addView(text("PLANNED", 10, color("#687A70"), true));
         plannedView = text("0m", 14, color("#18372E"), true);
         LinearLayout.LayoutParams plannedValueLp = new LinearLayout.LayoutParams(-1, -2);
         plannedValueLp.topMargin = dp(3);
@@ -5532,7 +5533,7 @@ public class MainActivity extends Activity {
         metrics.addView(plannedMetric, new LinearLayout.LayoutParams(0, -2, 1f));
 
         LinearLayout focusMetric = vertical();
-        focusMetric.addView(text("FOCUS TRACKED", 9, color("#687A70"), true));
+        focusMetric.addView(text("FOCUS TRACKED", 10, color("#687A70"), true));
         doneView = text("0m", 14, color("#18372E"), true);
         LinearLayout.LayoutParams focusValueLp = new LinearLayout.LayoutParams(-1, -2);
         focusValueLp.topMargin = dp(3);
@@ -5542,7 +5543,7 @@ public class MainActivity extends Activity {
         metrics.addView(focusMetric, focusMetricLp);
 
         LinearLayout studyMetric = vertical();
-        studyMetric.addView(text("STUDY ACTUAL / PLAN", 9, color("#687A70"), true));
+        studyMetric.addView(text("STUDY / PLAN", 10, color("#687A70"), true));
         studyActualView = text("0m / 0m", 13, color("#18372E"), true);
         LinearLayout.LayoutParams studyValueLp = new LinearLayout.LayoutParams(-1, -2);
         studyValueLp.topMargin = dp(3);
@@ -5552,7 +5553,7 @@ public class MainActivity extends Activity {
         metrics.addView(studyMetric, studyMetricLp);
         summary.addView(metrics);
 
-        todaySyllabusView = text("UPSC CSE · Syllabus not set", 10, color("#687A70"), false);
+        todaySyllabusView = text("UPSC CSE · Syllabus not set", 11, color("#687A70"), false);
         LinearLayout.LayoutParams syllabusLp = new LinearLayout.LayoutParams(-1, -2);
         syllabusLp.topMargin = dp(9);
         summary.addView(todaySyllabusView, syllabusLp);
@@ -5833,6 +5834,8 @@ public class MainActivity extends Activity {
             if (doneButton != null) doneButton.setVisibility(View.GONE);
             if (recoveryButton != null) recoveryButton.setVisibility(View.GONE);
             if (focusButton != null) focusButton.setVisibility(View.GONE);
+            View secondaryActions = root.findViewWithTag("currentSecondaryActions");
+            if (secondaryActions != null) secondaryActions.setVisibility(View.GONE);
             return;
         }
 
@@ -5847,6 +5850,7 @@ public class MainActivity extends Activity {
             currentCountdown.setText("Ready when you are");
             if (doneButton != null) doneButton.setVisibility(View.GONE);
             if (focusButton != null) focusButton.setVisibility(View.GONE);
+            configureTodaySecondaryActions(true);
             if (recoveryButton != null) {
                 recoveryButton.setText("Apply routine");
                 recoveryButton.setContentDescription("Apply a saved routine to today's schedule");
@@ -5863,6 +5867,8 @@ public class MainActivity extends Activity {
             if (doneButton != null) doneButton.setVisibility(View.GONE);
             if (focusButton != null) focusButton.setVisibility(View.GONE);
             if (recoveryButton != null) recoveryButton.setVisibility(View.GONE);
+            View secondaryActions = root.findViewWithTag("currentSecondaryActions");
+            if (secondaryActions != null) secondaryActions.setVisibility(View.GONE);
             return;
         }
 
@@ -5873,6 +5879,7 @@ public class MainActivity extends Activity {
             currentCountdown.setText(unfinished + (unfinished == 1 ? " block to review" : " blocks to review"));
             if (doneButton != null) doneButton.setVisibility(View.GONE);
             if (focusButton != null) focusButton.setVisibility(View.GONE);
+            configureTodaySecondaryActions(true);
             if (recoveryButton != null) {
                 recoveryButton.setText("Catch up");
                 recoveryButton.setContentDescription("Adjust today's plan and catch up on unfinished blocks");
@@ -5883,6 +5890,7 @@ public class MainActivity extends Activity {
         }
 
         Block target = current != null ? current : next;
+        configureTodaySecondaryActions(current == null);
         if (recoveryButton != null) {
             recoveryButton.setText("Catch up");
             recoveryButton.setContentDescription("Adjust today's plan and catch up");
@@ -5909,6 +5917,28 @@ public class MainActivity extends Activity {
             currentTime.setText("Next • " + time12(target.start) + " – " + time12(target.end));
             long untilMs = millisAtMinute(mins(target.start)) - System.currentTimeMillis();
             currentCountdown.setText("in " + formatCountdown(untilMs));
+        }
+    }
+
+    private void configureTodaySecondaryActions(boolean recoveryOnly) {
+        View rowView = root.findViewWithTag("currentSecondaryActions");
+        if (!(rowView instanceof LinearLayout)) return;
+        LinearLayout row = (LinearLayout) rowView;
+        row.setVisibility(View.VISIBLE);
+
+        View doneView = root.findViewWithTag("currentDone");
+        View recoveryView = root.findViewWithTag("recoveryButton");
+        if (doneView != null) {
+            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) doneView.getLayoutParams();
+            params.width = 0;
+            params.weight = 1f;
+            doneView.setLayoutParams(params);
+        }
+        if (recoveryView != null) {
+            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) recoveryView.getLayoutParams();
+            params.width = recoveryOnly ? -1 : 0;
+            params.weight = recoveryOnly ? 0f : 1f;
+            recoveryView.setLayoutParams(params);
         }
     }
 
