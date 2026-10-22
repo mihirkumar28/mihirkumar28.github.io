@@ -5446,6 +5446,7 @@ public class MainActivity extends Activity {
         root.addView(card, cp);
 
         TextView label = text("CURRENT TASK", 10, color("#2E8060"), true);
+        label.setTag("currentTaskEyebrow");
         label.setLetterSpacing(0.12f);
         card.addView(label);
 
@@ -5826,6 +5827,7 @@ public class MainActivity extends Activity {
         boolean viewingToday = selectedDateKey.equals(todayKey());
 
         if (!viewingToday) {
+            setCurrentTaskEyebrow(selectedDateKey.compareTo(todayKey()) < 0 ? "PAST DAY" : "PLANNED DAY");
             currentTitle.setText(selectedDateKey.compareTo(todayKey()) < 0 ? "Historical day" : "Planned day");
             Date d = parseDateKey(selectedDateKey);
             currentTime.setText(d == null ? selectedDateKey
@@ -5845,6 +5847,7 @@ public class MainActivity extends Activity {
                 blocks.size(), completed, current != null, next != null);
 
         if (state == DayFlowScreenRules.TodayState.EMPTY) {
+            setCurrentTaskEyebrow("GET STARTED");
             currentTitle.setText("No plan for today");
             currentTime.setText("Add a block or apply a routine.");
             currentCountdown.setText("Ready");
@@ -5861,6 +5864,7 @@ public class MainActivity extends Activity {
         }
 
         if (state == DayFlowScreenRules.TodayState.COMPLETE) {
+            setCurrentTaskEyebrow("DAY COMPLETE");
             currentTitle.setText("Day complete");
             currentTime.setText("All " + blocks.size() + " blocks completed.");
             currentCountdown.setText("✓");
@@ -5873,6 +5877,7 @@ public class MainActivity extends Activity {
         }
 
         if (state == DayFlowScreenRules.TodayState.NEEDS_REVIEW) {
+            setCurrentTaskEyebrow("PLAN STATUS");
             int unfinished = Math.max(0, blocks.size() - completed);
             currentTitle.setText("No upcoming task");
             currentTime.setText("Review missed or skipped blocks.");
@@ -5890,6 +5895,7 @@ public class MainActivity extends Activity {
         }
 
         Block target = current != null ? current : next;
+        setCurrentTaskEyebrow(current != null ? "CURRENT TASK" : "NEXT TASK");
         configureTodaySecondaryActions(current == null);
         if (recoveryButton != null) {
             recoveryButton.setText("Catch up");
@@ -5917,6 +5923,14 @@ public class MainActivity extends Activity {
             currentTime.setText("Next • " + time12(target.start) + " – " + time12(target.end));
             long untilMs = millisAtMinute(mins(target.start)) - System.currentTimeMillis();
             currentCountdown.setText("in " + formatCountdown(untilMs));
+        }
+    }
+
+    private void setCurrentTaskEyebrow(String label) {
+        View view = root.findViewWithTag("currentTaskEyebrow");
+        if (view instanceof TextView) {
+            TextView eyebrow = (TextView) view;
+            if (!label.contentEquals(eyebrow.getText())) eyebrow.setText(label);
         }
     }
 
