@@ -86,10 +86,9 @@ jobs:
           arch: x86_64
           emulator-options: -no-window -no-audio -no-boot-anim
           script: |
-            cd dayflow-android
             adb shell settings put global airplane_mode_on 1
             adb shell svc wifi disable
-            gradle :app:connectedDebugAndroidTest
+            cd dayflow-android && gradle :app:connectedDebugAndroidTest
 
       - name: Verify persistent release key
         if: env.DAYFLOW_SIGNED == 'true'
