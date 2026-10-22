@@ -127,7 +127,8 @@ public class MainActivity extends Activity {
     private String syllabusFilter = "All";
     private String syllabusQuery = "";
     private final Map<String, TextView> navItems = new LinkedHashMap<>();
-    private TextView dateView, modeView, completionView, progressPercent;
+    private TextView dateView, modeView, completionView, progressPercent, todaySyllabusView;
+    private ProgressBar todayPlanProgress;
     private TextView currentTitle, currentTime, currentCountdown, plannedView, doneView, studyActualView;
     private TextView officeStatus, officeTimes, commuteView;
     private Button officeAction, commuteAction, focusAction;
@@ -5372,10 +5373,10 @@ public class MainActivity extends Activity {
         add.setTextSize(22);
         add.setContentDescription("Add block");
         add.setOnClickListener(v -> openAddDialog());
-        top.addView(add, new LinearLayout.LayoutParams(dp(46), dp(46)));
+        top.addView(add, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         LinearLayout nav = horizontal();
-        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, dp(42));
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, dp(48));
         np.bottomMargin = dp(13);
         root.addView(nav, np);
 
@@ -5383,7 +5384,7 @@ public class MainActivity extends Activity {
         prev.setTextSize(24);
         prev.setContentDescription("Previous day");
         prev.setOnClickListener(v -> changeSelectedDate(-1));
-        nav.addView(prev, new LinearLayout.LayoutParams(dp(42), dp(38)));
+        nav.addView(prev, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         dateView = text("", 14, Color.WHITE, true);
         dateView.setGravity(Gravity.CENTER);
@@ -5395,7 +5396,7 @@ public class MainActivity extends Activity {
         next.setTextSize(24);
         next.setContentDescription("Next day");
         next.setOnClickListener(v -> changeSelectedDate(1));
-        nav.addView(next, new LinearLayout.LayoutParams(dp(42), dp(38)));
+        nav.addView(next, new LinearLayout.LayoutParams(dp(48), dp(48)));
     }
 
     private void buildModeRow() {
@@ -5413,7 +5414,7 @@ public class MainActivity extends Activity {
         wrapper.addView(arrangementLabel, arrangementLabelLp);
 
         LinearLayout row = horizontal();
-        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(42));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(48));
         rp.topMargin = dp(6);
         wrapper.addView(row, rp);
         String[][] options = {{"WFH", "wfh"}, {"WFO", "office"}};
@@ -5421,7 +5422,7 @@ public class MainActivity extends Activity {
             String modeKey = option[1];
             Button b = chip(option[0]);
             b.setTag("mode-chip-" + modeKey);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), 1);
             if (row.getChildCount() > 0) lp.leftMargin = dp(6);
             row.addView(b, lp);
             b.setContentDescription(option[0] + " work arrangement");
@@ -5429,86 +5430,132 @@ public class MainActivity extends Activity {
         }
 
         todayRoutineEditButton = secondaryButton("Modify & Save Today's Routine", this::openTodayRoutineEditor);
-        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(-1, dp(44));
+        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(-1, dp(48));
         editLp.topMargin = dp(7);
         wrapper.addView(todayRoutineEditButton, editLp);
         todayRoutineEditButton.setVisibility(View.VISIBLE);
     }
 
+    
     private void buildCurrentCard() {
         LinearLayout card = vertical();
-        card.setPadding(dp(18), dp(18), dp(18), dp(16));
+        card.setPadding(dp(18), dp(16), dp(18), dp(14));
         card.setBackground(bg("#DCEBE2", 20));
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
-        cp.bottomMargin = dp(14);
+        cp.bottomMargin = dp(12);
         root.addView(card, cp);
 
         TextView label = text("CURRENT TASK", 10, color("#2E8060"), true);
         label.setLetterSpacing(0.12f);
         card.addView(label);
 
-        currentTitle = text("Loading…", 24, Color.WHITE, true);
+        currentTitle = text("Loading…", 23, Color.WHITE, true);
+        currentTitle.setMaxLines(3);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
-        tp.topMargin = dp(5);
+        tp.topMargin = dp(4);
         card.addView(currentTitle, tp);
 
         LinearLayout row = horizontal();
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
-        rp.topMargin = dp(8);
+        rp.topMargin = dp(6);
         card.addView(row, rp);
         currentTime = text("—", 13, color("#496257"), false);
         currentCountdown = text("—", 13, color("#18372E"), true);
-        row.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1));
+        currentCountdown.setGravity(Gravity.RIGHT);
+        row.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1f));
         row.addView(currentCountdown);
 
         focusAction = actionButton("Start focus", Color.WHITE, "#23845F");
-        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(46));
-        focusLp.topMargin = dp(16);
+        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(48));
+        focusLp.topMargin = dp(12);
         card.addView(focusAction, focusLp);
         focusAction.setTag("focusAction");
         focusAction.setOnClickListener(v -> toggleFocusCurrent());
 
+        LinearLayout secondaryActions = horizontal();
+        LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(-1, dp(48));
+        secondaryLp.topMargin = dp(7);
+        card.addView(secondaryActions, secondaryLp);
+
         Button markDone = actionButton("Mark complete", color("#496257"), "#FFFFFF");
-        LinearLayout.LayoutParams doneLp = new LinearLayout.LayoutParams(-1, dp(42));
-        doneLp.topMargin = dp(8);
-        card.addView(markDone, doneLp);
         markDone.setTag("currentDone");
         markDone.setOnClickListener(v -> completeCurrent());
+        secondaryActions.addView(markDone, new LinearLayout.LayoutParams(0, dp(48), 1f));
 
         Button recover = actionButton("Catch up", color("#496257"), "#FFFFFF");
-        LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(-1, dp(40));
-        recLp.topMargin = dp(8);
-        card.addView(recover, recLp);
         recover.setTag("recoveryButton");
         recover.setOnClickListener(v -> recoveryMode());
+        LinearLayout.LayoutParams recoverLp = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        recoverLp.leftMargin = dp(8);
+        secondaryActions.addView(recover, recoverLp);
     }
 
+    
     private void buildTodaySummary() {
-        LinearLayout summary = horizontal();
+        LinearLayout summary = vertical();
         summary.setPadding(dp(14), dp(12), dp(14), dp(12));
         summary.setBackground(surfaceCard().getBackground());
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(104));
-        sp.bottomMargin = dp(14);
-        root.addView(summary, sp);
+        LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
+        summaryLp.bottomMargin = dp(12);
+        root.addView(summary, summaryLp);
 
-        LinearLayout left = vertical();
-        completionView = text("0 / 0 complete", 14, Color.WHITE, true);
-        progressPercent = text("0% of the plan", 12, color("#91A197"), false);
-        left.addView(completionView);
-        left.addView(progressPercent);
-        studyActualView = text("Study actual 0m / 0m planned", 11, color("#A5B5AA"), false);
-        left.addView(studyActualView);
-        summary.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout heading = horizontal();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        completionView = text("0 / 0 blocks complete", 13, Color.WHITE, true);
+        heading.addView(completionView, new LinearLayout.LayoutParams(0, -2, 1f));
+        progressPercent = text("0%", 15, color("#23845F"), true);
+        progressPercent.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        heading.addView(progressPercent);
+        summary.addView(heading);
 
-        LinearLayout metricBox = horizontal();
-        metricBox.setPadding(dp(12), dp(8), dp(12), dp(8));
-        metricBox.setBackground(bg("#152019", 13));
-        plannedView = text("0h", 15, Color.WHITE, true);
-        doneView = text("0h done", 11, color("#A5B5AA"), false);
-        metricBox.addView(plannedView);
-        metricBox.addView(spacerHorizontal(8));
-        metricBox.addView(doneView);
-        summary.addView(metricBox, new LinearLayout.LayoutParams(-2, dp(48)));
+        todayPlanProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        todayPlanProgress.setMax(100);
+        todayPlanProgress.setProgress(0);
+        todayPlanProgress.setIndeterminate(false);
+        todayPlanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#23845F")));
+        todayPlanProgress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(color("#DDE6DE")));
+        todayPlanProgress.setMinimumHeight(dp(5));
+        todayPlanProgress.setMaxHeight(dp(5));
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(5));
+        progressLp.topMargin = dp(8);
+        progressLp.bottomMargin = dp(11);
+        summary.addView(todayPlanProgress, progressLp);
+
+        LinearLayout metrics = horizontal();
+        metrics.setGravity(Gravity.TOP);
+        LinearLayout plannedMetric = vertical();
+        plannedMetric.addView(text("PLANNED", 9, color("#687A70"), true));
+        plannedView = text("0m", 14, color("#18372E"), true);
+        LinearLayout.LayoutParams plannedValueLp = new LinearLayout.LayoutParams(-1, -2);
+        plannedValueLp.topMargin = dp(3);
+        plannedMetric.addView(plannedView, plannedValueLp);
+        metrics.addView(plannedMetric, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        LinearLayout focusMetric = vertical();
+        focusMetric.addView(text("FOCUS TRACKED", 9, color("#687A70"), true));
+        doneView = text("0m", 14, color("#18372E"), true);
+        LinearLayout.LayoutParams focusValueLp = new LinearLayout.LayoutParams(-1, -2);
+        focusValueLp.topMargin = dp(3);
+        focusMetric.addView(doneView, focusValueLp);
+        LinearLayout.LayoutParams focusMetricLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        focusMetricLp.leftMargin = dp(8);
+        metrics.addView(focusMetric, focusMetricLp);
+
+        LinearLayout studyMetric = vertical();
+        studyMetric.addView(text("STUDY ACTUAL / PLAN", 9, color("#687A70"), true));
+        studyActualView = text("0m / 0m", 13, color("#18372E"), true);
+        LinearLayout.LayoutParams studyValueLp = new LinearLayout.LayoutParams(-1, -2);
+        studyValueLp.topMargin = dp(3);
+        studyMetric.addView(studyActualView, studyValueLp);
+        LinearLayout.LayoutParams studyMetricLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        studyMetricLp.leftMargin = dp(8);
+        metrics.addView(studyMetric, studyMetricLp);
+        summary.addView(metrics);
+
+        todaySyllabusView = text("UPSC CSE · Syllabus not set", 10, color("#687A70"), false);
+        LinearLayout.LayoutParams syllabusLp = new LinearLayout.LayoutParams(-1, -2);
+        syllabusLp.topMargin = dp(9);
+        summary.addView(todaySyllabusView, syllabusLp);
     }
 
     private void buildOfficeCardContents() {
@@ -5561,13 +5608,15 @@ public class MainActivity extends Activity {
         officeCard.addView(hint, hp);
     }
 
+    
     private void buildScheduleHeader() {
         LinearLayout row = horizontal();
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
-        rp.bottomMargin = dp(10);
+        rp.bottomMargin = dp(8);
         root.addView(row, rp);
 
-        TextView label = text("TODAY", 13, color("#A5B5AA"), true);
+        TextView label = text("TODAY'S TIMELINE", 13, color("#A5B5AA"), true);
+        label.setTag("scheduleHeading");
         row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
 
         TextView modeLabel = text("", 11, color("#82948A"), false);
@@ -5576,8 +5625,9 @@ public class MainActivity extends Activity {
 
         Button more = actionButton("•••", color("#A5B5AA"), "#1B2621");
         more.setTextSize(14);
-        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(44), dp(34));
-        mp.leftMargin = dp(7);
+        more.setContentDescription("More schedule actions");
+        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(48), dp(48));
+        mp.leftMargin = dp(6);
         row.addView(more, mp);
         more.setOnClickListener(v -> openManageDialog());
     }
@@ -5596,8 +5646,14 @@ public class MainActivity extends Activity {
         else if (selectedDateKey.compareTo(todayKey()) < 0) date += "  •  Past";
         else date += "  •  Planned";
         dateView.setText(date);
+        View scheduleHeading = root.findViewWithTag("scheduleHeading");
+        if (scheduleHeading instanceof TextView) {
+            String heading = selectedDateKey.equals(todayKey()) ? "TODAY'S TIMELINE"
+                    : selectedDateKey.compareTo(todayKey()) < 0 ? "PAST TIMELINE" : "PLANNED TIMELINE";
+            ((TextView) scheduleHeading).setText(heading);
+        }
 
-        String modeLabel = mode.equals("office") ? "WFO" : mode.equals("weekend") ? "Weekend routine" : "WFH";
+        String modeLabel = "office".equals(mode) ? "WFO" : "WFH";
         if (modeView != null) {
             modeView.setText(isWeekendDate(selectedDateKey) ? "WEEKEND" : "WEEKDAY");
         }
@@ -5653,24 +5709,26 @@ public class MainActivity extends Activity {
             }
         }
 
-        completionView.setText(done + " / " + total + " complete");
+        completionView.setText(done + " / " + total + " blocks complete");
         int percent = total == 0 ? 0 : Math.round(done * 100f / total);
-        progressPercent.setText(percent + "% of plan • " + syllabusProgressLabel());
+        progressPercent.setText(percent + "%");
+        if (todayPlanProgress != null) todayPlanProgress.setProgress(percent);
         plannedView.setText(fmtShort(plannedMinutes));
-        doneView.setText(fmtPreciseMillis(actualFocusMs) + " focus");
+        doneView.setText(fmtMillisForLabel(actualFocusMs));
         if (studyActualView != null) {
-            studyActualView.setText("Study actual " + fmtMillisForLabel(actualStudyMs)
-                    + " / " + fmtShort(plannedStudyMinutes) + " planned");
+            studyActualView.setText(fmtMillisForLabel(actualStudyMs) + " / " + fmtShort(plannedStudyMinutes));
         }
+        if (todaySyllabusView != null) todaySyllabusView.setText("UPSC CSE · " + syllabusProgressLabel());
 
         updateCurrentCard(current, next, nowMins);
         renderOfficeCard();
 
         timeline.removeAllViews();
         if (blocks.isEmpty()) {
-            TextView empty = text("Your day is empty.\nTap ＋ to add your first block.", 15, color("#A5B5AA"), false);
+            TextView empty = text("No blocks on this timeline yet. Add a block above or apply a saved routine.", 13, color("#A5B5AA"), false);
             empty.setGravity(Gravity.CENTER);
-            empty.setPadding(0, dp(42), 0, dp(42));
+            empty.setLineSpacing(dp(2), 1f);
+            empty.setPadding(dp(12), dp(18), dp(12), dp(18));
             timeline.addView(empty);
         } else {
             int lastEnd = -1;
@@ -5734,10 +5792,9 @@ public class MainActivity extends Activity {
                     plannedStudyMinutes += Math.max(0, mins(block.end) - mins(block.start));
                 }
             }
-            doneView.setText(fmtPreciseMillis(actualMs) + " focus");
+            doneView.setText(fmtMillisForLabel(actualMs));
             if (studyActualView != null) {
-                studyActualView.setText("Study actual " + fmtMillisForLabel(actualStudyMs)
-                        + " / " + fmtShort(plannedStudyMinutes) + " planned");
+                studyActualView.setText(fmtMillisForLabel(actualStudyMs) + " / " + fmtShort(plannedStudyMinutes));
             }
         }
     }
@@ -5758,33 +5815,80 @@ public class MainActivity extends Activity {
         }
     }
 
+    
     private void updateCurrentCard(Block current, Block next, int nowMins) {
-        View doneButton = root.findViewWithTag("currentDone");
-        View recoveryButton = root.findViewWithTag("recoveryButton");
+        View doneViewForCard = root.findViewWithTag("currentDone");
+        View recoveryView = root.findViewWithTag("recoveryButton");
         Button focusButton = (Button) root.findViewWithTag("focusAction");
+        Button doneButton = doneViewForCard instanceof Button ? (Button) doneViewForCard : null;
+        Button recoveryButton = recoveryView instanceof Button ? (Button) recoveryView : null;
         boolean viewingToday = selectedDateKey.equals(todayKey());
+
         if (!viewingToday) {
             currentTitle.setText(selectedDateKey.compareTo(todayKey()) < 0 ? "Historical day" : "Planned day");
             Date d = parseDateKey(selectedDateKey);
-            currentTime.setText(d == null ? selectedDateKey : new SimpleDateFormat("EEE, d MMMM", Locale.getDefault()).format(d));
+            currentTime.setText(d == null ? selectedDateKey
+                    : new SimpleDateFormat("EEE, d MMMM", Locale.getDefault()).format(d));
             currentCountdown.setText("Review timeline");
             if (doneButton != null) doneButton.setVisibility(View.GONE);
             if (recoveryButton != null) recoveryButton.setVisibility(View.GONE);
             if (focusButton != null) focusButton.setVisibility(View.GONE);
             return;
         }
-        if (recoveryButton != null) recoveryButton.setVisibility(View.VISIBLE);
-        Block target = current != null ? current : next;
 
-        if (target == null) {
-            currentTitle.setText("Day complete");
-            currentTime.setText("Nice work.");
-            currentCountdown.setText("✓");
+        int completed = 0;
+        for (Block block : blocks) if ("done".equals(block.status)) completed++;
+        DayFlowScreenRules.TodayState state = DayFlowScreenRules.resolveTodayState(
+                blocks.size(), completed, current != null, next != null);
+
+        if (state == DayFlowScreenRules.TodayState.EMPTY) {
+            currentTitle.setText("No plan for today");
+            currentTime.setText("Add a block or choose a saved routine.");
+            currentCountdown.setText("Ready when you are");
             if (doneButton != null) doneButton.setVisibility(View.GONE);
             if (focusButton != null) focusButton.setVisibility(View.GONE);
+            if (recoveryButton != null) {
+                recoveryButton.setText("Apply routine");
+                recoveryButton.setContentDescription("Apply a saved routine to today's schedule");
+                recoveryButton.setVisibility(View.VISIBLE);
+                recoveryButton.setOnClickListener(v -> showTemplatePicker());
+            }
             return;
         }
 
+        if (state == DayFlowScreenRules.TodayState.COMPLETE) {
+            currentTitle.setText("Day complete");
+            currentTime.setText("All " + blocks.size() + " blocks completed.");
+            currentCountdown.setText("✓");
+            if (doneButton != null) doneButton.setVisibility(View.GONE);
+            if (focusButton != null) focusButton.setVisibility(View.GONE);
+            if (recoveryButton != null) recoveryButton.setVisibility(View.GONE);
+            return;
+        }
+
+        if (state == DayFlowScreenRules.TodayState.NEEDS_REVIEW) {
+            int unfinished = Math.max(0, blocks.size() - completed);
+            currentTitle.setText("No upcoming task");
+            currentTime.setText("Review missed or skipped blocks.");
+            currentCountdown.setText(unfinished + (unfinished == 1 ? " block to review" : " blocks to review"));
+            if (doneButton != null) doneButton.setVisibility(View.GONE);
+            if (focusButton != null) focusButton.setVisibility(View.GONE);
+            if (recoveryButton != null) {
+                recoveryButton.setText("Catch up");
+                recoveryButton.setContentDescription("Adjust today's plan and catch up on unfinished blocks");
+                recoveryButton.setVisibility(View.VISIBLE);
+                recoveryButton.setOnClickListener(v -> recoveryMode());
+            }
+            return;
+        }
+
+        Block target = current != null ? current : next;
+        if (recoveryButton != null) {
+            recoveryButton.setText("Catch up");
+            recoveryButton.setContentDescription("Adjust today's plan and catch up");
+            recoveryButton.setVisibility(View.VISIBLE);
+            recoveryButton.setOnClickListener(v -> recoveryMode());
+        }
         if (doneButton != null) doneButton.setVisibility(current != null ? View.VISIBLE : View.GONE);
         if (focusButton != null) {
             focusButton.setVisibility(current != null ? View.VISIBLE : View.GONE);
@@ -5794,15 +5898,16 @@ public class MainActivity extends Activity {
                         : "Start focus • " + fmtShort(Math.max(0, mins(current.end) - mins(current.start))));
             }
         }
+
         if (current != null) {
             currentTitle.setText(current.title);
             currentTime.setText(time12(current.start) + " – " + time12(current.end));
             long remainingMs = millisAtMinute(mins(current.end)) - System.currentTimeMillis();
             currentCountdown.setText(formatCountdown(remainingMs) + " left");
         } else {
-            currentTitle.setText(next.title);
-            currentTime.setText("Next • " + time12(next.start) + " – " + time12(next.end));
-            long untilMs = millisAtMinute(mins(next.start)) - System.currentTimeMillis();
+            currentTitle.setText(target.title);
+            currentTime.setText("Next • " + time12(target.start) + " – " + time12(target.end));
+            long untilMs = millisAtMinute(mins(target.start)) - System.currentTimeMillis();
             currentCountdown.setText("in " + formatCountdown(untilMs));
         }
     }
@@ -5858,7 +5963,7 @@ public class MainActivity extends Activity {
 
         if ("pending".equals(b.status)) {
             Button done = actionButton("✓", Color.WHITE, current ? "#40B58A" : "#263A31");
-            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(44), dp(44));
+            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(48), dp(48));
             dlp.leftMargin = dp(8);
             card.addView(done, dlp);
             done.setOnClickListener(v -> {
@@ -5869,10 +5974,10 @@ public class MainActivity extends Activity {
         } else if ("done".equals(b.status)) {
             TextView check = text("✓", 20, color("#6FD6A3"), true);
             check.setGravity(Gravity.CENTER);
-            card.addView(check, new LinearLayout.LayoutParams(dp(44), dp(44)));
+            card.addView(check, new LinearLayout.LayoutParams(dp(48), dp(48)));
         } else {
             Button undo = actionButton("↩", color("#FFC5C9"), "#3A2729");
-            LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(dp(44), dp(44));
+            LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(dp(48), dp(48));
             ulp.leftMargin = dp(8);
             card.addView(undo, ulp);
             undo.setOnClickListener(v -> {
@@ -7290,7 +7395,9 @@ public class MainActivity extends Activity {
         }
         int total = blocks.size();
         int planPercent = total == 0 ? 0 : Math.round(done * 100f / total);
-        progressPercent.setText(planPercent + "% of plan • " + syllabusProgressLabel());
+        progressPercent.setText(planPercent + "%");
+        if (todayPlanProgress != null) todayPlanProgress.setProgress(planPercent);
+        if (todaySyllabusView != null) todaySyllabusView.setText("UPSC CSE · " + syllabusProgressLabel());
     }
 
     private String syllabusProgressLabel() {
@@ -7872,7 +7979,7 @@ public class MainActivity extends Activity {
                 .setTitle("Load " + label + " template?")
                 .setMessage("Your current timeline will be replaced with the shared routine plus your saved " + label + "-specific routine. Day-specific blocks take priority when a time or activity conflicts.")
                 .setPositiveButton("Load", (d, w) -> {
-                    mode = key;
+                    mode = DayFlowScreenRules.normalizeWorkArrangement(key, mode);
                     planPreviewMode = key;
                     SharedPreferences.Editor selection = getPrefs().edit().putString(modeKey(selectedDateKey), mode);
                     if (selectedDateKey.equals(todayKey())) selection.putString(MODE_KEY, mode);
@@ -9264,11 +9371,13 @@ public class MainActivity extends Activity {
         debugLog("App load: date=" + selectedDateKey + " mode=" + mode + " blocks=" + blocks.size());
     }
 
+    
     private void loadTemplateSilent() {
-        for (Block source : getCombinedTemplateBlocks(mode)) {
+        String routineKey = DayFlowScreenRules.defaultTemplateKey(isWeekendDate(selectedDateKey), mode);
+        for (Block source : getCombinedTemplateBlocks(routineKey)) {
             Block dailyCopy = new Block(System.currentTimeMillis() + blocks.size(),
                     source.start, source.end, source.title, source.priority, source.rigidity, "pending");
-            dailyCopy.templateOwner = source.templateOwner == null ? mode : source.templateOwner;
+            dailyCopy.templateOwner = source.templateOwner == null ? routineKey : source.templateOwner;
             blocks.add(dailyCopy);
         }
     }
@@ -9524,7 +9633,15 @@ private String modeKey(String dayKey) {
 private void loadSelectedDate() {
         blocks.clear();
         SharedPreferences p = getPrefs();
-        mode = p.getString(modeKey(selectedDateKey), p.getString(MODE_KEY, "wfh"));
+        String savedArrangement = p.getString(modeKey(selectedDateKey), null);
+        String lastArrangement = p.getString(MODE_KEY, "wfh");
+        mode = DayFlowScreenRules.normalizeWorkArrangement(savedArrangement, lastArrangement);
+        if (savedArrangement != null && !mode.equals(savedArrangement)) {
+            p.edit().putString(modeKey(selectedDateKey), mode).apply();
+        }
+        if (selectedDateKey.equals(todayKey()) && !mode.equals(lastArrangement)) {
+            p.edit().putString(MODE_KEY, mode).apply();
+        }
         String raw = p.getString(blocksKey(selectedDateKey), null);
 
         try {
