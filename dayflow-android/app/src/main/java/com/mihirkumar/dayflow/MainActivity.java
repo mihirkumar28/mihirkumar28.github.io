@@ -125,6 +125,10 @@ public class MainActivity extends Activity {
     private boolean roadmapDetailsExpanded = false;
     private boolean roadmapMonthlyGoalsCollapsed = false;
     private Button roadmapMonthlyGoalsToggle, roadmapTreeEditButton;
+    private String roadmapDisplayMode = "overview";
+    private LinearLayout roadmapViewSwitcher, roadmapOverviewContent, roadmapTrackCards,
+            roadmapOverviewProgress, roadmapTimelineContent, roadmapStructureContent;
+    private final Map<String, Button> roadmapViewButtons = new LinkedHashMap<>();
     private boolean roadmapTreeEditMode = false;
     private String selectedGoalMonth;
     private String activePage = "home";
@@ -1794,7 +1798,35 @@ public class MainActivity extends Activity {
         pageHeading(pageSyllabus, "YOUR PLAN", "Roadmap",
                 "One connected map for syllabus, monthly goals and deadlines.");
 
-        // Compact execution panel: one shared source of truth with the full roadmap tree.
+        roadmapViewSwitcher = horizontal();
+        roadmapViewSwitcher.setPadding(dp(3), dp(3), dp(3), dp(3));
+        roadmapViewSwitcher.setBackground(bg("#EAF0E9", 14));
+        String[][] viewChoices = {{"Overview", "overview"}, {"Timeline", "timeline"}, {"Structure", "structure"}};
+        for (String[] choice : viewChoices) {
+            Button button = secondaryButton(choice[0], () -> setRoadmapDisplayMode(choice[1]));
+            button.setTextSize(11);
+            button.setMinHeight(dp(42));
+            LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(0, dp(44), 1f);
+            if (roadmapViewSwitcher.getChildCount() > 0) buttonLp.leftMargin = dp(3);
+            roadmapViewSwitcher.addView(button, buttonLp);
+            roadmapViewButtons.put(choice[1], button);
+        }
+        LinearLayout.LayoutParams viewSwitcherLp = new LinearLayout.LayoutParams(-1, dp(50));
+        viewSwitcherLp.topMargin = dp(4);
+        viewSwitcherLp.bottomMargin = dp(8);
+        pageSyllabus.addView(roadmapViewSwitcher, viewSwitcherLp);
+
+        roadmapOverviewContent = vertical();
+        pageSyllabus.addView(roadmapOverviewContent, new LinearLayout.LayoutParams(-1, -2));
+        roadmapTimelineContent = vertical();
+        roadmapTimelineContent.setVisibility(View.GONE);
+        pageSyllabus.addView(roadmapTimelineContent, new LinearLayout.LayoutParams(-1, -2));
+        roadmapStructureContent = vertical();
+        roadmapStructureContent.setVisibility(View.GONE);
+        pageSyllabus.addView(roadmapStructureContent, new LinearLayout.LayoutParams(-1, -2));
+
+        // Overview order intentionally puts this month's actionable items first and
+        // overall progress last, with the two main preparation tracks between them.
         roadmapMonthlyGoalsCollapsed = getPrefs().getBoolean(ROADMAP_MONTHLY_PANEL_COLLAPSED_KEY, false);
         LinearLayout monthlyCard = vertical();
         monthlyCard.setPadding(dp(14), dp(11), dp(14), dp(10));
@@ -1806,7 +1838,7 @@ public class MainActivity extends Activity {
         LinearLayout monthlyHeader = horizontal();
         monthlyHeader.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout monthlyHeaderText = vertical();
-        monthlyHeaderText.addView(text("MONTHLY GOALS", 12, color("#2E8060"), true));
+        monthlyHeaderText.addView(text("THIS MONTH", 12, color("#2E8060"), true));
         roadmapFocusCount = text("", 10, color("#687A70"), false);
         roadmapFocusCount.setSingleLine(true);
         roadmapFocusCount.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1869,7 +1901,17 @@ public class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(-1, -2));
         monthlyCard.addView(roadmapMonthlyGoalsContent);
         roadmapMonthlyGoalsContent.setVisibility(roadmapMonthlyGoalsCollapsed ? View.GONE : View.VISIBLE);
+        monthlyCardLp.topMargin = dp(0);
+        monthlyCardLp.bottomMargin = dp(14);
+        roadmapOverviewContent.addView(monthlyCard, monthlyCardLp);
 
+        roadmapTrackCards = vertical();
+        LinearLayout.LayoutParams trackCardsLp = new LinearLayout.LayoutParams(-1, -2);
+        trackCardsLp.bottomMargin = dp(14);
+        roadmapOverviewContent.addView(roadmapTrackCards, trackCardsLp);
+
+        roadmapOverviewProgress = vertical();
+        roadmapOverviewContent.addView(roadmapOverviewProgress, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout treeHeading = horizontal();
         treeHeading.setGravity(Gravity.CENTER_VERTICAL);
@@ -1899,7 +1941,7 @@ public class MainActivity extends Activity {
         treeHeading.addView(roadmapSearchToggle, searchToggleLp);
         LinearLayout.LayoutParams treeHeadingLp = new LinearLayout.LayoutParams(-1, -2);
         treeHeadingLp.topMargin = dp(12);
-        pageSyllabus.addView(treeHeading, treeHeadingLp);
+        roadmapStructureContent.addView(treeHeading, treeHeadingLp);
 
         roadmapTreeSummary = text("", 10, color("#687A70"), false);
         roadmapTreeSummary.setLineSpacing(dp(1), 1f);
@@ -1908,7 +1950,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams treeSummaryLp = new LinearLayout.LayoutParams(-1, -2);
         treeSummaryLp.topMargin = dp(5);
         treeSummaryLp.bottomMargin = dp(8);
-        pageSyllabus.addView(roadmapTreeSummary, treeSummaryLp);
+        roadmapStructureContent.addView(roadmapTreeSummary, treeSummaryLp);
 
         roadmapSearchRow = horizontal();
         roadmapSearchRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -1932,7 +1974,7 @@ public class MainActivity extends Activity {
         roadmapSearchRow.setVisibility(View.GONE);
         LinearLayout.LayoutParams searchRowLp = new LinearLayout.LayoutParams(-1, -2);
         searchRowLp.bottomMargin = dp(7);
-        pageSyllabus.addView(roadmapSearchRow, searchRowLp);
+        roadmapStructureContent.addView(roadmapSearchRow, searchRowLp);
         roadmapSearchInput.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int count, int after) {}
             public void onTextChanged(CharSequence s, int st, int before, int count) {
@@ -1963,20 +2005,15 @@ public class MainActivity extends Activity {
         filterScroll.addView(roadmapFilterChips);
         LinearLayout.LayoutParams filterScrollLp = new LinearLayout.LayoutParams(-1, dp(36));
         filterScrollLp.bottomMargin = dp(8);
-        pageSyllabus.addView(filterScroll, filterScrollLp);
+        roadmapStructureContent.addView(filterScroll, filterScrollLp);
 
         roadmapTreeContainer = vertical();
-        pageSyllabus.addView(roadmapTreeContainer, new LinearLayout.LayoutParams(-1, -2));
+        roadmapStructureContent.addView(roadmapTreeContainer, new LinearLayout.LayoutParams(-1, -2));
 
-        // Place this-month priorities after the structure view, so the Roadmap opens
-        // with the wider track hierarchy and ends with the immediate execution list.
-        LinearLayout.LayoutParams monthPanelFooterLp = new LinearLayout.LayoutParams(-1, -2);
-        monthPanelFooterLp.topMargin = dp(16);
-        monthPanelFooterLp.bottomMargin = dp(8);
-        pageSyllabus.addView(monthlyCard, monthPanelFooterLp);
-
+        renderRoadmapTimeline();
         refreshRoadmapFilterStyles();
         refreshRoadmapTabContent();
+        setRoadmapDisplayMode("overview");
     }
 
     private void setRoadmapMonthlyGoalsCollapsed(boolean collapsed) {
@@ -2286,6 +2323,7 @@ public class MainActivity extends Activity {
     private void refreshRoadmapTabContent() {
         if (roadmapTreeContainer == null) return;
         refreshRoadmapSummary();
+        refreshRoadmapViewStyles();
     }
 
     private String roadmapId(String... parts) {
@@ -3714,6 +3752,297 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void setRoadmapDisplayMode(String mode) {
+        if (!"timeline".equals(mode) && !"structure".equals(mode)) mode = "overview";
+        roadmapDisplayMode = mode;
+        if (roadmapOverviewContent != null) roadmapOverviewContent.setVisibility(
+                "overview".equals(mode) ? View.VISIBLE : View.GONE);
+        if (roadmapTimelineContent != null) roadmapTimelineContent.setVisibility(
+                "timeline".equals(mode) ? View.VISIBLE : View.GONE);
+        if (roadmapStructureContent != null) roadmapStructureContent.setVisibility(
+                "structure".equals(mode) ? View.VISIBLE : View.GONE);
+        refreshRoadmapViewStyles();
+        if ("overview".equals(mode)) renderRoadmapOverview();
+        else if ("timeline".equals(mode)) renderRoadmapTimeline();
+        else renderRoadmapTreeBody();
+    }
+
+    private void refreshRoadmapViewStyles() {
+        for (Map.Entry<String, Button> entry : roadmapViewButtons.entrySet()) {
+            boolean active = entry.getKey().equals(roadmapDisplayMode);
+            Button button = entry.getValue();
+            button.setTextColor(color(active ? "#FFFFFF" : "#50635A"));
+            button.setBackground(bg(active ? "#286B55" : "#FFFFFF", 11));
+            button.setTypeface(Typeface.create("sans-serif", active ? Typeface.BOLD : Typeface.NORMAL));
+            button.setElevation(active ? dp(1) : 0f);
+        }
+    }
+
+    private RoadmapNode nextIncompleteRoadmapAction(RoadmapNode node) {
+        if (node == null) return null;
+        if (isRoadmapActionNode(node) && !node.done) return node;
+        for (RoadmapNode child : node.children) {
+            RoadmapNode found = nextIncompleteRoadmapAction(child);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private void renderRoadmapOverview() {
+        if (roadmapTrackCards == null || roadmapOverviewProgress == null) return;
+        roadmapTrackCards.removeAllViews();
+        roadmapOverviewProgress.removeAllViews();
+
+        TextView tracksTitle = text("YOUR TRACKS", 15, color("#18372E"), true);
+        roadmapTrackCards.addView(tracksTitle);
+        TextView tracksSubtitle = text("Choose a track to explore its subjects and goals.", 11,
+                color("#687A70"), false);
+        LinearLayout.LayoutParams tracksSubtitleLp = new LinearLayout.LayoutParams(-1, -2);
+        tracksSubtitleLp.topMargin = dp(3);
+        tracksSubtitleLp.bottomMargin = dp(8);
+        roadmapTrackCards.addView(tracksSubtitle, tracksSubtitleLp);
+
+        ArrayList<RoadmapNode> roots = buildRoadmapTreeNodes();
+        ensureRoadmapExpansionState(roots);
+        int[] overall = new int[]{0, 0};
+        for (RoadmapNode rootNode : roots) {
+            overall = RoadmapTreeRules.combineProgress(overall, roadmapNodeProgress(rootNode));
+            LinearLayout card = vertical();
+            card.setPadding(dp(14), dp(12), dp(14), dp(11));
+            GradientDrawable cardBg = bg("#FFFFFF", 15);
+            cardBg.setStroke(dp(1), color("#E1E9E2"));
+            card.setBackground(cardBg);
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            cardLp.bottomMargin = dp(8);
+            roadmapTrackCards.addView(card, cardLp);
+
+            LinearLayout header = horizontal();
+            header.setGravity(Gravity.CENTER_VERTICAL);
+            TextView icon = text("upsc".equals(rootNode.rootKey) ? "◈"
+                    : "software".equals(rootNode.rootKey) ? "</>" : "✦",
+                    17, color("software".equals(rootNode.rootKey) ? "#A76821" : "#286B55"), true);
+            icon.setGravity(Gravity.CENTER);
+            icon.setBackground(bg("software".equals(rootNode.rootKey) ? "#F8EEDD" : "#EAF3EC", 10));
+            header.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+
+            LinearLayout titles = vertical();
+            LinearLayout.LayoutParams titlesLp = new LinearLayout.LayoutParams(0, -2, 1f);
+            titlesLp.leftMargin = dp(10);
+            titlesLp.rightMargin = dp(6);
+            header.addView(titles, titlesLp);
+            TextView title = text(rootNode.title, 15, color("#18372E"), true);
+            title.setMaxLines(2);
+            titles.addView(title);
+            TextView subtitle = text(rootNode.subtitle == null ? "" : rootNode.subtitle, 10,
+                    color("#687A70"), false);
+            subtitle.setMaxLines(2);
+            subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
+            subtitleLp.topMargin = dp(2);
+            titles.addView(subtitle, subtitleLp);
+
+            int[] progress = roadmapNodeProgress(rootNode);
+            TextView count = text(progress[0] + "/" + progress[1], 11, color("#286B55"), true);
+            header.addView(count);
+            card.addView(header);
+
+            ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            bar.setMax(Math.max(1, progress[1]));
+            bar.setProgress(Math.min(progress[0], Math.max(1, progress[1])));
+            bar.setProgressTintList(android.content.res.ColorStateList.valueOf(color(
+                    "software".equals(rootNode.rootKey) ? "#B88A4D" : "#398267")));
+            bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(color("#EAF0E9")));
+            LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(-1, dp(4));
+            barLp.topMargin = dp(10);
+            barLp.bottomMargin = dp(8);
+            card.addView(bar, barLp);
+
+            RoadmapNode next = nextIncompleteRoadmapAction(rootNode);
+            TextView nextLine = text(next == null ? "All visible actions complete"
+                    : "Next up  ·  " + next.title, 11, color("#50635A"), false);
+            nextLine.setMaxLines(2);
+            nextLine.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            card.addView(nextLine);
+
+            LinearLayout footer = horizontal();
+            footer.setGravity(Gravity.CENTER_VERTICAL);
+            footer.addView(text("Open track", 10, color("#286B55"), true),
+                    new LinearLayout.LayoutParams(0, -2, 1f));
+            footer.addView(text("↗", 15, color("#286B55"), true));
+            LinearLayout.LayoutParams footerLp = new LinearLayout.LayoutParams(-1, -2);
+            footerLp.topMargin = dp(8);
+            card.addView(footer, footerLp);
+            card.setOnClickListener(v -> {
+                expandedRoadmapNodeIds.add(rootNode.id);
+                persistRoadmapExpansionState();
+                setRoadmapDisplayMode("structure");
+            });
+            card.setContentDescription(rootNode.title + ", " + progress[0] + " of " + progress[1]
+                    + " complete. Next up: " + (next == null ? "none" : next.title)
+                    + ". Tap to open track.");
+        }
+
+        LinearLayout summary = vertical();
+        summary.setPadding(dp(15), dp(14), dp(15), dp(14));
+        GradientDrawable summaryBg = bg("#FFFFFF", 16);
+        summaryBg.setStroke(dp(1), color("#E1E9E2"));
+        summary.setBackground(summaryBg);
+        roadmapOverviewProgress.addView(summary, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout progressHeader = horizontal();
+        progressHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = text("OVERALL PROGRESS", 10, color("#2E8060"), true);
+        label.setLetterSpacing(0.06f);
+        progressHeader.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
+        progressHeader.addView(text((overall[1] == 0 ? 0 : overall[0] * 100 / overall[1]) + "%",
+                13, color("#286B55"), true));
+        summary.addView(progressHeader);
+
+        TextView numbers = text(overall[0] + " of " + overall[1] + " roadmap items complete",
+                17, color("#18372E"), true);
+        LinearLayout.LayoutParams numbersLp = new LinearLayout.LayoutParams(-1, -2);
+        numbersLp.topMargin = dp(8);
+        summary.addView(numbers, numbersLp);
+
+        ProgressBar overallBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        overallBar.setMax(Math.max(1, overall[1]));
+        overallBar.setProgress(Math.min(overall[0], Math.max(1, overall[1])));
+        overallBar.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#398267")));
+        overallBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(color("#EAF0E9")));
+        LinearLayout.LayoutParams overallBarLp = new LinearLayout.LayoutParams(-1, dp(5));
+        overallBarLp.topMargin = dp(8);
+        summary.addView(overallBar, overallBarLp);
+
+        ArrayList<RoadmapMilestone> milestones = readRoadmapMilestones();
+        RoadmapMilestone nextMilestone = null;
+        Collections.sort(milestones, Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
+        for (RoadmapMilestone milestone : milestones) if (!milestone.done) { nextMilestone = milestone; break; }
+        String nextText = nextMilestone == null ? "No upcoming deadlines" :
+                "Next milestone  ·  " + nextMilestone.title + "  ·  " + displayRoadmapDate(nextMilestone.date);
+        TextView nextDetail = text(nextText, 11, color("#687A70"), false);
+        nextDetail.setMaxLines(2);
+        nextDetail.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams nextLp = new LinearLayout.LayoutParams(-1, -2);
+        nextLp.topMargin = dp(7);
+        summary.addView(nextDetail, nextLp);
+    }
+
+    private void renderRoadmapTimeline() {
+        if (roadmapTimelineContent == null) return;
+        roadmapTimelineContent.removeAllViews();
+
+        TextView heading = text("PLAN ACROSS MONTHS", 10, color("#2E8060"), true);
+        heading.setLetterSpacing(0.08f);
+        roadmapTimelineContent.addView(heading);
+        TextView title = text("Timeline", 23, color("#18372E"), true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.topMargin = dp(2);
+        roadmapTimelineContent.addView(title, titleLp);
+        TextView subtitle = text("See how your goals unfold over time. Select a month to focus its goals.", 11,
+                color("#687A70"), false);
+        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
+        subtitleLp.topMargin = dp(3);
+        subtitleLp.bottomMargin = dp(10);
+        roadmapTimelineContent.addView(subtitle, subtitleLp);
+
+        ArrayList<MonthlyGoal> allGoals = readMonthlyGoals();
+        ArrayList<String> months = new ArrayList<>();
+        for (int i = 0; i < RoadmapMonthlyPlan.monthCount(); i++) {
+            String key = RoadmapMonthlyPlan.monthKeyAt(i);
+            if (key != null && !months.contains(key)) months.add(key);
+        }
+        for (MonthlyGoal goal : allGoals) if (goal.month != null && !months.contains(goal.month)) months.add(goal.month);
+        if (selectedGoalMonth != null && !months.contains(selectedGoalMonth)) months.add(selectedGoalMonth);
+        Collections.sort(months);
+        String selected = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
+        int start = months.indexOf(selected);
+        if (start < 0) start = 0;
+        int end = Math.min(months.size(), start + 12);
+        if (months.isEmpty()) {
+            roadmapTimelineContent.addView(text("No planned months yet. Add goals from Structure.", 12,
+                    color("#687A70"), false));
+            return;
+        }
+        TextView window = text("NEXT " + (end - start) + " MONTHS", 9, color("#687A70"), true);
+        LinearLayout.LayoutParams windowLp = new LinearLayout.LayoutParams(-1, -2);
+        windowLp.bottomMargin = dp(7);
+        roadmapTimelineContent.addView(window, windowLp);
+
+        for (int index = start; index < end; index++) {
+            String month = months.get(index);
+            ArrayList<MonthlyGoal> monthGoals = new ArrayList<>();
+            for (MonthlyGoal goal : allGoals) {
+                if (month.equals(goal.month) && goal.parentGoalId == 0L
+                        && MonthlyGoalLifecycle.showInMonthlyPanel(goal.lifecycleStatus)) monthGoals.add(goal);
+            }
+            monthGoals.sort(monthlyGoalOrderComparator(allGoals));
+            int done = 0;
+            for (MonthlyGoal goal : monthGoals) if (goal.done) done++;
+
+            LinearLayout card = vertical();
+            card.setPadding(dp(13), dp(12), dp(13), dp(12));
+            GradientDrawable cardBg = bg(month.equals(selected) ? "#EAF3EC" : "#FFFFFF", 14);
+            cardBg.setStroke(dp(month.equals(selected) ? 2 : 1),
+                    color(month.equals(selected) ? "#8EB6A0" : "#E1E9E2"));
+            card.setBackground(cardBg);
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            cardLp.bottomMargin = dp(8);
+            roadmapTimelineContent.addView(card, cardLp);
+
+            LinearLayout monthHeader = horizontal();
+            monthHeader.setGravity(Gravity.CENTER_VERTICAL);
+            monthHeader.addView(text(monthLabelForKey(month), 14, color("#18372E"), true),
+                    new LinearLayout.LayoutParams(0, -2, 1f));
+            monthHeader.addView(text(done + "/" + monthGoals.size() + " complete", 10,
+                    color("#286B55"), true));
+            card.addView(monthHeader);
+            card.setOnClickListener(v -> {
+                selectedGoalMonth = month;
+                renderRoadmapFocus();
+                renderRoadmapTimeline();
+            });
+
+            ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            progress.setMax(Math.max(1, monthGoals.size()));
+            progress.setProgress(Math.min(done, Math.max(1, monthGoals.size())));
+            progress.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#398267")));
+            progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(color("#DCE6DE")));
+            LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(4));
+            progressLp.topMargin = dp(7);
+            progressLp.bottomMargin = dp(6);
+            card.addView(progress, progressLp);
+
+            if (monthGoals.isEmpty()) {
+                card.addView(text("No goals scheduled", 11, color("#687A70"), false));
+            } else {
+                for (int i = 0; i < Math.min(3, monthGoals.size()); i++) {
+                    MonthlyGoal goal = monthGoals.get(i);
+                    LinearLayout goalRow = horizontal();
+                    goalRow.setGravity(Gravity.CENTER_VERTICAL);
+                    goalRow.addView(text(goal.done ? "✓" : "•", 13,
+                            color(goal.done ? "#398267" : "#82948A"), true),
+                            new LinearLayout.LayoutParams(dp(20), -2));
+                    TextView goalTitle = text(goal.title, 11,
+                            color(goal.done ? "#687A70" : "#344A40"), goal.done);
+                    goalTitle.setMaxLines(2);
+                    goalTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    goalRow.addView(goalTitle, new LinearLayout.LayoutParams(0, -2, 1f));
+                    goalRow.setOnClickListener(v -> openMonthlyGoalInRoadmap(goal));
+                    LinearLayout.LayoutParams goalLp = new LinearLayout.LayoutParams(-1, -2);
+                    goalLp.topMargin = dp(5);
+                    card.addView(goalRow, goalLp);
+                }
+                if (monthGoals.size() > 3) {
+                    TextView more = text("+" + (monthGoals.size() - 3) + " more goals", 10,
+                            color("#286B55"), true);
+                    LinearLayout.LayoutParams moreLp = new LinearLayout.LayoutParams(-1, -2);
+                    moreLp.topMargin = dp(5);
+                    card.addView(more, moreLp);
+                }
+            }
+        }
+    }
+
     private void refreshRoadmapSummary() {
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
         int cseTotal = 0, cseDone = 0, interviewTotal = 0, interviewDone = 0;
@@ -3759,6 +4088,9 @@ public class MainActivity extends Activity {
         // Keep the selected month and roadmap tree synchronised with the source-of-truth stores.
         if (roadmapFocusMonthLabel != null) renderRoadmapFocus();
         if (roadmapTreeContainer != null) renderRoadmapTreeBody();
+        if (roadmapTrackCards != null) renderRoadmapOverview();
+        if (roadmapTimelineContent != null) renderRoadmapTimeline();
+        refreshRoadmapViewStyles();
         // Roadmap edits also change the Today screen's connected progress label.
         refreshTodaySummaryProgress();
     }
