@@ -77,13 +77,18 @@ public final class DayFlowUpdateDownloadWorker extends Worker {
                 throw new IOException("Couldn't replace an earlier partial update download.");
             }
 
-            connection = (HttpURLConnection) new URL(APK_URL).openConnection();
+            // Include the release version in the URL so a previously cached APK cannot shadow the new build.
+            String versionedApkUrl = APK_URL + (APK_URL.contains("?") ? "&" : "?")
+                    + "v=" + expectedVersionCode;
+            connection = (HttpURLConnection) new URL(versionedApkUrl).openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(15000);
             connection.setReadTimeout(30000);
             connection.setInstanceFollowRedirects(true);
             connection.setRequestProperty("User-Agent", "DayFlow-Android");
             connection.setRequestProperty("Accept", "application/vnd.android.package-archive");
+            connection.setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0");
+            connection.setRequestProperty("Pragma", "no-cache");
             int response = connection.getResponseCode();
             if (response < 200 || response >= 300) {
                 throw new IOException("Update download returned HTTP " + response + ".");
