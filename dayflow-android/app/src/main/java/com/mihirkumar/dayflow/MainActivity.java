@@ -1869,7 +1869,6 @@ public class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(-1, -2));
         monthlyCard.addView(roadmapMonthlyGoalsContent);
         roadmapMonthlyGoalsContent.setVisibility(roadmapMonthlyGoalsCollapsed ? View.GONE : View.VISIBLE);
-        pageSyllabus.addView(monthlyCard, monthlyCardLp);
 
 
         LinearLayout treeHeading = horizontal();
@@ -1968,6 +1967,14 @@ public class MainActivity extends Activity {
 
         roadmapTreeContainer = vertical();
         pageSyllabus.addView(roadmapTreeContainer, new LinearLayout.LayoutParams(-1, -2));
+
+        // Place this-month priorities after the structure view, so the Roadmap opens
+        // with the wider track hierarchy and ends with the immediate execution list.
+        LinearLayout.LayoutParams monthPanelFooterLp = new LinearLayout.LayoutParams(-1, -2);
+        monthPanelFooterLp.topMargin = dp(16);
+        monthPanelFooterLp.bottomMargin = dp(8);
+        pageSyllabus.addView(monthlyCard, monthPanelFooterLp);
+
         refreshRoadmapFilterStyles();
         refreshRoadmapTabContent();
     }
