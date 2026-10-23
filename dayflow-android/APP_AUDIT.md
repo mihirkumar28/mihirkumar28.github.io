@@ -64,3 +64,15 @@ Source changes on `fix/today-tab-usability`:
 - [x] Make the timeline heading follow the selected date and make Today-screen controls at least 48dp where updated.
 - [x] Add pure JVM tests for Today state resolution, legacy arrangement normalization and date-type template defaults.
 - [ ] Confirm CI unit tests/build results and verify the rendered screen on-device at narrow widths and enlarged accessibility text.
+
+
+## Unified usability redesign — 2026-10-23
+
+- [x] Combine a readable date navigator, automatic weekday/weekend badge, and separate WFH/WFO selector on Today.
+- [x] Rework the current/next-task card into a compact action-first surface with state-aware controls.
+- [x] Tighten the daily summary while keeping completion, planned minutes, focus time, study actual-versus-plan, and syllabus progress visible.
+- [x] Improve timeline hierarchy with readable time labels, a single accent marker, task duration/rigidity, and consistent completion actions.
+- [x] Clarify Plan as a routine-preview/apply workflow and label WFH/WFO/Weekend explicitly; communicate that applying replaces only the selected date's actual schedule.
+- [x] Improve widget label/value readability and reclaim vertical space while preserving a transparent outer surface and content-wrapping card.
+- [x] Normalize legacy widget mode values so a saved "weekend" label cannot create a false work arrangement.
+- [ ] Verify the rendered Android UI and widget in emulator/device screenshots at narrow widths, widget sizes, and enlarged accessibility text.

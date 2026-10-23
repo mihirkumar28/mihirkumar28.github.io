@@ -232,7 +232,7 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
 
         String statusText;
         if (!officeMode) {
-            statusText = mode.equals("weekend") ? "WEEKEND" : "WFH";
+            statusText = isWeekendToday() ? "WEEKEND" : "WFH";
         } else {
             statusText = inOffice ? "IN OFFICE" : "OUT OF OFFICE";
         }
@@ -398,10 +398,19 @@ public class DayFlowWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    private static boolean isWeekendToday() {
+        int day = Calendar.getInstance().get(Calendar.DAY_OF_WEEK);
+        return day == Calendar.SATURDAY || day == Calendar.SUNDAY;
+    }
+
     private static String getTodayMode(Context context) {
         String key = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        return p.getString("mode_" + key, p.getString(MODE_KEY, "wfh"));
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String saved = prefs.getString("mode_" + key, prefs.getString(MODE_KEY, "wfh"));
+        if ("office".equals(saved) || "wfh".equals(saved)) return saved;
+        // Treat old "weekend" values as legacy day-type labels, not work arrangements.
+        String fallback = prefs.getString(MODE_KEY, "wfh");
+        return "office".equals(fallback) ? "office" : "wfh";
     }
 
     private static String commuteAction(JSONObject day) {

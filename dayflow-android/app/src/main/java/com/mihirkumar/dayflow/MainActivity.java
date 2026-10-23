@@ -604,13 +604,23 @@ public class MainActivity extends Activity {
     }
 
     private void pageHeading(LinearLayout page,String eyebrow,String title,String subtitle) {
-        TextView small=text(eyebrow.toUpperCase(Locale.US),10,color("#65C5A0"),true);
+        TextView small = text(eyebrow.toUpperCase(Locale.US), 9, color("#2E8060"), true);
         small.setLetterSpacing(0.1f);
-        LinearLayout.LayoutParams sm=new LinearLayout.LayoutParams(-1,-2); sm.bottomMargin=dp(5); page.addView(small,sm);
-        TextView heading=text(title,27,color("#F2F7F3"),true);
-        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2); hp.bottomMargin=dp(5); page.addView(heading,hp);
-        TextView detail=text(subtitle,13,color("#9AABA0"),false); detail.setLineSpacing(dp(2),1f);
-        LinearLayout.LayoutParams detailLp=new LinearLayout.LayoutParams(-1,-2); detailLp.bottomMargin=dp(18); page.addView(detail,detailLp);
+        LinearLayout.LayoutParams sm = new LinearLayout.LayoutParams(-1, -2);
+        sm.bottomMargin = dp(4);
+        page.addView(small, sm);
+
+        TextView heading = text(title, 25, color("#18372E"), true);
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
+        hp.bottomMargin = dp(4);
+        page.addView(heading, hp);
+
+        TextView detail = text(subtitle, 12, color("#687A70"), false);
+        detail.setLineSpacing(dp(2), 1f);
+        detail.setMaxLines(3);
+        LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
+        detailLp.bottomMargin = dp(14);
+        page.addView(detail, detailLp);
     }
 
     private GradientDrawable surfaceBackground(float radius) {
@@ -727,53 +737,83 @@ public class MainActivity extends Activity {
 
     private void buildPlanPage() {
         if (planPreviewMode == null) planPreviewMode = mode;
-        pageHeading(pagePlan,"Build your day","Plan","Choose WFH, Office or Weekend to view its saved template. The selected date's actual schedule stays separate.");
-        LinearLayout dateCard=surfaceCard();LinearLayout dateRow=horizontal();
-        dateRow.addView(secondaryButton("‹",()->{changeSelectedDate(-1);renderPlanPage();}),new LinearLayout.LayoutParams(dp(45),dp(40)));
-        TextView date=text("",14,color("#F1F6F2"),true);date.setGravity(Gravity.CENTER);date.setTag("planDate");dateRow.addView(date,new LinearLayout.LayoutParams(0,dp(40),1));
-        dateRow.addView(secondaryButton("›",()->{changeSelectedDate(1);renderPlanPage();}),new LinearLayout.LayoutParams(dp(45),dp(40)));dateCard.addView(dateRow);
-        TextView modeLabel=text("DAY TYPE",10,color("#687A70"),true);
-        LinearLayout.LayoutParams modeLabelLp=new LinearLayout.LayoutParams(-1,-2);modeLabelLp.topMargin=dp(12);dateCard.addView(modeLabel,modeLabelLp);
-        LinearLayout modes=horizontal();
-        String[][] choices={{"WFH","wfh"},{"Office","office"},{"Weekend","weekend"}};
-        for(String[] choice:choices){
-            Button b=secondaryButton(choice[0],()->choosePlanPreviewMode(choice[1]));
-            b.setTag("plan-mode-chip-"+choice[1]);
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(40),1);
-            if(modes.getChildCount()>0)lp.leftMargin=dp(6);
-            modes.addView(b,lp);
+        pageHeading(pagePlan, "Routine builder", "Plan your routines",
+                "Preview a reusable routine. Applying it changes only the selected date's schedule.");
+        LinearLayout dateCard = surfaceCard();
+        LinearLayout dateRow = horizontal();
+        dateRow.addView(secondaryButton("‹", () -> { changeSelectedDate(-1); renderPlanPage(); }),
+                new LinearLayout.LayoutParams(dp(44), dp(42)));
+        TextView date = text("", 13, color("#18372E"), true);
+        date.setGravity(Gravity.CENTER);
+        date.setTag("planDate");
+        dateRow.addView(date, new LinearLayout.LayoutParams(0, dp(42), 1));
+        dateRow.addView(secondaryButton("›", () -> { changeSelectedDate(1); renderPlanPage(); }),
+                new LinearLayout.LayoutParams(dp(44), dp(42)));
+        dateCard.addView(dateRow);
+
+        TextView modeLabel = text("ROUTINE TEMPLATE", 9, color("#687A70"), true);
+        modeLabel.setLetterSpacing(0.06f);
+        LinearLayout.LayoutParams modeLabelLp = new LinearLayout.LayoutParams(-1, -2);
+        modeLabelLp.topMargin = dp(12);
+        dateCard.addView(modeLabel, modeLabelLp);
+        LinearLayout modes = horizontal();
+        String[][] choices = {{"WFH", "wfh"}, {"WFO", "office"}, {"Weekend", "weekend"}};
+        for (String[] choice : choices) {
+            Button b = secondaryButton(choice[0], () -> choosePlanPreviewMode(choice[1]));
+            b.setTag("plan-mode-chip-" + choice[1]);
+            b.setTextSize(12);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1);
+            if (modes.getChildCount() > 0) lp.leftMargin = dp(6);
+            modes.addView(b, lp);
         }
-        LinearLayout.LayoutParams modesLp=new LinearLayout.LayoutParams(-1,dp(42));modesLp.topMargin=dp(6);dateCard.addView(modes,modesLp);
-        LinearLayout templateRow=horizontal();
-        Button applyRoutine=primaryButton("Apply template to date",()->showTemplatePicker());
-        templateRow.addView(applyRoutine,new LinearLayout.LayoutParams(0,dp(42),1));
-        Button editRoutine=secondaryButton("Edit templates",()->showTemplateEditorPicker());
-        LinearLayout.LayoutParams editRoutineLp=new LinearLayout.LayoutParams(0,dp(42),1);editRoutineLp.leftMargin=dp(8);
-        templateRow.addView(editRoutine,editRoutineLp);
-        LinearLayout.LayoutParams templateRowLp=new LinearLayout.LayoutParams(-1,dp(44));templateRowLp.topMargin=dp(10);dateCard.addView(templateRow,templateRowLp);pagePlan.addView(dateCard);
+        LinearLayout.LayoutParams modesLp = new LinearLayout.LayoutParams(-1, dp(42));
+        modesLp.topMargin = dp(6);
+        dateCard.addView(modes, modesLp);
 
-        planTemplatePreview=vertical();
-        LinearLayout.LayoutParams templatePreviewLp=new LinearLayout.LayoutParams(-1,-2);templatePreviewLp.topMargin=dp(12);templatePreviewLp.bottomMargin=dp(10);
-        pagePlan.addView(planTemplatePreview,templatePreviewLp);
+        LinearLayout templateRow = horizontal();
+        Button applyRoutine = primaryButton("Apply to selected date", () -> showTemplatePicker());
+        templateRow.addView(applyRoutine, new LinearLayout.LayoutParams(0, dp(44), 1));
+        Button editRoutine = secondaryButton("Edit templates", () -> showTemplateEditorPicker());
+        LinearLayout.LayoutParams editRoutineLp = new LinearLayout.LayoutParams(0, dp(44), 1);
+        editRoutineLp.leftMargin = dp(8);
+        templateRow.addView(editRoutine, editRoutineLp);
+        LinearLayout.LayoutParams templateRowLp = new LinearLayout.LayoutParams(-1, dp(44));
+        templateRowLp.topMargin = dp(9);
+        dateCard.addView(templateRow, templateRowLp);
+        pagePlan.addView(dateCard);
 
-        planDayScheduleToggle=secondaryButton("Show this date's saved schedule",()->{
-            boolean expand=actualScheduleContent!=null&&actualScheduleContent.getVisibility()!=View.VISIBLE;
+        planTemplatePreview = vertical();
+        LinearLayout.LayoutParams templatePreviewLp = new LinearLayout.LayoutParams(-1, -2);
+        templatePreviewLp.topMargin = dp(12);
+        templatePreviewLp.bottomMargin = dp(10);
+        pagePlan.addView(planTemplatePreview, templatePreviewLp);
+
+        planDayScheduleToggle = secondaryButton("Show this date's saved schedule", () -> {
+            boolean expand = actualScheduleContent != null && actualScheduleContent.getVisibility() != View.VISIBLE;
             setPlanDayScheduleExpanded(expand);
         });
-        LinearLayout.LayoutParams toggleLp=new LinearLayout.LayoutParams(-1,dp(44));toggleLp.topMargin=dp(4);toggleLp.bottomMargin=dp(10);
-        pagePlan.addView(planDayScheduleToggle,toggleLp);
+        LinearLayout.LayoutParams toggleLp = new LinearLayout.LayoutParams(-1, dp(44));
+        toggleLp.topMargin = dp(4);
+        toggleLp.bottomMargin = dp(10);
+        pagePlan.addView(planDayScheduleToggle, toggleLp);
 
-        actualScheduleContent=vertical();
+        actualScheduleContent = vertical();
         actualScheduleContent.setVisibility(View.GONE);
-        TextView separationHint=text("This is the actual schedule saved for this date, including its progress and date-specific edits. It is separate from the reusable template above; selecting a day type does not overwrite it.",11,color("#687A70"),false);
-        separationHint.setLineSpacing(dp(2),1f);
-        LinearLayout.LayoutParams separationHintLp=new LinearLayout.LayoutParams(-1,-2);separationHintLp.bottomMargin=dp(10);
-        actualScheduleContent.addView(separationHint,separationHintLp);
-        Button add=primaryButton("＋  Add a block to this date",()->openAddDialog());
-        LinearLayout.LayoutParams addLp=new LinearLayout.LayoutParams(-1,dp(48));addLp.bottomMargin=dp(15);actualScheduleContent.addView(add,addLp);
-        TextView section=text("SAVED BLOCKS FOR THIS DATE",11,color("#9AABA0"),true);
-        LinearLayout.LayoutParams secLp=new LinearLayout.LayoutParams(-1,-2);secLp.bottomMargin=dp(9);actualScheduleContent.addView(section,secLp);
-        planList=vertical();actualScheduleContent.addView(planList);
+        TextView separationHint = text("This is the actual schedule saved for this date, including progress and date-specific edits. It is separate from the reusable template above.", 11, color("#687A70"), false);
+        separationHint.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams separationHintLp = new LinearLayout.LayoutParams(-1, -2);
+        separationHintLp.bottomMargin = dp(10);
+        actualScheduleContent.addView(separationHint, separationHintLp);
+        Button add = primaryButton("＋  Add block to this date", () -> openAddDialog());
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(-1, dp(46));
+        addLp.bottomMargin = dp(14);
+        actualScheduleContent.addView(add, addLp);
+        TextView section = text("SAVED BLOCKS FOR THIS DATE", 9, color("#687A70"), true);
+        LinearLayout.LayoutParams secLp = new LinearLayout.LayoutParams(-1, -2);
+        secLp.bottomMargin = dp(8);
+        actualScheduleContent.addView(section, secLp);
+        planList = vertical();
+        actualScheduleContent.addView(planList);
         pagePlan.addView(actualScheduleContent);
         renderPlanPage();
     }
@@ -906,13 +946,17 @@ public class MainActivity extends Activity {
         LinearLayout heading = horizontal();
         heading.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout headingText = vertical();
-        headingText.addView(text("SELECTED TEMPLATE", 10, color("#2E8060"), true));
+        headingText.addView(text("ROUTINE PREVIEW", 9, color("#2E8060"), true));
         String previewKey = planPreviewMode == null ? mode : planPreviewMode;
         headingText.addView(text(templateLabel(previewKey) + " routine", 18, color("#18372E"), true));
         heading.addView(headingText, new LinearLayout.LayoutParams(0, -2, 1));
         planTemplatePreview.addView(heading);
 
-        TextView hint = text("This is the saved " + templateLabel(previewKey).toLowerCase(Locale.ROOT) + " template combined with shared blocks. Save changes in Edit templates; use Apply template to date to replace this date's saved schedule.", 11, color("#687A70"), false);
+        Date selected = parseDateKey(selectedDateKey);
+        String selectedLabel = selectedDateKey.equals(todayKey()) ? "today"
+                : selected == null ? selectedDateKey
+                : new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(selected);
+        TextView hint = text("Shared blocks are locked in this preview. Edit templates to change reusable blocks. Applying a template replaces only " + selectedLabel + "'s saved schedule.", 11, color("#687A70"), false);
         hint.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
         hintLp.topMargin = dp(4);
@@ -934,7 +978,7 @@ public class MainActivity extends Activity {
             LinearLayout row = horizontal();
             row.setGravity(Gravity.CENTER_VERTICAL);
             LinearLayout time = vertical();
-            time.addView(text(time12(block.start), 12, color("#286B55"), true));
+            time.addView(text(time12(block.start), 11, color("#286B55"), true));
             time.addView(text(time12(block.end), 10, color("#687A70"), false));
             row.addView(time, new LinearLayout.LayoutParams(dp(66), -2));
 
@@ -950,6 +994,7 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
             metaLp.topMargin = dp(3);
             details.addView(meta, metaLp);
+            row.setContentDescription(block.title + ", " + time12(block.start) + " to " + time12(block.end) + ", " + source);
             card.addView(row);
             LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
             cardLp.bottomMargin = dp(6);
@@ -5375,84 +5420,96 @@ public class MainActivity extends Activity {
     private void buildHeader() {
         LinearLayout top = horizontal();
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
-        tp.bottomMargin = dp(12);
+        tp.bottomMargin = dp(8);
         root.addView(top, tp);
 
         LinearLayout brand = vertical();
-        TextView eyebrow = text("DAYFLOW  /  YOUR DAY", 10, color("#2E8060"), true);
+        TextView eyebrow = text("DAYFLOW  /  YOUR DAY", 9, color("#2E8060"), true);
         eyebrow.setLetterSpacing(0.12f);
         brand.addView(eyebrow);
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         String greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-        TextView title = text(greeting, 26, Color.WHITE, true);
+        TextView title = text(greeting, 24, Color.WHITE, true);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.topMargin = dp(3);
+        titleLp.topMargin = dp(2);
         brand.addView(title, titleLp);
-        brand.addView(text("Make the next block count.", 12, color("#687A70"), false));
+        brand.addView(text("Your schedule, at a glance.", 12, color("#687A70"), false));
         top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
 
-        Button add = actionButton("＋", Color.WHITE, "#23845F");
+        Button add = actionButton("+", Color.WHITE, "#23845F");
         add.setTextSize(22);
-        add.setContentDescription("Add block");
+        add.setContentDescription("Add a time block");
         add.setOnClickListener(v -> openAddDialog());
         top.addView(add, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
-        LinearLayout nav = horizontal();
-        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, dp(48));
-        np.bottomMargin = dp(13);
-        root.addView(nav, np);
+        LinearLayout dateNav = horizontal();
+        dateNav.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams navLp = new LinearLayout.LayoutParams(-1, dp(44));
+        navLp.bottomMargin = dp(10);
+        root.addView(dateNav, navLp);
 
         Button prev = actionButton("‹", color("#496257"), "#EAF0E9");
         prev.setTextSize(24);
         prev.setContentDescription("Previous day");
         prev.setOnClickListener(v -> changeSelectedDate(-1));
-        nav.addView(prev, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        dateNav.addView(prev, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
         dateView = text("", 14, Color.WHITE, true);
         dateView.setGravity(Gravity.CENTER);
         dateView.setContentDescription("Selected day. Tap to choose a date.");
         dateView.setOnClickListener(v -> openDatePicker());
-        nav.addView(dateView, new LinearLayout.LayoutParams(0, -1, 1));
+        dateNav.addView(dateView, new LinearLayout.LayoutParams(0, -1, 1));
 
         Button next = actionButton("›", color("#496257"), "#EAF0E9");
         next.setTextSize(24);
         next.setContentDescription("Next day");
         next.setOnClickListener(v -> changeSelectedDate(1));
-        nav.addView(next, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        dateNav.addView(next, new LinearLayout.LayoutParams(dp(44), dp(44)));
     }
 
     private void buildModeRow() {
         LinearLayout wrapper = vertical();
         LinearLayout.LayoutParams wrapperLp = new LinearLayout.LayoutParams(-1, -2);
-        wrapperLp.bottomMargin = dp(14);
+        wrapperLp.bottomMargin = dp(10);
         root.addView(wrapper, wrapperLp);
 
-        // Calendar classification is automatic; WFH/WFO is the separate work arrangement.
-        modeView = text("WEEKDAY", 10, color("#687A70"), true);
-        wrapper.addView(modeView);
+        // Calendar day type and work arrangement are deliberately separate concepts.
+        LinearLayout heading = horizontal();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        modeView = text("WEEKDAY", 10, color("#286B55"), true);
+        modeView.setLetterSpacing(0.06f);
+        modeView.setPadding(dp(9), dp(6), dp(9), dp(6));
+        modeView.setBackground(bg("#EAF0E9", 10));
+        modeView.setContentDescription("Automatically detected calendar day type");
+        heading.addView(modeView);
+
         TextView arrangementLabel = text("WORK ARRANGEMENT", 10, color("#687A70"), true);
-        LinearLayout.LayoutParams arrangementLabelLp = new LinearLayout.LayoutParams(-1, -2);
-        arrangementLabelLp.topMargin = dp(8);
-        wrapper.addView(arrangementLabel, arrangementLabelLp);
+        arrangementLabel.setLetterSpacing(0.06f);
+        LinearLayout.LayoutParams arrangementLabelLp = new LinearLayout.LayoutParams(-2, -2);
+        arrangementLabelLp.leftMargin = dp(9);
+        heading.addView(arrangementLabel, arrangementLabelLp);
+        wrapper.addView(heading);
 
         LinearLayout row = horizontal();
-        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(48));
-        rp.topMargin = dp(6);
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(44));
+        rp.topMargin = dp(7);
         wrapper.addView(row, rp);
         String[][] options = {{"WFH", "wfh"}, {"WFO", "office"}};
         for (String[] option : options) {
             String modeKey = option[1];
             Button b = chip(option[0]);
             b.setTag("mode-chip-" + modeKey);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), 1);
-            if (row.getChildCount() > 0) lp.leftMargin = dp(6);
+            b.setTextSize(13);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(44), 1);
+            if (row.getChildCount() > 0) lp.leftMargin = dp(8);
             row.addView(b, lp);
             b.setContentDescription(option[0] + " work arrangement");
             b.setOnClickListener(v -> chooseMode(modeKey));
         }
 
         todayRoutineEditButton = secondaryButton("Modify & Save Today's Routine", this::openTodayRoutineEditor);
-        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(-1, dp(48));
+        todayRoutineEditButton.setTextSize(12);
+        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(-1, dp(42));
         editLp.topMargin = dp(7);
         wrapper.addView(todayRoutineEditButton, editLp);
         todayRoutineEditButton.setVisibility(View.VISIBLE);
@@ -5461,55 +5518,59 @@ public class MainActivity extends Activity {
     
     private void buildCurrentCard() {
         LinearLayout card = vertical();
-        card.setPadding(dp(18), dp(16), dp(18), dp(14));
+        card.setPadding(dp(16), dp(14), dp(16), dp(13));
         card.setBackground(bg("#DCEBE2", 20));
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
-        cp.bottomMargin = dp(12);
+        cp.bottomMargin = dp(10);
         root.addView(card, cp);
 
-        TextView label = text("CURRENT TASK", 10, color("#2E8060"), true);
+        TextView label = text("CURRENT TASK", 9, color("#286B55"), true);
         label.setTag("currentTaskEyebrow");
-        label.setLetterSpacing(0.12f);
+        label.setLetterSpacing(0.1f);
+        label.setPadding(0, 0, 0, dp(2));
         card.addView(label);
 
-        currentTitle = text("Loading…", 23, Color.WHITE, true);
-        currentTitle.setMaxLines(3);
+        currentTitle = text("Loading…", 22, Color.WHITE, true);
+        currentTitle.setMaxLines(2);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
-        tp.topMargin = dp(4);
+        tp.topMargin = dp(3);
         card.addView(currentTitle, tp);
 
         LinearLayout row = horizontal();
+        row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
-        rp.topMargin = dp(6);
+        rp.topMargin = dp(5);
         card.addView(row, rp);
-        currentTime = text("—", 13, color("#496257"), false);
+        currentTime = text("—", 12, color("#496257"), false);
         currentCountdown = text("—", 13, color("#18372E"), true);
         currentCountdown.setGravity(Gravity.RIGHT);
         row.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1f));
         row.addView(currentCountdown);
 
         focusAction = actionButton("Start focus", Color.WHITE, "#23845F");
-        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(48));
-        focusLp.topMargin = dp(12);
+        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(44));
+        focusLp.topMargin = dp(10);
         card.addView(focusAction, focusLp);
         focusAction.setTag("focusAction");
         focusAction.setOnClickListener(v -> toggleFocusCurrent());
 
         LinearLayout secondaryActions = horizontal();
         secondaryActions.setTag("currentSecondaryActions");
-        LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(-1, dp(48));
-        secondaryLp.topMargin = dp(7);
+        LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(-1, dp(40));
+        secondaryLp.topMargin = dp(6);
         card.addView(secondaryActions, secondaryLp);
 
         Button markDone = actionButton("Mark complete", color("#496257"), "#FFFFFF");
+        markDone.setTextSize(12);
         markDone.setTag("currentDone");
         markDone.setOnClickListener(v -> completeCurrent());
-        secondaryActions.addView(markDone, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        secondaryActions.addView(markDone, new LinearLayout.LayoutParams(0, dp(40), 1f));
 
         Button recover = actionButton("Catch up", color("#496257"), "#FFFFFF");
+        recover.setTextSize(12);
         recover.setTag("recoveryButton");
         recover.setOnClickListener(v -> recoveryMode());
-        LinearLayout.LayoutParams recoverLp = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        LinearLayout.LayoutParams recoverLp = new LinearLayout.LayoutParams(0, dp(40), 1f);
         recoverLp.leftMargin = dp(8);
         secondaryActions.addView(recover, recoverLp);
     }
@@ -5518,16 +5579,16 @@ public class MainActivity extends Activity {
     private void buildTodaySummary() {
         LinearLayout summary = vertical();
         summary.setPadding(dp(14), dp(12), dp(14), dp(12));
-        summary.setBackground(surfaceCard().getBackground());
+        summary.setBackground(bg("#FFFFFF", 16));
         LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
         summaryLp.bottomMargin = dp(12);
         root.addView(summary, summaryLp);
 
         LinearLayout heading = horizontal();
         heading.setGravity(Gravity.CENTER_VERTICAL);
-        completionView = text("0 / 0 blocks complete", 13, Color.WHITE, true);
+        completionView = text("0 / 0 blocks complete", 12, color("#18372E"), true);
         heading.addView(completionView, new LinearLayout.LayoutParams(0, -2, 1f));
-        progressPercent = text("0%", 15, color("#23845F"), true);
+        progressPercent = text("0%", 14, color("#286B55"), true);
         progressPercent.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         heading.addView(progressPercent);
         summary.addView(heading);
@@ -5538,17 +5599,17 @@ public class MainActivity extends Activity {
         todayPlanProgress.setIndeterminate(false);
         todayPlanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#23845F")));
         todayPlanProgress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(color("#DDE6DE")));
-        todayPlanProgress.setMinimumHeight(dp(5));
-        todayPlanProgress.setMaxHeight(dp(5));
-        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(5));
-        progressLp.topMargin = dp(8);
-        progressLp.bottomMargin = dp(11);
+        todayPlanProgress.setMinimumHeight(dp(4));
+        todayPlanProgress.setMaxHeight(dp(4));
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(4));
+        progressLp.topMargin = dp(7);
+        progressLp.bottomMargin = dp(10);
         summary.addView(todayPlanProgress, progressLp);
 
         LinearLayout metrics = horizontal();
         metrics.setGravity(Gravity.TOP);
         LinearLayout plannedMetric = vertical();
-        plannedMetric.addView(text("PLANNED", 10, color("#687A70"), true));
+        plannedMetric.addView(text("PLANNED", 9, color("#687A70"), true));
         plannedView = text("0m", 14, color("#18372E"), true);
         LinearLayout.LayoutParams plannedValueLp = new LinearLayout.LayoutParams(-1, -2);
         plannedValueLp.topMargin = dp(3);
@@ -5556,7 +5617,7 @@ public class MainActivity extends Activity {
         metrics.addView(plannedMetric, new LinearLayout.LayoutParams(0, -2, 1f));
 
         LinearLayout focusMetric = vertical();
-        focusMetric.addView(text("FOCUS TRACKED", 10, color("#687A70"), true));
+        focusMetric.addView(text("FOCUS TRACKED", 9, color("#687A70"), true));
         doneView = text("0m", 14, color("#18372E"), true);
         LinearLayout.LayoutParams focusValueLp = new LinearLayout.LayoutParams(-1, -2);
         focusValueLp.topMargin = dp(3);
@@ -5566,8 +5627,8 @@ public class MainActivity extends Activity {
         metrics.addView(focusMetric, focusMetricLp);
 
         LinearLayout studyMetric = vertical();
-        studyMetric.addView(text("STUDY / PLAN", 10, color("#687A70"), true));
-        studyActualView = text("0m / 0m", 13, color("#18372E"), true);
+        studyMetric.addView(text("STUDY ACTUAL / PLAN", 9, color("#687A70"), true));
+        studyActualView = text("0m / 0m", 12, color("#18372E"), true);
         LinearLayout.LayoutParams studyValueLp = new LinearLayout.LayoutParams(-1, -2);
         studyValueLp.topMargin = dp(3);
         studyMetric.addView(studyActualView, studyValueLp);
@@ -5576,7 +5637,9 @@ public class MainActivity extends Activity {
         metrics.addView(studyMetric, studyMetricLp);
         summary.addView(metrics);
 
-        todaySyllabusView = text("UPSC CSE · Syllabus not set", 11, color("#687A70"), false);
+        todaySyllabusView = text("UPSC CSE · Syllabus not set", 10, color("#496257"), false);
+        todaySyllabusView.setPadding(dp(8), dp(6), dp(8), dp(6));
+        todaySyllabusView.setBackground(bg("#EAF0E9", 9));
         LinearLayout.LayoutParams syllabusLp = new LinearLayout.LayoutParams(-1, -2);
         syllabusLp.topMargin = dp(9);
         summary.addView(todaySyllabusView, syllabusLp);
@@ -5988,55 +6051,64 @@ public class MainActivity extends Activity {
         LinearLayout row = horizontal();
         row.setGravity(Gravity.TOP);
         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
-        rowLp.bottomMargin = dp(10);
+        rowLp.bottomMargin = dp(8);
         timeline.addView(row, rowLp);
 
         LinearLayout timeCol = vertical();
         timeCol.setGravity(Gravity.RIGHT);
-        timeCol.addView(text(time12(b.start), 12, color("#A5B5AA"), true));
-        timeCol.addView(text(time12(b.end), 10, color("#75877C"), false));
-        row.addView(timeCol, new LinearLayout.LayoutParams(dp(63), -2));
+        timeCol.setPadding(0, dp(10), 0, 0);
+        timeCol.addView(text(time12(b.start), 11, color("#496257"), true));
+        timeCol.addView(text(time12(b.end), 10, color("#687A70"), false));
+        row.addView(timeCol, new LinearLayout.LayoutParams(dp(64), -2));
 
         LinearLayout card = horizontal();
-        card.setPadding(dp(13), dp(11), dp(8), dp(11));
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(11), dp(10), dp(8), dp(10));
 
-        String surface, border;
+        String surface, border, marker;
         if ("done".equals(b.status)) {
-            surface = "#EAF0E9"; border = "#2E8060";
+            surface = "#EAF0E9"; border = "#DDE6DE"; marker = "#2E8060";
         } else if ("skipped".equals(b.status)) {
-            surface = "#F8E8E6"; border = "#B44248";
+            surface = "#F8E8E6"; border = "#B44248"; marker = "#B44248";
         } else if (current) {
-            surface = "#DCEBE2"; border = "#286B55";
+            surface = "#DCEBE2"; border = "#286B55"; marker = "#286B55";
         } else {
-            surface = "#FFFFFF"; border = "#DDE6DE";
+            surface = "#FFFFFF"; border = "#DDE6DE"; marker = "#799E89";
         }
 
-        GradientDrawable cardBg = bg(surface, 16);
+        GradientDrawable cardBg = bg(surface, 15);
         cardBg.setStroke(dp(current ? 2 : 1), color(border));
         card.setBackground(cardBg);
 
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(0, -2, 1);
-        cardLp.leftMargin = dp(9);
+        cardLp.leftMargin = dp(8);
         row.addView(card, cardLp);
 
+        View markerView = new View(this);
+        markerView.setBackground(bg(marker, 3));
+        LinearLayout.LayoutParams markerLp = new LinearLayout.LayoutParams(dp(4), dp(34));
+        markerLp.rightMargin = dp(9);
+        card.addView(markerView, markerLp);
+
         LinearLayout details = vertical();
-        TextView title = text(b.title, 15, Color.WHITE, true);
-        TextView meta = text(blockBehaviorLabel(b) + " • " + fmt(mins(b.end) - mins(b.start)), 11, color("#496257"), false);
+        TextView title = text(b.title, 14, Color.WHITE, true);
+        title.setMaxLines(2);
         details.addView(title);
-        details.addView(meta);
-
-        if (current) {
-            TextView state = text("IN PROGRESS", 10, color("#286B55"), true);
-            state.setPadding(0, dp(6), 0, 0);
-            details.addView(state);
-        }
-
+        String metaText = blockBehaviorLabel(b) + "  ·  " + fmt(Math.max(0, mins(b.end) - mins(b.start)));
+        if ("done".equals(b.status)) metaText += "  ·  Completed";
+        else if ("skipped".equals(b.status)) metaText += "  ·  Skipped";
+        else if (current) metaText += "  ·  Now";
+        TextView meta = text(metaText, 10, color("#496257"), false);
+        LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
+        metaLp.topMargin = dp(3);
+        details.addView(meta, metaLp);
         card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
 
         if ("pending".equals(b.status)) {
-            Button done = actionButton("✓", Color.WHITE, current ? "#40B58A" : "#263A31");
-            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(48), dp(48));
-            dlp.leftMargin = dp(8);
+            Button done = actionButton("✓", Color.WHITE, current ? "#40B58A" : "#286B55");
+            done.setContentDescription("Mark " + b.title + " complete");
+            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(40), dp(40));
+            dlp.leftMargin = dp(7);
             card.addView(done, dlp);
             done.setOnClickListener(v -> {
                 stopFocusForBlock(b, System.currentTimeMillis());
@@ -6044,13 +6116,15 @@ public class MainActivity extends Activity {
                 save();
             });
         } else if ("done".equals(b.status)) {
-            TextView check = text("✓", 20, color("#6FD6A3"), true);
+            TextView check = text("✓", 18, color("#2E8060"), true);
             check.setGravity(Gravity.CENTER);
-            card.addView(check, new LinearLayout.LayoutParams(dp(48), dp(48)));
+            check.setContentDescription("Completed");
+            card.addView(check, new LinearLayout.LayoutParams(dp(32), dp(40)));
         } else {
-            Button undo = actionButton("↩", color("#FFC5C9"), "#3A2729");
-            LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(dp(48), dp(48));
-            ulp.leftMargin = dp(8);
+            Button undo = actionButton("↶", color("#B44248"), "#FFFFFF");
+            undo.setContentDescription("Restore skipped block");
+            LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(dp(40), dp(40));
+            ulp.leftMargin = dp(7);
             card.addView(undo, ulp);
             undo.setOnClickListener(v -> {
                 b.status = "pending";
