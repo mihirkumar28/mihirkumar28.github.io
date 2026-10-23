@@ -52,11 +52,15 @@ public class MainActivity extends Activity {
     private static final String UPDATE_APK_URL = "https://mihirkumar28.github.io/app-release.apk";
     private static final String UPDATE_LAST_CHECK_KEY = "appUpdateLastCheckAt";
     private static final String UPDATE_PROMPTED_VERSION_KEY = "appUpdatePromptedVersion";
+    private static final String UPDATE_SNOOZED_VERSION_KEY = "appUpdateSnoozedVersion";
+    private static final String UPDATE_SNOOZE_UNTIL_KEY = "appUpdateSnoozeUntil";
     private static final String PENDING_UPDATE_APK_KEY = "pendingUpdateApkPath";
     private static final String UPDATE_DOWNLOAD_ERROR_KEY = "appUpdateDownloadError";
     private static final String UPDATE_INSTALL_PERMISSION_PROMPTED_KEY = "appUpdateInstallPermissionPrompted";
     private static final int UPDATE_NOTIFICATION_PERMISSION_REQUEST = 4203;
-    private static final long UPDATE_CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L;
+    // Check often enough to discover a newly published APK during normal use.
+    private static final long UPDATE_CHECK_INTERVAL_MS = 2L * 60L * 60L * 1000L;
+    private static final long UPDATE_REPROMPT_INTERVAL_MS = 12L * 60L * 60L * 1000L;
     private static final long MAX_UPDATE_APK_BYTES = 120L * 1024L * 1024L;
     private static final String SYLLABUS_KEY = "syllabusTopics";
     private static final String SYLLABUS_TARGET_KEY = "syllabusTargetDate";
@@ -1369,13 +1373,17 @@ public class MainActivity extends Activity {
             boolean channelMissing = false;
             java.net.HttpURLConnection connection = null;
             try {
-                connection = (java.net.HttpURLConnection) new java.net.URL(UPDATE_METADATA_URL).openConnection();
+                String metadataUrl = UPDATE_METADATA_URL + (UPDATE_METADATA_URL.contains("?") ? "&" : "?")
+                        + "check=" + now;
+                connection = (java.net.HttpURLConnection) new java.net.URL(metadataUrl).openConnection();
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(15000);
                 connection.setReadTimeout(20000);
                 connection.setInstanceFollowRedirects(true);
                 connection.setRequestProperty("User-Agent", "DayFlow-Android");
                 connection.setRequestProperty("Accept", "application/json");
+                connection.setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0");
+                connection.setRequestProperty("Pragma", "no-cache");
                 int response = connection.getResponseCode();
                 if (response == 404) {
                     channelMissing = true;
@@ -1417,13 +1425,19 @@ public class MainActivity extends Activity {
                 }
 
                 long current = installedVersionCode();
-                if (DayFlowUpdateInfo.isNewerThan(current, result)) {
-                    String prompted = getPrefs().getString(UPDATE_PROMPTED_VERSION_KEY, "");
-                    if (manual || !String.valueOf(result.versionCode).equals(prompted)) {
-                        getPrefs().edit().putString(UPDATE_PROMPTED_VERSION_KEY, String.valueOf(result.versionCode)).apply();
-                        showAvailableUpdate(result);
-                    }
-                } else if (manual) {
+                long snoozedVersion = -1L;
+                try {
+                    snoozedVersion = Long.parseLong(getPrefs().getString(UPDATE_SNOOZED_VERSION_KEY, ""));
+                } catch (NumberFormatException ignored) {
+                    // No update has been deferred on this installation.
+                }
+                long snoozeUntil = getPrefs().getLong(UPDATE_SNOOZE_UNTIL_KEY, 0L);
+                if (DayFlowUpdateInfo.shouldPromptForUpdate(manual, current, result,
+                        snoozedVersion, snoozeUntil, System.currentTimeMillis())) {
+                    getPrefs().edit().putString(UPDATE_PROMPTED_VERSION_KEY,
+                            String.valueOf(result.versionCode)).apply();
+                    showAvailableUpdate(result);
+                } else if (manual && !DayFlowUpdateInfo.isNewerThan(current, result)) {
                     new AlertDialog.Builder(this)
                             .setTitle("You're up to date")
                             .setMessage("DayFlow " + installedVersionName() + " is the latest published version.")
@@ -1442,8 +1456,16 @@ public class MainActivity extends Activity {
                         + "\nAvailable: " + release.versionName
                         + "\n\n" + notes
                         + "\n\nFor a normal in-place update, Android must recognize the same signing identity. Android will ask you to approve installation.")
-                .setPositiveButton("Download & install", (dialog, which) -> downloadAndInstallUpdate(release))
-                .setNegativeButton("Later", null)
+                .setPositiveButton("Download & install", (dialog, which) -> {
+                    getPrefs().edit().remove(UPDATE_SNOOZED_VERSION_KEY)
+                            .remove(UPDATE_SNOOZE_UNTIL_KEY).apply();
+                    downloadAndInstallUpdate(release);
+                })
+                .setNegativeButton("Later", (dialog, which) -> getPrefs().edit()
+                        .putString(UPDATE_SNOOZED_VERSION_KEY, String.valueOf(release.versionCode))
+                        .putLong(UPDATE_SNOOZE_UNTIL_KEY,
+                                System.currentTimeMillis() + UPDATE_REPROMPT_INTERVAL_MS)
+                        .apply())
                 .show();
     }
 
