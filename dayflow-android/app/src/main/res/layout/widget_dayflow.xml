@@ -13,9 +13,9 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingLeft="10dp"
-        android:paddingTop="6dp"
+        android:paddingTop="4dp"
         android:paddingRight="10dp"
-        android:paddingBottom="6dp"
+        android:paddingBottom="4dp"
         android:background="@drawable/widget_card_background">
 
     <LinearLayout
@@ -38,7 +38,7 @@
             android:includeFontPadding="false"
             android:text="WFH"
             android:textColor="#285A43"
-            android:textSize="8sp"
+            android:textSize="10sp"
             android:textStyle="bold"
             android:background="@drawable/widget_status_badge" />
 
@@ -55,7 +55,7 @@
             android:layout_marginEnd="4dp"
             android:text="ENDS IN"
             android:textColor="#687A70"
-            android:textSize="7sp"
+            android:textSize="8sp"
             android:textStyle="bold"
             android:includeFontPadding="false" />
 
@@ -67,7 +67,7 @@
             android:format="%s"
             android:text="00:00"
             android:textColor="#18372E"
-            android:textSize="10sp"
+            android:textSize="11sp"
             android:textStyle="bold"
             android:singleLine="true"
             android:includeFontPadding="false" />
@@ -83,14 +83,14 @@
         android:includeFontPadding="false"
         android:text="Current task"
         android:textColor="#18372E"
-        android:textSize="14sp"
+        android:textSize="15sp"
         android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginTop="5dp"
-        android:layout_marginBottom="5dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
         android:background="#DCE6DE"
         android:orientation="horizontal" />
 
@@ -112,7 +112,7 @@
                 android:layout_height="wrap_content"
                 android:text="OFFICE"
                 android:textColor="#687A70"
-                android:textSize="7sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
 
@@ -124,7 +124,7 @@
                 android:format="%s"
                 android:text="0m"
                 android:textColor="#18372E"
-                android:textSize="10sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:ellipsize="end"
@@ -151,7 +151,7 @@
                 android:layout_height="wrap_content"
                 android:text="COMMUTE"
                 android:textColor="#687A70"
-                android:textSize="7sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
 
@@ -163,7 +163,7 @@
                 android:format="%s"
                 android:text="0m"
                 android:textColor="#18372E"
-                android:textSize="10sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:ellipsize="end"
@@ -190,7 +190,7 @@
                 android:layout_height="wrap_content"
                 android:text="SCREEN"
                 android:textColor="#687A70"
-                android:textSize="7sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
 
@@ -204,7 +204,7 @@
                 android:includeFontPadding="false"
                 android:text="Collecting"
                 android:textColor="#18372E"
-                android:textSize="10sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
@@ -213,14 +213,14 @@
         android:id="@+id/widget_controls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
+        android:layout_marginTop="5dp"
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
         <TextView
             android:id="@+id/widget_action"
             android:layout_width="0dp"
-            android:layout_height="34dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
             android:layout_marginEnd="4dp"
             android:gravity="center"
@@ -228,7 +228,7 @@
             android:ellipsize="end"
             android:text="Check in"
             android:textColor="#FFFFFF"
-            android:textSize="9sp"
+            android:textSize="10sp"
             android:textStyle="bold"
             android:background="@drawable/widget_action_primary"
             android:includeFontPadding="false" />
@@ -236,7 +236,7 @@
         <TextView
             android:id="@+id/widget_commute"
             android:layout_width="0dp"
-            android:layout_height="34dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
             android:layout_marginStart="4dp"
             android:gravity="center"
@@ -244,7 +244,7 @@
             android:ellipsize="end"
             android:text="Start commute"
             android:textColor="#18372E"
-            android:textSize="9sp"
+            android:textSize="10sp"
             android:textStyle="bold"
             android:background="@drawable/widget_action_secondary"
             android:includeFontPadding="false" />
