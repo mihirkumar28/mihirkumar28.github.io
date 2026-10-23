@@ -3042,9 +3042,13 @@ public class MainActivity extends Activity {
         boolean hasChildren = !node.children.isEmpty();
         boolean ownMatch = !query.isEmpty() && roadmapActiveFilter.equals("All")
                 && roadmapNodeOwnMatchesQuery(node, query);
-        // Expand only ancestors needed to reveal an explicit search/filter result.
-        boolean autoExpand = hasChildren && !query.isEmpty()
-                && (ownMatch || roadmapHasVisibleChild(node, query));
+        // The default tree stays compact. Explicit filters reveal their matches across months;
+        // search reveals only matching ancestor paths.
+        boolean autoExpand = hasChildren && (
+                roadmapActiveFilter.equals("Overdue")
+                || roadmapActiveFilter.equals("Open")
+                || roadmapActiveFilter.equals("Done")
+                || (!query.isEmpty() && (ownMatch || roadmapHasVisibleChild(node, query))));
         boolean expanded = hasChildren && (expandedRoadmapNodeIds.contains(node.id) || autoExpand);
 
         LinearLayout row = horizontal();
