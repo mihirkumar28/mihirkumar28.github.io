@@ -1194,10 +1194,15 @@ public class MainActivity extends Activity {
                         + " · " + fmtMillis(Math.max(0L, todayNow - startedAt)) + " this session"
                     : todayDateLabel + " · Office session active";
         } else if (travelling) {
-            long commuteStart = todayLog == null ? 0L
-                    : todayLog.optLong("commuteInEnd", 0L) == 0L
-                        ? todayLog.optLong("commuteInStart", 0L)
-                        : todayLog.optLong("commuteOutStart", 0L);
+            long commuteStart = 0L;
+            if (todayLog != null) {
+                long commuteInStart = todayLog.optLong("commuteInStart", 0L);
+                long commuteInEnd = todayLog.optLong("commuteInEnd", 0L);
+                long commuteOutStart = todayLog.optLong("commuteOutStart", 0L);
+                long commuteOutEnd = todayLog.optLong("commuteOutEnd", 0L);
+                if (commuteInStart > 0L && commuteInEnd == 0L) commuteStart = commuteInStart;
+                else if (commuteOutStart > 0L && commuteOutEnd == 0L) commuteStart = commuteOutStart;
+            }
             todayDetail = commuteStart > 0L
                     ? todayDateLabel + " · Commute started at " + clock(commuteStart)
                         + " · " + fmtMillis(Math.max(0L, todayNow - commuteStart)) + " elapsed"
@@ -1339,7 +1344,7 @@ public class MainActivity extends Activity {
                 int markerColor = liveToday ? color("#B44248")
                         : isToday ? color("#286B55")
                         : recorded ? color("#23845F") : color("#82948A");
-                TextView marker = text(markerLabel, liveToday || isToday ? 7 : 7, markerColor, true);
+                TextView marker = text(markerLabel, liveToday || isToday ? 8 : 7, markerColor, true);
                 marker.setGravity(Gravity.CENTER);
                 marker.setMaxLines(1);
                 marker.setIncludeFontPadding(false);
