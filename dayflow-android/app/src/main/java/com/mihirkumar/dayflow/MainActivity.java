@@ -77,7 +77,7 @@ public class MainActivity extends Activity {
     private static final String PDF_LIBRARY_ROADMAP_GOAL_MIGRATION_KEY = "pdfLibraryRoadmapGoalMigration_v1";
     private static final int MONTHLY_PLAN_MIGRATION_VERSION = 2;
     private static final String ROADMAP_MILESTONES_KEY = "roadmapMilestones";
-    private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v1";
+    private static final String ROADMAP_EXPANSION_KEY = "roadmapExpandedNodeIds_v2";
     private static final String ROADMAP_MONTH_SLOTS_KEY_PREFIX = "roadmapMonthSlots_v1_";
     private static final String ROADMAP_MONTHLY_PANEL_COLLAPSED_KEY = "roadmapMonthlyGoalsCollapsed_v1";
     private static final String CSE_CHECKPOINT_KEY = "cseCheckpointDate";
@@ -1902,8 +1902,10 @@ public class MainActivity extends Activity {
         treeHeadingLp.topMargin = dp(12);
         pageSyllabus.addView(treeHeading, treeHeadingLp);
 
-        roadmapTreeSummary = text("", 11, color("#687A70"), false);
-        roadmapTreeSummary.setLineSpacing(dp(2), 1f);
+        roadmapTreeSummary = text("", 10, color("#687A70"), false);
+        roadmapTreeSummary.setLineSpacing(dp(1), 1f);
+        roadmapTreeSummary.setMaxLines(2);
+        roadmapTreeSummary.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams treeSummaryLp = new LinearLayout.LayoutParams(-1, -2);
         treeSummaryLp.topMargin = dp(5);
         treeSummaryLp.bottomMargin = dp(8);
@@ -2313,14 +2315,27 @@ public class MainActivity extends Activity {
             Set<String> saved = getPrefs().getStringSet(ROADMAP_EXPANSION_KEY, Collections.emptySet());
             if (saved != null) expandedRoadmapNodeIds.addAll(new HashSet<>(saved));
         } else {
+            // Start with an overview, not every year of month-by-month details expanded.
             expandedRoadmapNodeIds.add(roadmapId("track", "upsc"));
             expandedRoadmapNodeIds.add(roadmapId("track", "software"));
+            expandedRoadmapNodeIds.add(roadmapId("track", "other"));
             expandedRoadmapNodeIds.add(roadmapId("subject", "upsc", "General Studies"));
             expandedRoadmapNodeIds.add(roadmapId("subject", "upsc", "Maths Optional"));
-            expandedRoadmapNodeIds.add(roadmapId("subject", "software", "Software Interview Prep"));
+            expandedRoadmapNodeIds.add(roadmapId("subject", "software", "Interview skills & topics"));
             expandedRoadmapNodeIds.add(roadmapId("group", "current-goals", "upsc", "General Studies"));
             expandedRoadmapNodeIds.add(roadmapId("group", "current-goals", "upsc", "Maths Optional"));
             expandedRoadmapNodeIds.add(roadmapId("group", "current-goals", "software", "Software Interview Prep"));
+
+            // Only expand the selected month; other months remain one-line navigation rows.
+            String monthToOpen = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
+            ArrayList<RoadmapNode> pending = new ArrayList<>(roots);
+            while (!pending.isEmpty()) {
+                RoadmapNode node = pending.remove(pending.size() - 1);
+                if ("goal-month".equals(node.groupKind) && monthToOpen.equals(node.month)) {
+                    expandedRoadmapNodeIds.add(node.id);
+                }
+                pending.addAll(node.children);
+            }
         }
         roadmapExpansionStateLoaded = true;
         persistRoadmapExpansionState();
@@ -2862,6 +2877,19 @@ public class MainActivity extends Activity {
         return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
+    private void showRoadmapGoalDetailsDialog(MonthlyGoal goal) {
+        if (goal == null) return;
+        String message = "SOURCE\n" + goalInfoValue(goal.source, "Not specified — edit goal")
+                + "\n\nPAGES\n" + goalInfoValue(goal.pages, "Not listed")
+                + "\n\nESTIMATED TIME\n" + goalInfoValue(goal.estimatedTime, "Not estimated — edit goal");
+        new AlertDialog.Builder(this)
+                .setTitle(goal.title)
+                .setMessage(message)
+                .setPositiveButton("Edit goal", (dialog, which) -> editMonthlyGoal(goal))
+                .setNegativeButton("Done", null)
+                .show();
+    }
+
     private void addRoadmapGoalDetailPanel(LinearLayout parent, MonthlyGoal goal) {
         LinearLayout panel = vertical();
         panel.setPadding(dp(8), dp(7), dp(8), dp(7));
@@ -2969,22 +2997,23 @@ public class MainActivity extends Activity {
         for (RoadmapNode rootNode : roots) {
             overall = RoadmapTreeRules.combineProgress(overall, roadmapNodeProgress(rootNode));
         }
-        String status = overall[0] + " of " + overall[1] + " roadmap items complete.";
+
+        StringBuilder summary = new StringBuilder();
+        summary.append(overall[0]).append("/").append(overall[1]).append(" roadmap items complete");
         RoadmapMilestone next = null;
         for (RoadmapMilestone milestone : readRoadmapMilestones()) {
             if (milestone.done) continue;
             if (next == null || (milestone.date != null
                     && milestone.date.compareTo(next.date == null ? "9999-12-31" : next.date) < 0)) next = milestone;
         }
-        if (next != null) status += " Next deadline: " + next.title + " · " + displayRoadmapDate(next.date) + ".";
-        if (roadmapTreeEditMode) {
-            status += " Edit mode: drop onto a goal to swap positions; drop onto an empty month to move a goal there, or a populated month to make it a sub-goal. Continuity rules stay enforced.";
-        } else if (roadmapSearchText.trim().isEmpty() && roadmapActiveFilter.equals("All")) {
-            status += " Expand a branch to explore; tap a leaf to edit it.";
-        } else {
-            status += " Showing matches in their parent branches.";
+        if (next != null) {
+            summary.append("  ·  Next: ").append(next.title).append(" (")
+                    .append(displayRoadmapDate(next.date)).append(")");
         }
-        roadmapTreeSummary.setText(status);
+        if (roadmapTreeEditMode) summary.append("  ·  Drag to move; tap Edit to finish.");
+        else if (!roadmapSearchText.trim().isEmpty()) summary.append("  ·  Search results");
+        else if (!"All".equals(roadmapActiveFilter)) summary.append("  ·  ").append(roadmapActiveFilter);
+        roadmapTreeSummary.setText(summary.toString());
 
         int rendered = 0;
         for (RoadmapNode rootNode : roots) {
@@ -2992,18 +3021,17 @@ public class MainActivity extends Activity {
             renderRoadmapNode(rootNode, 0, false);
             rendered++;
             View divider = new View(this);
-            divider.setBackgroundColor(color("#DDE6DE"));
+            divider.setBackgroundColor(color("#E8EEE9"));
             LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
-            dividerLp.topMargin = dp(5);
-            dividerLp.bottomMargin = dp(5);
+            dividerLp.topMargin = dp(4);
+            dividerLp.bottomMargin = dp(4);
             roadmapTreeContainer.addView(divider, dividerLp);
         }
         if (rendered == 0) {
             LinearLayout empty = vertical();
             empty.setPadding(dp(12), dp(18), dp(12), dp(18));
-            empty.addView(text("No roadmap items match.", 14, color("#18372E"), true));
-            empty.addView(text("Try All, clear the search, or add a goal, topic or milestone.",
-                    12, color("#687A70"), false));
+            empty.addView(text("No roadmap items match", 14, color("#18372E"), true));
+            empty.addView(text("Clear the search or choose another filter.", 12, color("#687A70"), false));
             roadmapTreeContainer.addView(empty);
         }
     }
@@ -3014,33 +3042,33 @@ public class MainActivity extends Activity {
         boolean hasChildren = !node.children.isEmpty();
         boolean ownMatch = !query.isEmpty() && roadmapActiveFilter.equals("All")
                 && roadmapNodeOwnMatchesQuery(node, query);
-        boolean autoExpand = hasChildren && (roadmapActiveFilter.equals("Overdue")
-                || roadmapActiveFilter.equals("Open") || roadmapActiveFilter.equals("Done")
-                || (!query.isEmpty() && (ownMatch || roadmapHasVisibleChild(node, query))));
+        // Expand only ancestors needed to reveal an explicit search/filter result.
+        boolean autoExpand = hasChildren && !query.isEmpty()
+                && (ownMatch || roadmapHasVisibleChild(node, query));
         boolean expanded = hasChildren && (expandedRoadmapNodeIds.contains(node.id) || autoExpand);
 
         LinearLayout row = horizontal();
         row.setTag(node.id);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        int left = 4 + Math.min(depth, 5) * 13;
-        row.setPadding(dp(left), dp(7), dp(4), dp(7));
+        int left = 3 + Math.min(depth, 5) * 12;
+        row.setPadding(dp(left), dp(5), dp(3), dp(5));
         if ("track".equals(node.type)) row.setBackground(bg("#EAF3EC", 11));
         else if ("subject".equals(node.type)) row.setBackground(bg("#F7F9F6", 9));
         else row.setBackgroundColor(Color.TRANSPARENT);
         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
-        rowLp.bottomMargin = dp("track".equals(node.type) ? 5 : 1);
+        rowLp.bottomMargin = dp("track".equals(node.type) ? 4 : 0);
         roadmapTreeContainer.addView(row, rowLp);
 
         if (roadmapTreeEditMode && isRoadmapGoalNode(node)) {
             MonthlyGoal goal = (MonthlyGoal) node.item;
             boolean canDrag = canStartRoadmapGoalDrag(node);
-            TextView dragHandle = text(canDrag ? "☷" : "🔒", 16,
+            TextView dragHandle = text(canDrag ? "⠿" : "🔒", 15,
                     color(canDrag ? "#23845F" : "#9AA79F"), true);
             dragHandle.setGravity(Gravity.CENTER);
             dragHandle.setContentDescription(canDrag
                     ? "Hold and drag " + goal.title + ". Drop onto another goal to swap slots, or onto a month to add it as a sub-goal."
                     : "Locked: completed work in this goal must stay in sequence");
-            row.addView(dragHandle, new LinearLayout.LayoutParams(dp(26), dp(30)));
+            row.addView(dragHandle, new LinearLayout.LayoutParams(dp(24), dp(30)));
             if (canDrag) {
                 dragHandle.setOnLongClickListener(v -> {
                     android.content.ClipData data = android.content.ClipData.newPlainText(
@@ -3052,87 +3080,86 @@ public class MainActivity extends Activity {
                     } else {
                         started = v.startDrag(data, shadow, null, 0);
                     }
-                    if (!started) {
-                        Toast.makeText(MainActivity.this, "Couldn't start dragging this goal.", Toast.LENGTH_SHORT).show();
-                    }
+                    if (!started) Toast.makeText(MainActivity.this,
+                            "Couldn't start dragging this goal.", Toast.LENGTH_SHORT).show();
                     return started;
                 });
             }
             attachRoadmapGoalDropTarget(row, node);
-        } else if (roadmapTreeEditMode && isRoadmapMonthDropNode(node)) {
-            // Attach after the row's children are built so text and the + button are drop targets too.
         }
 
         if (isRoadmapActionNode(node)) {
             Button mark = actionButton(node.done ? "✓" : "○",
                     color(node.done ? "#F5FBF7" : "#50635A"),
                     node.done ? "#23845F" : "#FFFFFF");
-            mark.setTextSize(12);
+            mark.setTextSize(11);
             mark.setContentDescription(node.done ? "Mark pending" : "Mark complete");
-            row.addView(mark, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            row.addView(mark, new LinearLayout.LayoutParams(dp(28), dp(28)));
             mark.setOnClickListener(v -> toggleRoadmapLeaf(node));
         } else if (hasChildren) {
-            TextView disclosure = text(expanded ? "⌄" : "›", 19, color("#2E8060"), true);
+            TextView disclosure = text(expanded ? "⌄" : "›", 18, color("#2E8060"), true);
             disclosure.setGravity(Gravity.CENTER);
-            row.addView(disclosure, new LinearLayout.LayoutParams(dp(28), dp(30)));
+            row.addView(disclosure, new LinearLayout.LayoutParams(dp(22), dp(28)));
         } else {
-            TextView symbol = text("↗", 15, color("#82948A"), true);
-            symbol.setGravity(Gravity.CENTER);
-            row.addView(symbol, new LinearLayout.LayoutParams(dp(28), dp(30)));
+            row.addView(new View(this), new LinearLayout.LayoutParams(dp(22), dp(28)));
         }
 
         LinearLayout detail = vertical();
         LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(0, -2, 1f);
-        detailLp.leftMargin = dp(7);
-        detailLp.rightMargin = dp(4);
+        detailLp.leftMargin = dp(6);
+        detailLp.rightMargin = dp(3);
         row.addView(detail, detailLp);
-        float titleSize = "track".equals(node.type) ? 14f : "subject".equals(node.type) ? 13f : 12f;
+        float titleSize = "track".equals(node.type) ? 14f : "subject".equals(node.type) ? 12.5f : 12f;
         TextView title = text(node.title, titleSize,
                 node.done && isRoadmapActionNode(node) ? color("#687A70") : color("#18372E"),
-                !"group".equals(node.type) && !"topic".equals(node.type));
+                "track".equals(node.type) || "subject".equals(node.type) || "career".equals(node.type));
         title.setMaxLines("track".equals(node.type) || "subject".equals(node.type) ? 2 : 3);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         if (node.done && isRoadmapActionNode(node)) {
             title.setPaintFlags(title.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
         }
         detail.addView(title);
+
         String metadata = roadmapNodeMetadata(node);
         if (metadata != null && !metadata.trim().isEmpty()) {
             boolean trackDescription = "track".equals(node.type) || "subject".equals(node.type);
-            TextView meta = text(metadata, trackDescription ? 12 : 11,
+            TextView meta = text(metadata, trackDescription ? 10 : 10,
                     RoadmapTreeRules.isOverdue(node.type, node.done, node.statusPeriod, todayKey())
-                            ? color("#A76821") : color("#52675C"),
-                    false);
-            // Darker neutral copy stays readable; regular weight preserves title hierarchy.
-            meta.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
-            meta.setLineSpacing(dp(2), 1f);
-            meta.setMaxLines(2);
+                            ? color("#A76821") : color("#687A70"), false);
+            meta.setLineSpacing(dp(1), 1f);
+            meta.setMaxLines(trackDescription ? 2 : 1);
             meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
             LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
-            metaLp.topMargin = dp(3);
+            metaLp.topMargin = dp(2);
             detail.addView(meta, metaLp);
-        }
-
-        // Monthly goal execution facts live in a visibly nested panel, not in a truncated paragraph.
-        if ("goal".equals(node.type) && node.item instanceof MonthlyGoal) {
-            addRoadmapGoalDetailPanel(detail, (MonthlyGoal) node.item);
         }
 
         int[] progress = roadmapNodeProgress(node);
         if (progress[1] > 0 && hasChildren) {
-            TextView count = text(progress[0] + "/" + progress[1], 10, color("#2E8060"), true);
+            TextView count = text(progress[0] + "/" + progress[1], 9, color("#2E8060"), true);
             count.setGravity(Gravity.CENTER);
-            row.addView(count, new LinearLayout.LayoutParams(dp(42), dp(30)));
+            row.addView(count, new LinearLayout.LayoutParams(dp(38), dp(28)));
         }
 
         Runnable childAction = roadmapNodeChildAction(node);
         if (childAction != null) {
             Button addChild = actionButton("+", color("#2E8060"), "#FFFFFF");
-            addChild.setTextSize(17);
+            addChild.setTextSize(15);
             addChild.setContentDescription("Add item under " + node.title);
-            row.addView(addChild, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            row.addView(addChild, new LinearLayout.LayoutParams(dp(28), dp(28)));
             addChild.setOnClickListener(v -> childAction.run());
         }
+
+        // Keep source/pages/estimated-time information available on demand instead of
+        // repeating a full details card beneath every visible leaf.
+        if ("goal".equals(node.type) && node.item instanceof MonthlyGoal) {
+            Button info = actionButton("i", color("#286B55"), "#EAF3EC");
+            info.setTextSize(12);
+            info.setContentDescription("Show plan details for " + node.title);
+            row.addView(info, new LinearLayout.LayoutParams(dp(28), dp(28)));
+            info.setOnClickListener(v -> showRoadmapGoalDetailsDialog((MonthlyGoal) node.item));
+        }
+
         String editDropHint = roadmapTreeEditMode && isRoadmapMonthDropNode(node)
                 ? (node.children.isEmpty()
                     ? ". Drop a goal here to move it into this month."
@@ -3142,15 +3169,12 @@ public class MainActivity extends Activity {
         row.setContentDescription(node.title + ". " + metadata
                 + (hasChildren ? (expanded ? ". Tap to collapse." : ". Tap to expand.")
                 : (roadmapTreeEditMode
-                    ? ". Drag the goal handle; exit Edit to edit details."
+                    ? ". Drag the goal handle; exit Edit to edit it."
                     : ". Tap to edit."))
                 + editDropHint);
         row.setOnClickListener(v -> {
-            if (hasChildren) {
-                changeRoadmapExpansion(node);
-            } else if (!roadmapTreeEditMode) {
-                openRoadmapLeaf(node);
-            }
+            if (hasChildren) changeRoadmapExpansion(node);
+            else if (!roadmapTreeEditMode) openRoadmapLeaf(node);
         });
         row.setOnLongClickListener(v -> {
             if (roadmapTreeEditMode) return false;
@@ -3169,8 +3193,6 @@ public class MainActivity extends Activity {
             return false;
         });
 
-        // Attach after all row children (especially the + Add button) exist. Android routes
-        // drag events to the child under the pointer, so the whole month row must accept drops.
         if (roadmapTreeEditMode && isRoadmapMonthDropNode(node)) {
             attachRoadmapMonthDropTarget(row, node);
         }
