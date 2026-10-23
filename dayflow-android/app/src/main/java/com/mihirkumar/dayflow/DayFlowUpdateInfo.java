@@ -32,4 +32,14 @@ final class DayFlowUpdateInfo {
     static boolean isNewerThan(long installedVersionCode, ReleaseInfo candidate) {
         return candidate != null && candidate.versionCode > installedVersionCode;
     }
+
+    /**
+     * Re-offer a deferred update after its snooze expires, and never let a defer for
+     * an older release hide a newly published version. Manual checks ignore snoozes.
+     */
+    static boolean shouldPromptForUpdate(boolean manual, long installedVersionCode,
+            ReleaseInfo candidate, long snoozedVersionCode, long snoozeUntilMillis, long nowMillis) {
+        if (!isNewerThan(installedVersionCode, candidate)) return false;
+        return manual || candidate.versionCode != snoozedVersionCode || nowMillis >= snoozeUntilMillis;
+    }
 }
