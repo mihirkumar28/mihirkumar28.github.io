@@ -2323,8 +2323,6 @@ public class MainActivity extends Activity {
     private void refreshRoadmapTabContent() {
         if (roadmapTreeContainer == null) return;
         refreshRoadmapSummary();
-        renderRoadmapOverview();
-        renderRoadmapTimeline();
         refreshRoadmapViewStyles();
     }
 
