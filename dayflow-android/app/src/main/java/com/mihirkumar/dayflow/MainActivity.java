@@ -1117,135 +1117,198 @@ public class MainActivity extends Activity {
     }
 
     private void buildOfficePage() {
-        pageHeading(pageOffice,"Time ledger","Office & commute","One-tap attendance, commute sessions and weekly totals. Presence is separate from timetable completion.");
-        officePageContent=vertical();pageOffice.addView(officePageContent);renderOfficePage();
+        pageHeading(pageOffice, "Time ledger", "Office & commute",
+                "Attendance and commute, without the clutter.");
+        officePageContent = vertical();
+        pageOffice.addView(officePageContent);
+        renderOfficePage();
     }
     private void renderOfficePage() {
         if (officePageContent == null) return;
         officePageContent.removeAllViews();
 
-        // Cumulative totals lead the page: this is the primary view, not any single day.
-        LinearLayout cumulative = surfaceCard();
-        cumulative.addView(text("CUMULATIVE TIME", 10, color("#2E8060"), true));
-        LinearLayout periodControls = horizontal();
-        String[] periodKeys = {"all", "month", "week"};
-        String[] periodLabels = {"All time", "This month", "This week"};
-        for (int i = 0; i < periodKeys.length; i++) {
-            final String chosenPeriod = periodKeys[i];
-            Button periodButton = chosenPeriod.equals(officeSummaryPeriod)
-                    ? primaryButton(periodLabels[i], () -> {
-                        officeSummaryPeriod = chosenPeriod;
-                        renderOfficePage();
-                    })
-                    : secondaryButton(periodLabels[i], () -> {
-                        officeSummaryPeriod = chosenPeriod;
-                        renderOfficePage();
-                    });
-            periodButton.setTextSize(11);
-            periodButton.setMinHeight(dp(36));
-            LinearLayout.LayoutParams periodLp = new LinearLayout.LayoutParams(0, dp(38), 1f);
-            if (i > 0) periodLp.leftMargin = dp(5);
-            periodControls.addView(periodButton, periodLp);
-        }
-        LinearLayout.LayoutParams periodsLp = new LinearLayout.LayoutParams(-1, dp(38));
-        periodsLp.topMargin = dp(10);
-        periodsLp.bottomMargin = dp(12);
-        cumulative.addView(periodControls, periodsLp);
-
-        long[] totals = attendanceTotalsForPeriod(officeSummaryPeriod);
-        long officeTotal = totals[0];
-        long commuteTotal = totals[1];
-        long recordedDays = totals[2];
-        TextView totalTime = text(fmtMillis(officeTotal + commuteTotal), 32, color("#18372E"), true);
-        cumulative.addView(totalTime);
-        cumulative.addView(text("TOTAL TIME LOGGED", 10, color("#687A70"), true));
-        LinearLayout breakdown = horizontal();
-        LinearLayout officeMetric = vertical();
-        officeMetric.addView(text("IN OFFICE", 10, color("#687A70"), true));
-        officeMetric.addView(text(fmtMillis(officeTotal), 17, color("#18372E"), true));
-        breakdown.addView(officeMetric, new LinearLayout.LayoutParams(0, -2, 1f));
-        LinearLayout commuteMetric = vertical();
-        commuteMetric.addView(text("COMMUTE", 10, color("#687A70"), true));
-        commuteMetric.addView(text(fmtMillis(commuteTotal), 17, color("#18372E"), true));
-        breakdown.addView(commuteMetric, new LinearLayout.LayoutParams(0, -2, 1f));
-        LinearLayout.LayoutParams breakdownLp = new LinearLayout.LayoutParams(-1, -2);
-        breakdownLp.topMargin = dp(12);
-        cumulative.addView(breakdown, breakdownLp);
-        cumulative.addView(text("Across " + recordedDays + " recorded day" + (recordedDays == 1 ? "" : "s")
-                + " · totals update when a record is saved.", 11, color("#687A70"), false));
-        officePageContent.addView(cumulative);
-
-        JSONObject todayLog = getOfficeDay(todayKey(), false);
-        boolean inside = hasOpenOfficeSession(todayLog);
-        boolean travelling = hasOpenCommute(todayLog);
-        long todayNow = System.currentTimeMillis();
-        long officeSoFar = officeDuration(todayLog, todayNow);
-        long commuteSoFar = commuteDuration(todayLog, todayNow);
-        String todayDateLabel = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault())
+        final long now = System.currentTimeMillis();
+        final String today = todayKey();
+        final JSONObject todayLog = getOfficeDay(today, false);
+        final boolean inside = hasOpenOfficeSession(todayLog);
+        final boolean travelling = hasOpenCommute(todayLog);
+        final boolean recordedToday = OfficeAttendanceTime.hasRecordedData(todayLog);
+        final long officeSoFar = officeDuration(todayLog, now);
+        final long commuteSoFar = commuteDuration(todayLog, now);
+        final String dateLabel = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault())
                 .format(new Date());
-        String todayDetail;
+
+        // Primary surface: one clear status, one meaningful detail, two contextual actions.
+        LinearLayout hero = vertical();
+        hero.setPadding(dp(16), dp(15), dp(16), dp(15));
+        hero.setBackground(bg("#DCEBE2", 20));
+        LinearLayout.LayoutParams heroLp = new LinearLayout.LayoutParams(-1, -2);
+        heroLp.bottomMargin = dp(12);
+        officePageContent.addView(hero, heroLp);
+
+        LinearLayout statusLine = horizontal();
+        statusLine.setGravity(Gravity.CENTER_VERTICAL);
+        TextView dayLabel = text("TODAY  ·  " + dateLabel.toUpperCase(Locale.getDefault()),
+                9, color("#496257"), true);
+        dayLabel.setLetterSpacing(0.05f);
+        statusLine.addView(dayLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        if (inside || travelling) {
+            TextView liveBadge = text("● LIVE", 10, color("#286B55"), true);
+            liveBadge.setPadding(dp(8), dp(5), dp(8), dp(5));
+            liveBadge.setBackground(bg("#FFFFFF", 20));
+            statusLine.addView(liveBadge);
+        }
+        hero.addView(statusLine);
+
+        String statusTitle = inside ? "Clocked in"
+                : travelling ? "Commute in progress"
+                : recordedToday ? "Session saved" : "Ready when you are";
+        TextView statusTitleView = text(statusTitle, 23, color("#18372E"), true);
+        LinearLayout.LayoutParams statusTitleLp = new LinearLayout.LayoutParams(-1, -2);
+        statusTitleLp.topMargin = dp(6);
+        hero.addView(statusTitleView, statusTitleLp);
+
+        String statusDetail;
         if (inside) {
             JSONArray sessions = todayLog == null ? null : todayLog.optJSONArray("sessions");
             JSONObject activeSession = sessions == null || sessions.length() == 0
                     ? null : sessions.optJSONObject(sessions.length() - 1);
             long startedAt = activeSession == null ? 0L : activeSession.optLong("in", 0L);
-            todayDetail = startedAt > 0L
-                    ? todayDateLabel + " · Started at " + clock(startedAt)
-                        + " · " + fmtMillis(Math.max(0L, todayNow - startedAt)) + " this session"
-                    : todayDateLabel + " · Office session active";
+            statusDetail = startedAt > 0L
+                    ? "Started " + clock(startedAt) + "  ·  "
+                        + fmtMillis(Math.max(0L, now - startedAt)) + " this session"
+                    : "Office session active";
         } else if (travelling) {
             long commuteStart = 0L;
             if (todayLog != null) {
-                long commuteInStart = todayLog.optLong("commuteInStart", 0L);
-                long commuteInEnd = todayLog.optLong("commuteInEnd", 0L);
-                long commuteOutStart = todayLog.optLong("commuteOutStart", 0L);
-                long commuteOutEnd = todayLog.optLong("commuteOutEnd", 0L);
-                if (commuteInStart > 0L && commuteInEnd == 0L) commuteStart = commuteInStart;
-                else if (commuteOutStart > 0L && commuteOutEnd == 0L) commuteStart = commuteOutStart;
+                long inStart = todayLog.optLong("commuteInStart", 0L);
+                long inEnd = todayLog.optLong("commuteInEnd", 0L);
+                long outStart = todayLog.optLong("commuteOutStart", 0L);
+                long outEnd = todayLog.optLong("commuteOutEnd", 0L);
+                if (inStart > 0L && inEnd == 0L) commuteStart = inStart;
+                else if (outStart > 0L && outEnd == 0L) commuteStart = outStart;
             }
-            todayDetail = commuteStart > 0L
-                    ? todayDateLabel + " · Commute started at " + clock(commuteStart)
-                        + " · " + fmtMillis(Math.max(0L, todayNow - commuteStart)) + " elapsed"
-                    : todayDateLabel + " · Commute session active";
-        } else if (OfficeAttendanceTime.hasRecordedData(todayLog)) {
-            todayDetail = todayDateLabel + " · " + fmtMillis(officeSoFar)
-                    + " in office · " + fmtMillis(commuteSoFar) + " commute";
+            statusDetail = commuteStart > 0L
+                    ? "Commute started " + clock(commuteStart) + "  ·  "
+                        + fmtMillis(Math.max(0L, now - commuteStart)) + " elapsed"
+                    : "Commute session active";
+        } else if (recordedToday) {
+            statusDetail = fmtMillis(officeSoFar) + " in office  ·  "
+                    + fmtMillis(commuteSoFar) + " commuting";
         } else {
-            todayDetail = todayDateLabel + " · No attendance recorded yet";
+            statusDetail = "No attendance recorded yet";
         }
-        LinearLayout status = surfaceCard();
-        status.addView(text("TODAY'S STATUS", 10, color("#2E8060"), true));
-        status.addView(text(inside ? "Clocked in" : travelling ? "Commute in progress" : "Not clocked in",
-                20, color("#18372E"), true));
-        TextView todayDetailView = text(todayDetail, 12, color("#687A70"), false);
-        todayDetailView.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams todayDetailLp = new LinearLayout.LayoutParams(-1, -2);
-        todayDetailLp.topMargin = dp(4);
-        status.addView(todayDetailView, todayDetailLp);
-        LinearLayout quickActions = horizontal();
-        Button check = primaryButton(inside ? "Check out" : "Check in", () -> {
+        TextView detail = text(statusDetail, 12, color("#496257"), false);
+        detail.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
+        detailLp.topMargin = dp(3);
+        hero.addView(detail, detailLp);
+
+        LinearLayout actions = horizontal();
+        LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, dp(48));
+        actionsLp.topMargin = dp(13);
+        hero.addView(actions, actionsLp);
+        Button attendanceAction = primaryButton(inside ? "Check out" : "Check in", () -> {
             toggleOfficeAttendance();
             renderOfficePage();
         });
-        Button travel = secondaryButton(travelling ? "Finish commute" : "Start commute", () -> {
+        attendanceAction.setTextSize(13);
+        actions.addView(attendanceAction, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button commuteAction = secondaryButton(travelling ? "Finish commute" : "Start commute", () -> {
             toggleCommute();
             renderOfficePage();
         });
-        quickActions.addView(check, new LinearLayout.LayoutParams(0, dp(44), 1f));
-        LinearLayout.LayoutParams travelActionLp = new LinearLayout.LayoutParams(0, dp(44), 1f);
-        travelActionLp.leftMargin = dp(8);
-        quickActions.addView(travel, travelActionLp);
-        LinearLayout.LayoutParams quickLp = new LinearLayout.LayoutParams(-1, dp(44));
-        quickLp.topMargin = dp(10);
-        status.addView(quickActions, quickLp);
-        officePageContent.addView(status);
+        commuteAction.setTextSize(13);
+        LinearLayout.LayoutParams commuteActionLp = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        commuteActionLp.leftMargin = dp(8);
+        actions.addView(commuteAction, commuteActionLp);
 
-        LinearLayout history = surfaceCard();
-        history.addView(text("ATTENDANCE CALENDAR", 10, color("#2E8060"), true));
-        history.addView(text("Tap any past date to edit its office and commute times.", 12,
-                color("#687A70"), false));
+        // Compact period and total summary: fewer nested cards, clearer numeric hierarchy.
+        LinearLayout summary = vertical();
+        summary.setPadding(dp(15), dp(13), dp(15), dp(13));
+        summary.setBackground(bg("#FFFFFF", 18));
+        LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
+        summaryLp.bottomMargin = dp(17);
+        officePageContent.addView(summary, summaryLp);
 
-        // Keep the visible month on day one so navigation and grids remain stable.
+        LinearLayout summaryHeader = horizontal();
+        summaryHeader.setGravity(Gravity.CENTER_VERTICAL);
+        summaryHeader.addView(text("Time logged", 16, color("#18372E"), true),
+                new LinearLayout.LayoutParams(0, -2, 1f));
+
+        LinearLayout periodControls = horizontal();
+        String[] periodKeys = {"all", "month", "week"};
+        String[] periodLabels = {"All time", "Month", "Week"};
+        for (int i = 0; i < periodKeys.length; i++) {
+            final String selected = periodKeys[i];
+            boolean active = selected.equals(officeSummaryPeriod);
+            TextView chip = text(periodLabels[i], 10, active ? color("#18372E") : color("#687A70"), true);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(dp(8), dp(7), dp(8), dp(7));
+            chip.setBackground(bg(active ? "#DCEBE2" : "#F4F6F1", 12));
+            chip.setOnClickListener(v -> {
+                officeSummaryPeriod = selected;
+                renderOfficePage();
+            });
+            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(-2, dp(34));
+            if (i > 0) chipLp.leftMargin = dp(4);
+            periodControls.addView(chip, chipLp);
+        }
+        summaryHeader.addView(periodControls);
+        summary.addView(summaryHeader);
+
+        long[] totals = attendanceTotalsForPeriod(officeSummaryPeriod);
+        long officeTotal = totals[0], commuteTotal = totals[1], recordedDays = totals[2];
+        LinearLayout totalRow = horizontal();
+        totalRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout totalText = vertical();
+        TextView bigTotal = text(fmtMillis(officeTotal + commuteTotal), 29, color("#18372E"), true);
+        LinearLayout.LayoutParams bigTotalLp = new LinearLayout.LayoutParams(-1, -2);
+        bigTotalLp.topMargin = dp(10);
+        totalText.addView(bigTotal, bigTotalLp);
+        totalText.addView(text("TOTAL TIME", 9, color("#687A70"), true));
+        totalRow.addView(totalText, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView dayCount = text(recordedDays + (recordedDays == 1 ? " day" : " days"),
+                11, color("#687A70"), false);
+        dayCount.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        totalRow.addView(dayCount);
+        summary.addView(totalRow);
+
+        View metricDivider = new View(this);
+        metricDivider.setBackgroundColor(color("#E5EBE5"));
+        LinearLayout.LayoutParams metricDividerLp = new LinearLayout.LayoutParams(-1, dp(1));
+        metricDividerLp.topMargin = dp(12);
+        metricDividerLp.bottomMargin = dp(10);
+        summary.addView(metricDivider, metricDividerLp);
+
+        LinearLayout metrics = horizontal();
+        LinearLayout officeMetric = vertical();
+        officeMetric.addView(text("IN OFFICE", 9, color("#687A70"), true));
+        LinearLayout.LayoutParams officeValueLp = new LinearLayout.LayoutParams(-1, -2);
+        officeValueLp.topMargin = dp(3);
+        officeMetric.addView(text(fmtMillis(officeTotal), 16, color("#18372E"), true), officeValueLp);
+        metrics.addView(officeMetric, new LinearLayout.LayoutParams(0, -2, 1f));
+        LinearLayout commuteMetric = vertical();
+        commuteMetric.addView(text("COMMUTE", 9, color("#687A70"), true));
+        LinearLayout.LayoutParams commuteValueLp = new LinearLayout.LayoutParams(-1, -2);
+        commuteValueLp.topMargin = dp(3);
+        commuteMetric.addView(text(fmtMillis(commuteTotal), 16, color("#18372E"), true), commuteValueLp);
+        metrics.addView(commuteMetric, new LinearLayout.LayoutParams(0, -2, 1f));
+        summary.addView(metrics);
+
+        // Calendar becomes a quiet section, with saved days marked subtly and today unmistakable.
+        LinearLayout calendarSection = vertical();
+        LinearLayout.LayoutParams calendarSectionLp = new LinearLayout.LayoutParams(-1, -2);
+        calendarSectionLp.bottomMargin = dp(12);
+        officePageContent.addView(calendarSection, calendarSectionLp);
+
+        LinearLayout calendarHeader = horizontal();
+        calendarHeader.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout calendarHeading = vertical();
+        calendarHeading.addView(text("Attendance history", 17, color("#18372E"), true));
+        calendarHeading.addView(text("Tap a date to view or edit its record", 11, color("#687A70"), false));
+        calendarHeader.addView(calendarHeading, new LinearLayout.LayoutParams(0, -2, 1f));
+
         Calendar monthStart = (Calendar) attendanceCalendarMonth.clone();
         monthStart.set(Calendar.DAY_OF_MONTH, 1);
         monthStart.set(Calendar.HOUR_OF_DAY, 12);
@@ -1263,114 +1326,108 @@ public class MainActivity extends Activity {
         boolean isCurrentMonth = monthStart.get(Calendar.YEAR) == currentMonth.get(Calendar.YEAR)
                 && monthStart.get(Calendar.MONTH) == currentMonth.get(Calendar.MONTH);
 
-        LinearLayout monthNavigation = horizontal();
+        LinearLayout monthNav = horizontal();
+        monthNav.setGravity(Gravity.CENTER_VERTICAL);
         Button previousMonth = secondaryButton("‹", () -> changeAttendanceCalendarMonth(-1));
-        previousMonth.setTextSize(21);
+        previousMonth.setTextSize(20);
         previousMonth.setContentDescription("Previous month");
-        monthNavigation.addView(previousMonth, new LinearLayout.LayoutParams(dp(44), dp(40)));
-        TextView monthLabel = text(new SimpleDateFormat("MMMM yyyy", Locale.getDefault())
-                .format(monthStart.getTime()), 16, color("#18372E"), true);
-        monthLabel.setGravity(Gravity.CENTER);
-        monthNavigation.addView(monthLabel, new LinearLayout.LayoutParams(0, dp(40), 1f));
+        monthNav.addView(previousMonth, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        TextView monthTitle = text(new SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+                .format(monthStart.getTime()), 14, color("#18372E"), true);
+        monthTitle.setGravity(Gravity.CENTER);
+        monthNav.addView(monthTitle, new LinearLayout.LayoutParams(0, dp(40), 1f));
         Button nextMonth = secondaryButton("›", () -> changeAttendanceCalendarMonth(1));
-        nextMonth.setTextSize(21);
+        nextMonth.setTextSize(20);
         nextMonth.setContentDescription("Next month");
         nextMonth.setEnabled(!isCurrentMonth);
-        if (isCurrentMonth) nextMonth.setAlpha(0.35f);
-        monthNavigation.addView(nextMonth, new LinearLayout.LayoutParams(dp(44), dp(40)));
-        LinearLayout.LayoutParams monthNavigationLp = new LinearLayout.LayoutParams(-1, dp(40));
-        monthNavigationLp.topMargin = dp(10);
-        monthNavigationLp.bottomMargin = dp(8);
-        history.addView(monthNavigation, monthNavigationLp);
+        if (isCurrentMonth) nextMonth.setAlpha(0.3f);
+        monthNav.addView(nextMonth, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        LinearLayout.LayoutParams monthNavLp = new LinearLayout.LayoutParams(-1, dp(40));
+        monthNavLp.topMargin = dp(10);
+        monthNavLp.bottomMargin = dp(4);
+        calendarSection.addView(calendarHeader);
+        calendarSection.addView(monthNav, monthNavLp);
 
-        LinearLayout weekdayHeader = horizontal();
-        String[] weekdays = {"S", "M", "T", "W", "T", "F", "S"};
-        for (String weekday : weekdays) {
-            TextView label = text(weekday, 11, color("#687A70"), true);
+        LinearLayout weekdays = horizontal();
+        String[] weekdayNames = {"S", "M", "T", "W", "T", "F", "S"};
+        for (String name : weekdayNames) {
+            TextView label = text(name, 10, color("#82948A"), true);
             label.setGravity(Gravity.CENTER);
-            weekdayHeader.addView(label, new LinearLayout.LayoutParams(0, dp(26), 1f));
+            weekdays.addView(label, new LinearLayout.LayoutParams(0, dp(25), 1f));
         }
-        history.addView(weekdayHeader);
+        calendarSection.addView(weekdays);
 
-        LinearLayout calendarGrid = vertical();
+        LinearLayout grid = vertical();
         Calendar firstDay = (Calendar) monthStart.clone();
-        int firstOffset = firstDay.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY;
+        int offset = firstDay.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY;
         int daysInMonth = monthStart.getActualMaximum(Calendar.DAY_OF_MONTH);
-        int slotCount = ((firstOffset + daysInMonth + 6) / 7) * 7;
-        String todayKey = todayKey();
-        for (int rowIndex = 0; rowIndex < slotCount / 7; rowIndex++) {
+        int slots = ((offset + daysInMonth + 6) / 7) * 7;
+        for (int rowIndex = 0; rowIndex < slots / 7; rowIndex++) {
             LinearLayout weekRow = horizontal();
             for (int column = 0; column < 7; column++) {
                 int slot = rowIndex * 7 + column;
-                int dayNumber = slot - firstOffset + 1;
+                int dayNumber = slot - offset + 1;
                 if (dayNumber < 1 || dayNumber > daysInMonth) {
-                    View blank = new View(this);
-                    weekRow.addView(blank, new LinearLayout.LayoutParams(0, dp(43), 1f));
+                    weekRow.addView(new View(this), new LinearLayout.LayoutParams(0, dp(42), 1f));
                     continue;
                 }
-
                 Calendar dayCalendar = (Calendar) monthStart.clone();
                 dayCalendar.set(Calendar.DAY_OF_MONTH, dayNumber);
                 String dayKey = keyForDate(dayCalendar.getTime());
                 JSONObject record = getOfficeDay(dayKey, false);
                 boolean recorded = OfficeAttendanceTime.hasRecordedData(record);
-                boolean isToday = dayKey.equals(todayKey);
-                boolean futureDate = dayKey.compareTo(todayKey) > 0;
-                boolean liveToday = isToday && (hasOpenOfficeSession(record) || hasOpenCommute(record));
+                boolean isToday = dayKey.equals(today);
+                boolean futureDate = dayKey.compareTo(today) > 0;
+                boolean live = isToday && (hasOpenOfficeSession(record) || hasOpenCommute(record));
 
                 LinearLayout cell = vertical();
                 cell.setGravity(Gravity.CENTER);
-                cell.setPadding(dp(1), dp(1), dp(1), dp(1));
-                GradientDrawable cellBackground = bg(recorded ? "#DCEBE2"
-                        : isToday ? "#EAF4EE" : "#FFFFFF", 9);
-                if (isToday) {
-                    // Today's date remains distinct even after it has a saved/live record.
-                    cellBackground.setStroke(dp(2), color("#286B55"));
-                } else if (recorded) {
-                    cellBackground.setStroke(dp(1), color("#B8D5C3"));
-                }
-                cell.setBackground(cellBackground);
-                LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(0, dp(48), 1f);
+                LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(0, dp(42), 1f);
                 cellLp.setMargins(dp(1), dp(1), dp(1), dp(1));
                 weekRow.addView(cell, cellLp);
 
-                TextView dayNumberView = text(String.valueOf(dayNumber), 13,
-                        futureDate ? color("#A8BAAE") : recorded ? color("#18372E")
-                                : isToday ? color("#2E8060") : color("#50635A"),
-                        recorded || isToday);
-                dayNumberView.setGravity(Gravity.CENTER);
-                cell.addView(dayNumberView, new LinearLayout.LayoutParams(-1, dp(25)));
-                String markerLabel = liveToday ? "LIVE" : isToday ? "TODAY" : recorded ? "●" : " ";
-                int markerColor = liveToday ? color("#B44248")
-                        : isToday ? color("#286B55")
-                        : recorded ? color("#23845F") : color("#82948A");
-                TextView marker = text(markerLabel, liveToday || isToday ? 8 : 7, markerColor, true);
+                TextView number = text(String.valueOf(dayNumber), 12,
+                        futureDate ? color("#A8BAAE") : color("#50635A"), false);
+                number.setGravity(Gravity.CENTER);
+                if (isToday) {
+                    GradientDrawable circle = new GradientDrawable();
+                    circle.setShape(GradientDrawable.OVAL);
+                    circle.setColor(color("#286B55"));
+                    number.setTextColor(Color.WHITE);
+                    number.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                    number.setBackground(circle);
+                }
+                LinearLayout numberWrap = horizontal();
+                numberWrap.setGravity(Gravity.CENTER);
+                numberWrap.addView(number, new LinearLayout.LayoutParams(dp(30), dp(30)));
+                cell.addView(numberWrap);
+
+                TextView marker = new TextView(this);
                 marker.setGravity(Gravity.CENTER);
-                marker.setMaxLines(1);
+                marker.setText(recorded ? "•" : " ");
+                marker.setTextSize(11);
                 marker.setIncludeFontPadding(false);
-                cell.addView(marker, new LinearLayout.LayoutParams(-1, dp(12)));
+                marker.setTextColor(color(live ? "#B44248" : "#2E8060"));
+                cell.addView(marker, new LinearLayout.LayoutParams(-1, dp(9)));
                 cell.setContentDescription(new SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault())
                         .format(dayCalendar.getTime())
-                        + (liveToday ? ", today with an active attendance or commute session"
-                            : isToday ? ", today"
-                            : recorded ? ", attendance or commute recorded" : ", no record")
-                        + (futureDate ? "" : ", tap to edit"));
+                        + (live ? ", today's live attendance or commute session"
+                            : isToday ? ", today" : recorded ? ", record saved" : ", no record")
+                        + (futureDate ? "" : ", tap to view or edit"));
                 cell.setEnabled(!futureDate);
-                if (futureDate) cell.setAlpha(0.45f);
+                if (futureDate) cell.setAlpha(0.38f);
                 else cell.setOnClickListener(v -> editAttendanceDay(dayKey));
             }
-            calendarGrid.addView(weekRow);
+            grid.addView(weekRow);
         }
-        history.addView(calendarGrid);
+        calendarSection.addView(grid);
+
         LinearLayout legend = horizontal();
-        TextView recordedLegend = text("●  Record saved", 10, color("#23845F"), true);
-        legend.addView(recordedLegend, new LinearLayout.LayoutParams(0, dp(25), 1f));
-        legend.addView(text("○  Today", 10, color("#687A70"), false),
-                new LinearLayout.LayoutParams(0, dp(25), 1f));
-        LinearLayout.LayoutParams legendLp = new LinearLayout.LayoutParams(-1, dp(25));
-        legendLp.topMargin = dp(3);
-        history.addView(legend, legendLp);
-        officePageContent.addView(history);
+        TextView recordedLegend = text("•  Record saved", 10, color("#2E8060"), false);
+        legend.addView(recordedLegend, new LinearLayout.LayoutParams(0, dp(23), 1f));
+        TextView todayLegend = text("●  Today", 10, color("#286B55"), true);
+        legend.addView(todayLegend, new LinearLayout.LayoutParams(0, dp(23), 1f));
+        calendarSection.addView(legend);
     }
 
     private void changeAttendanceCalendarMonth(int offset) {
