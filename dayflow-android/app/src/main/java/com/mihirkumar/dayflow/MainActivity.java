@@ -1178,10 +1178,45 @@ public class MainActivity extends Activity {
         JSONObject todayLog = getOfficeDay(todayKey(), false);
         boolean inside = hasOpenOfficeSession(todayLog);
         boolean travelling = hasOpenCommute(todayLog);
+        long todayNow = System.currentTimeMillis();
+        long officeSoFar = officeDuration(todayLog, todayNow);
+        long commuteSoFar = commuteDuration(todayLog, todayNow);
+        String todayDateLabel = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault())
+                .format(new Date());
+        String todayDetail;
+        if (inside) {
+            JSONArray sessions = todayLog == null ? null : todayLog.optJSONArray("sessions");
+            JSONObject activeSession = sessions == null || sessions.length() == 0
+                    ? null : sessions.optJSONObject(sessions.length() - 1);
+            long startedAt = activeSession == null ? 0L : activeSession.optLong("in", 0L);
+            todayDetail = startedAt > 0L
+                    ? todayDateLabel + " · Started at " + clock(startedAt)
+                        + " · " + fmtMillis(Math.max(0L, todayNow - startedAt)) + " this session"
+                    : todayDateLabel + " · Office session active";
+        } else if (travelling) {
+            long commuteStart = todayLog == null ? 0L
+                    : todayLog.optLong("commuteInEnd", 0L) == 0L
+                        ? todayLog.optLong("commuteInStart", 0L)
+                        : todayLog.optLong("commuteOutStart", 0L);
+            todayDetail = commuteStart > 0L
+                    ? todayDateLabel + " · Commute started at " + clock(commuteStart)
+                        + " · " + fmtMillis(Math.max(0L, todayNow - commuteStart)) + " elapsed"
+                    : todayDateLabel + " · Commute session active";
+        } else if (OfficeAttendanceTime.hasRecordedData(todayLog)) {
+            todayDetail = todayDateLabel + " · " + fmtMillis(officeSoFar)
+                    + " in office · " + fmtMillis(commuteSoFar) + " commute";
+        } else {
+            todayDetail = todayDateLabel + " · No attendance recorded yet";
+        }
         LinearLayout status = surfaceCard();
         status.addView(text("TODAY'S STATUS", 10, color("#2E8060"), true));
         status.addView(text(inside ? "Clocked in" : travelling ? "Commute in progress" : "Not clocked in",
                 20, color("#18372E"), true));
+        TextView todayDetailView = text(todayDetail, 12, color("#687A70"), false);
+        todayDetailView.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams todayDetailLp = new LinearLayout.LayoutParams(-1, -2);
+        todayDetailLp.topMargin = dp(4);
+        status.addView(todayDetailView, todayDetailLp);
         LinearLayout quickActions = horizontal();
         Button check = primaryButton(inside ? "Check out" : "Check in", () -> {
             toggleOfficeAttendance();
@@ -1276,12 +1311,21 @@ public class MainActivity extends Activity {
                 boolean recorded = OfficeAttendanceTime.hasRecordedData(record);
                 boolean isToday = dayKey.equals(todayKey);
                 boolean futureDate = dayKey.compareTo(todayKey) > 0;
+                boolean liveToday = isToday && (hasOpenOfficeSession(record) || hasOpenCommute(record));
 
                 LinearLayout cell = vertical();
                 cell.setGravity(Gravity.CENTER);
                 cell.setPadding(dp(1), dp(1), dp(1), dp(1));
-                cell.setBackground(bg(recorded ? "#DCEBE2" : "#FFFFFF", 9));
-                LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(0, dp(43), 1f);
+                GradientDrawable cellBackground = bg(recorded ? "#DCEBE2"
+                        : isToday ? "#EAF4EE" : "#FFFFFF", 9);
+                if (isToday) {
+                    // Today's date remains distinct even after it has a saved/live record.
+                    cellBackground.setStroke(dp(2), color("#286B55"));
+                } else if (recorded) {
+                    cellBackground.setStroke(dp(1), color("#B8D5C3"));
+                }
+                cell.setBackground(cellBackground);
+                LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(0, dp(48), 1f);
                 cellLp.setMargins(dp(1), dp(1), dp(1), dp(1));
                 weekRow.addView(cell, cellLp);
 
@@ -1290,13 +1334,21 @@ public class MainActivity extends Activity {
                                 : isToday ? color("#2E8060") : color("#50635A"),
                         recorded || isToday);
                 dayNumberView.setGravity(Gravity.CENTER);
-                cell.addView(dayNumberView, new LinearLayout.LayoutParams(-1, dp(24)));
-                TextView marker = text(recorded ? "●" : isToday ? "○" : " ",
-                        7, color(recorded ? "#23845F" : "#82948A"), true);
+                cell.addView(dayNumberView, new LinearLayout.LayoutParams(-1, dp(25)));
+                String markerLabel = liveToday ? "LIVE" : isToday ? "TODAY" : recorded ? "●" : " ";
+                int markerColor = liveToday ? color("#B44248")
+                        : isToday ? color("#286B55")
+                        : recorded ? color("#23845F") : color("#82948A");
+                TextView marker = text(markerLabel, liveToday || isToday ? 7 : 7, markerColor, true);
                 marker.setGravity(Gravity.CENTER);
-                cell.addView(marker, new LinearLayout.LayoutParams(-1, dp(10)));
+                marker.setMaxLines(1);
+                marker.setIncludeFontPadding(false);
+                cell.addView(marker, new LinearLayout.LayoutParams(-1, dp(12)));
                 cell.setContentDescription(new SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault())
-                        .format(dayCalendar.getTime()) + (recorded ? ", attendance or commute recorded" : ", no record")
+                        .format(dayCalendar.getTime())
+                        + (liveToday ? ", today with an active attendance or commute session"
+                            : isToday ? ", today"
+                            : recorded ? ", attendance or commute recorded" : ", no record")
                         + (futureDate ? "" : ", tap to edit"));
                 cell.setEnabled(!futureDate);
                 if (futureDate) cell.setAlpha(0.45f);
