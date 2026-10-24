@@ -1838,7 +1838,7 @@ public class MainActivity extends Activity {
         LinearLayout monthlyHeader = horizontal();
         monthlyHeader.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout monthlyHeaderText = vertical();
-        monthlyHeaderText.addView(text("THIS MONTH", 12, color("#2E8060"), true));
+        monthlyHeaderText.addView(text("MONTHLY FOCUS", 12, color("#2E8060"), true));
         roadmapFocusCount = text("", 10, color("#687A70"), false);
         roadmapFocusCount.setSingleLine(true);
         roadmapFocusCount.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -3622,6 +3622,8 @@ public class MainActivity extends Activity {
             expandedRoadmapNodeIds.addAll(path);
             persistRoadmapExpansionState();
         }
+        // Timeline/Overview links must reveal the goal in the visible tree, not in a hidden view.
+        setRoadmapDisplayMode("structure");
         refreshRoadmapSummary();
         if (roadmapTreeContainer != null) {
             roadmapTreeContainer.post(() -> {
@@ -3858,7 +3860,7 @@ public class MainActivity extends Activity {
             card.addView(bar, barLp);
 
             RoadmapNode next = nextIncompleteRoadmapAction(rootNode);
-            TextView nextLine = text(next == null ? "All visible actions complete"
+            TextView nextLine = text(next == null ? "No open actions in this track"
                     : "Next up  ·  " + next.title, 11, color("#50635A"), false);
             nextLine.setMaxLines(2);
             nextLine.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -3873,9 +3875,33 @@ public class MainActivity extends Activity {
             footerLp.topMargin = dp(8);
             card.addView(footer, footerLp);
             card.setOnClickListener(v -> {
-                expandedRoadmapNodeIds.add(rootNode.id);
+                // A track shortcut must not land in a filtered/search result that hides the track.
+                roadmapActiveFilter = "All";
+                roadmapSearchText = "";
+                if (roadmapSearchInput != null && roadmapSearchInput.getText() != null
+                        && roadmapSearchInput.getText().length() > 0) {
+                    roadmapSearchInput.setText("");
+                }
+                if (roadmapSearchRow != null && roadmapSearchRow.getVisibility() == View.VISIBLE) {
+                    setRoadmapSearchExpanded(false);
+                }
+                refreshRoadmapFilterStyles();
+                ArrayList<RoadmapNode> currentRoots = buildRoadmapTreeNodes();
+                ArrayList<String> path = new ArrayList<>();
+                if (collectRoadmapPath(currentRoots, rootNode.id, path)) {
+                    expandedRoadmapNodeIds.addAll(path);
+                } else {
+                    expandedRoadmapNodeIds.add(rootNode.id);
+                }
                 persistRoadmapExpansionState();
                 setRoadmapDisplayMode("structure");
+                if (roadmapTreeContainer != null) {
+                    roadmapTreeContainer.post(() -> {
+                        View target = roadmapTreeContainer.findViewWithTag(rootNode.id);
+                        if (target != null) target.requestRectangleOnScreen(
+                                new android.graphics.Rect(0, 0, target.getWidth(), target.getHeight()), true);
+                    });
+                }
             });
             card.setContentDescription(rootNode.title + ", " + progress[0] + " of " + progress[1]
                     + " complete. Next up: " + (next == null ? "none" : next.title)
@@ -3917,8 +3943,11 @@ public class MainActivity extends Activity {
         RoadmapMilestone nextMilestone = null;
         Collections.sort(milestones, Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
         for (RoadmapMilestone milestone : milestones) if (!milestone.done) { nextMilestone = milestone; break; }
+        boolean nextIsOverdue = nextMilestone != null && nextMilestone.date != null
+                && nextMilestone.date.compareTo(todayKey()) < 0;
         String nextText = nextMilestone == null ? "No upcoming deadlines" :
-                "Next milestone  ·  " + nextMilestone.title + "  ·  " + displayRoadmapDate(nextMilestone.date);
+                (nextIsOverdue ? "Overdue milestone  ·  " : "Next milestone  ·  ")
+                        + nextMilestone.title + "  ·  " + displayRoadmapDate(nextMilestone.date);
         TextView nextDetail = text(nextText, 11, color("#687A70"), false);
         nextDetail.setMaxLines(2);
         nextDetail.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -3963,7 +3992,8 @@ public class MainActivity extends Activity {
                     color("#687A70"), false));
             return;
         }
-        TextView window = text("NEXT " + (end - start) + " MONTHS", 9, color("#687A70"), true);
+        TextView window = text((end - start) + "-MONTH WINDOW  ·  FROM " + monthLabelForKey(months.get(start)),
+                9, color("#687A70"), true);
         LinearLayout.LayoutParams windowLp = new LinearLayout.LayoutParams(-1, -2);
         windowLp.bottomMargin = dp(7);
         roadmapTimelineContent.addView(window, windowLp);
