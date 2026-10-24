@@ -19,6 +19,15 @@ public final class DayFlowScreenRules {
         return "office".equals(workArrangement) ? "office" : "wfh";
     }
 
+    /**
+     * A date's routine profile normally follows the calendar. An explicit saved selection
+     * may override it for that date only; this does not change the WFH/WFO arrangement.
+     */
+    public static String resolveRoutineProfile(String savedProfile, boolean calendarWeekend) {
+        if ("weekday".equals(savedProfile) || "weekend".equals(savedProfile)) return savedProfile;
+        return calendarWeekend ? "weekend" : "weekday";
+    }
+
     /** Non-today dates are handled separately so they cannot expose live actions. */
     public static TodayState resolveTodayState(
             int totalBlocks, int completedBlocks, boolean hasCurrentBlock, boolean hasUpcomingBlock) {

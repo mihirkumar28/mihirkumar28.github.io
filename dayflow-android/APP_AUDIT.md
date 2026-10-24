@@ -132,3 +132,14 @@ Source changes on `fix/today-tab-usability`:
 - [x] Use a subtle completion-state treatment for the count pill without changing the underlying goal count or progress logic.
 - [ ] Run Android unit tests and signed APK build.
 - [ ] Verify count/chevron appearance on a physical device.
+
+## Today tab — selectable weekend routine and linear timeline — 2026-10-24
+
+- [x] Add a separate Weekday routine / Weekend routine selector on Today; the selection is persisted per date and is independent of WFH/WFO work arrangement.
+- [x] Require confirmation before replacing a date's schedule with a different routine; use the existing template loader so matching blocks retain completion/focus history and reusable templates remain unchanged.
+- [x] Keep WFH/WFO as its own two-option work-arrangement selector; applying Weekend no longer writes the legacy value "weekend" into the work-arrangement field.
+- [x] Move the schedule timeline ahead of the stats panel so the primary tasks appear earlier in the scroll.
+- [x] Compact the current-task panel and replace repeated schedule cards with a time-first linear row layout, readable dark text, status accents and compact completion actions.
+- [x] Reduce free-time row height and add unit coverage for default and overridden weekday/weekend routine profiles.
+- [ ] Verify Android regression tests and signed APK build.
+- [ ] Verify the Weekend selector and linear list on a physical device, including longer task titles and WFO visibility.
