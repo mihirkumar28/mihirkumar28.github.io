@@ -130,6 +130,8 @@ public class MainActivity extends Activity {
     private String roadmapDisplayMode = "overview";
     private LinearLayout roadmapViewSwitcher, roadmapOverviewContent, roadmapTrackCards,
             roadmapOverviewProgress, roadmapTimelineContent, roadmapStructureContent;
+    private HorizontalScrollView roadmapJourneyMonthScroll;
+    private LinearLayout roadmapJourneyMonthStrip;
     private final Map<String, Button> roadmapViewButtons = new LinkedHashMap<>();
     private boolean roadmapTreeEditMode = false;
     private String selectedGoalMonth;
