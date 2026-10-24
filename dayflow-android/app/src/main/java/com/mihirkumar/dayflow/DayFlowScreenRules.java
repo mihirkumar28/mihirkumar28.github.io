@@ -20,12 +20,17 @@ public final class DayFlowScreenRules {
     }
 
     /**
-     * A date's routine profile normally follows the calendar. An explicit saved selection
-     * may override it for that date only; this does not change the WFH/WFO arrangement.
+     * Resolve exactly one of DayFlow's three routine types: WFH, WFO or Weekend.
+     * An explicit per-date selection wins; otherwise weekends use Weekend and weekdays
+     * inherit that date's saved WFH/WFO arrangement.
      */
-    public static String resolveRoutineProfile(String savedProfile, boolean calendarWeekend) {
-        if ("weekday".equals(savedProfile) || "weekend".equals(savedProfile)) return savedProfile;
-        return calendarWeekend ? "weekend" : "weekday";
+    public static String resolveRoutineProfile(
+            String savedProfile, boolean calendarWeekend, String workArrangement) {
+        if ("wfh".equals(savedProfile) || "office".equals(savedProfile) || "weekend".equals(savedProfile)) {
+            return savedProfile;
+        }
+        if (calendarWeekend) return "weekend";
+        return "office".equals(workArrangement) ? "office" : "wfh";
     }
 
     /** Non-today dates are handled separately so they cannot expose live actions. */

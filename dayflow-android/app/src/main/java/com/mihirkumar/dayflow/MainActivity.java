@@ -6774,50 +6774,26 @@ public class MainActivity extends Activity {
         wrapper.addView(routineHeading, routineHeadingLp);
 
         LinearLayout profileRow = horizontal();
-        LinearLayout.LayoutParams profileRowLp = new LinearLayout.LayoutParams(-1, dp(40));
-        profileRowLp.topMargin = dp(5);
+        LinearLayout.LayoutParams profileRowLp = new LinearLayout.LayoutParams(-1, dp(44));
+        profileRowLp.topMargin = dp(6);
         wrapper.addView(profileRow, profileRowLp);
-        String[][] profiles = {{"Weekday routine", "weekday"}, {"Weekend routine", "weekend"}};
+
+        // These are the only three routine types in DayFlow. Weekend is a complete
+        // routine of its own, not a calendar badge layered on top of WFH/WFO.
+        String[][] profiles = {{"WFH", "wfh"}, {"WFO", "office"}, {"Weekend", "weekend"}};
         for (String[] profile : profiles) {
+            String profileLabel = profile[0];
             String profileKey = profile[1];
-            Button button = secondaryButton(profile[0], () -> chooseRoutineProfile(profileKey));
+            Button button = secondaryButton(profileLabel, () -> chooseRoutineProfile(profileKey));
             button.setTag("routine-profile-chip-" + profileKey);
             button.setTextSize(11);
-            button.setMinHeight(dp(40));
-            button.setPadding(dp(6), 0, dp(6), 0);
-            button.setContentDescription("Use " + profile[0].toLowerCase(Locale.US)
-                    + " for the selected date. This replaces only that date's schedule after confirmation.");
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1f);
-            if (profileRow.getChildCount() > 0) lp.leftMargin = dp(7);
+            button.setMinHeight(dp(44));
+            button.setPadding(dp(3), 0, dp(3), 0);
+            button.setContentDescription("Select the " + profileLabel
+                    + " routine for this date. Applying it replaces only this date's schedule after confirmation.");
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(44), 1f);
+            if (profileRow.getChildCount() > 0) lp.leftMargin = dp(6);
             profileRow.addView(button, lp);
-        }
-
-        LinearLayout arrangementHeading = horizontal();
-        arrangementHeading.setGravity(Gravity.CENTER_VERTICAL);
-        TextView arrangementLabel = text("WORK ARRANGEMENT", 10, color("#687A70"), true);
-        arrangementLabel.setLetterSpacing(0.06f);
-        arrangementHeading.addView(arrangementLabel, new LinearLayout.LayoutParams(0, -2, 1f));
-        arrangementHeading.addView(text("WFH / WFO", 9, color("#87968D"), false));
-        LinearLayout.LayoutParams arrangementHeadingLp = new LinearLayout.LayoutParams(-1, -2);
-        arrangementHeadingLp.topMargin = dp(9);
-        wrapper.addView(arrangementHeading, arrangementHeadingLp);
-
-        LinearLayout arrangementRow = horizontal();
-        LinearLayout.LayoutParams arrangementRowLp = new LinearLayout.LayoutParams(-1, dp(42));
-        arrangementRowLp.topMargin = dp(5);
-        wrapper.addView(arrangementRow, arrangementRowLp);
-        String[][] options = {{"WFH", "wfh"}, {"WFO", "office"}};
-        for (String[] option : options) {
-            String modeKey = option[1];
-            Button button = chip(option[0]);
-            button.setTag("mode-chip-" + modeKey);
-            button.setTextSize(12);
-            button.setMinHeight(dp(42));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
-            if (arrangementRow.getChildCount() > 0) lp.leftMargin = dp(7);
-            arrangementRow.addView(button, lp);
-            button.setContentDescription(option[0] + " work arrangement");
-            button.setOnClickListener(v -> chooseMode(modeKey));
         }
 
         todayRoutineEditButton = secondaryButton("Modify & Save Today's Routine", this::openTodayRoutineEditor);
@@ -7053,27 +7029,19 @@ public class MainActivity extends Activity {
             ((TextView) scheduleHeading).setText(heading);
         }
 
-        String modeLabel = "office".equals(mode) ? "WFO" : "WFH";
+        String routineProfile = routineProfileForDate(selectedDateKey);
+        String modeLabel = "office".equals(routineProfile) ? "WFO"
+                : "weekend".equals(routineProfile) ? "Weekend" : "WFH";
         if (modeView != null) {
             modeView.setText(isWeekendDate(selectedDateKey) ? "WEEKEND" : "WEEKDAY");
         }
-        String routineProfile = routineProfileForDate(selectedDateKey);
-        for (String key : new String[]{"weekday", "weekend"}) {
+        for (String key : new String[]{"wfh", "office", "weekend"}) {
             View profileChoice = root.findViewWithTag("routine-profile-chip-" + key);
             if (profileChoice instanceof Button) {
                 boolean selectedProfile = key.equals(routineProfile);
                 ((Button) profileChoice).setTextColor(color(selectedProfile ? "#FFFFFF" : "#496257"));
                 profileChoice.setBackground(bg(selectedProfile ? "#286B55" : "#FFFFFF", 11));
                 profileChoice.setElevation(selectedProfile ? dp(1) : 0f);
-            }
-        }
-        for (String key : new String[]{"wfh", "office"}) {
-            View modeChoice = root.findViewWithTag("mode-chip-" + key);
-            if (modeChoice instanceof Button) {
-                boolean selectedMode = ("wfh".equals(key) && "wfh".equals(mode))
-                        || ("office".equals(key) && "office".equals(mode));
-                ((Button) modeChoice).setTextColor(selectedMode ? Color.WHITE : color("#496257"));
-                modeChoice.setBackground(bg(selectedMode ? "#286B55" : "#FFFFFF", 12));
             }
         }
         View headerMode = root.findViewWithTag("modeHeader");
@@ -8392,32 +8360,41 @@ public class MainActivity extends Activity {
     }
 
     private String routineProfileForDate(String dateKey) {
-        String saved = getPrefs().getString(routineProfileKey(dateKey), null);
-        return DayFlowScreenRules.resolveRoutineProfile(saved, isWeekendDate(dateKey));
+        SharedPreferences prefs = getPrefs();
+        String saved = prefs.getString(routineProfileKey(dateKey), null);
+        String savedArrangement = prefs.getString(modeKey(dateKey),
+                dateKey.equals(selectedDateKey) ? mode : prefs.getString(MODE_KEY, "wfh"));
+        return DayFlowScreenRules.resolveRoutineProfile(saved, isWeekendDate(dateKey), savedArrangement);
     }
 
     private void chooseRoutineProfile(String profile) {
-        if (!"weekday".equals(profile) && !"weekend".equals(profile)) return;
+        if (!"wfh".equals(profile) && !"office".equals(profile) && !"weekend".equals(profile)) return;
         String currentProfile = routineProfileForDate(selectedDateKey);
-        final String templateKey = "weekend".equals(profile)
-                ? "weekend" : ("office".equals(mode) ? "office" : "wfh");
-        // Re-tapping the selected profile is useful when the date's hand-edited schedule
-        // has drifted from its reusable routine. Avoid prompting when it already matches.
+        final String templateKey = profile;
+        // Re-tapping the active routine reapplies it only if this date's edited schedule
+        // has diverged. The date-only editor never writes to reusable template storage.
         if (profile.equals(currentProfile) && scheduleMatchesTemplate(templateKey)) return;
 
-        final String routineLabel = "weekend".equals(profile)
-                ? "Weekend" : ("office".equals(templateKey) ? "Weekday (WFO)" : "Weekday (WFH)");
-        final String dateLabel = selectedDateKey.equals(todayKey())
-                ? "today" : selectedDateKey;
+        final String routineLabel = "office".equals(profile) ? "WFO"
+                : "weekend".equals(profile) ? "Weekend" : "WFH";
+        final String dateLabel = selectedDateKey.equals(todayKey()) ? "today" : selectedDateKey;
         new AlertDialog.Builder(this)
                 .setTitle("Use " + routineLabel + " routine?")
                 .setMessage("This replaces the saved timeline for " + dateLabel
-                        + " with the shared routine plus the selected routine's blocks. "
+                        + " with the shared routine plus the " + routineLabel + "-specific blocks. "
                         + "Matching blocks keep their completion and focus history. "
-                        + "Only this date changes; reusable templates are not modified. "
-                        + "Your WFH/WFO setting remains separate from the routine type.")
+                        + "Only this date changes; reusable templates and other dates are not modified.")
                 .setPositiveButton("Apply routine", (dialog, which) -> {
-                    getPrefs().edit().putString(routineProfileKey(selectedDateKey), profile).apply();
+                    SharedPreferences.Editor selection = getPrefs().edit()
+                            .putString(routineProfileKey(selectedDateKey), profile);
+                    // Internal work-arrangement storage only accepts WFH/WFO. Weekend is
+                    // a distinct routine and must never be saved as a work-arrangement value.
+                    if ("wfh".equals(profile) || "office".equals(profile)) {
+                        mode = profile;
+                        selection.putString(modeKey(selectedDateKey), mode);
+                        if (selectedDateKey.equals(todayKey())) selection.putString(MODE_KEY, mode);
+                    }
+                    selection.apply();
                     planPreviewMode = templateKey;
                     loadTemplate(templateKey);
                     setPlanDayScheduleExpanded(true);
@@ -8433,12 +8410,12 @@ public class MainActivity extends Activity {
 
     private void chooseMode(String key) {
         if (!"wfh".equals(key) && !"office".equals(key)) return;
-        if (key.equals(mode)) return;
         // WFH/WFO changes only the work-arrangement setting for this date. It never
         // replaces date-specific blocks and never changes a reusable routine template.
         mode = key;
         SharedPreferences.Editor selection = getPrefs().edit()
-                .putString(modeKey(selectedDateKey), mode);
+                .putString(modeKey(selectedDateKey), mode)
+                .putString(routineProfileKey(selectedDateKey), key);
         if (selectedDateKey.equals(todayKey())) selection.putString(MODE_KEY, mode);
         selection.apply();
         render();
@@ -10323,18 +10300,18 @@ public class MainActivity extends Activity {
         }
         blocks.clear();
         blocks.addAll(replacement);
-        if ("weekend".equals(key)) {
-            getPrefs().edit().putString(routineProfileKey(selectedDateKey), "weekend").apply();
-        } else if ("wfh".equals(key) || "office".equals(key)) {
-            getPrefs().edit().putString(routineProfileKey(selectedDateKey), "weekday").apply();
+        if ("weekend".equals(key) || "wfh".equals(key) || "office".equals(key)) {
+            getPrefs().edit().putString(routineProfileKey(selectedDateKey), key).apply();
         }
         save();
     }
 
     private void renderOfficeCard() {
         if (officeCard == null) return;
-        officeCard.setVisibility("office".equals(mode) ? View.VISIBLE : View.GONE);
-        if (!"office".equals(mode)) return;
+        boolean weekendRoutine = "weekend".equals(routineProfileForDate(selectedDateKey));
+        boolean showOfficeActions = !weekendRoutine && "office".equals(mode);
+        officeCard.setVisibility(showOfficeActions ? View.VISIBLE : View.GONE);
+        if (!showOfficeActions) return;
 
         try {
             JSONObject day = getOfficeDay(selectedDateKey, false);
@@ -10919,7 +10896,7 @@ public class MainActivity extends Activity {
 
     
     private void loadTemplateSilent() {
-        String routineKey = DayFlowScreenRules.defaultTemplateKey(isWeekendDate(selectedDateKey), mode);
+        String routineKey = routineProfileForDate(selectedDateKey);
         for (Block source : getCombinedTemplateBlocks(routineKey)) {
             Block dailyCopy = new Block(System.currentTimeMillis() + blocks.size(),
                     source.start, source.end, source.title, source.priority, source.rigidity, "pending");
