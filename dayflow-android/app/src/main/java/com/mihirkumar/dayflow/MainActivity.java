@@ -133,6 +133,14 @@ public class MainActivity extends Activity {
     private HorizontalScrollView roadmapJourneyMonthScroll;
     private LinearLayout roadmapJourneyMonthStrip;
     private View roadmapFlowCurrentMonthView;
+    private HorizontalScrollView roadmapFlowMonthScroll, roadmapFlowFilterScroll;
+    private LinearLayout roadmapFlowMonthStrip, roadmapFlowFilterStrip;
+    private final Map<String, View> roadmapFlowMonthViews = new LinkedHashMap<>();
+    private final Set<String> expandedRoadmapFlowMonths = new HashSet<>();
+    private final Set<Long> expandedRoadmapFlowGoalIds = new HashSet<>();
+    private boolean roadmapFlowExpansionInitialized = false;
+    private boolean roadmapFlowIncompleteOnly = false;
+    private String roadmapFlowTrackFilter = "All";
     private final Map<String, Button> roadmapViewButtons = new LinkedHashMap<>();
     private boolean roadmapTreeEditMode = false;
     private String selectedGoalMonth;
@@ -3962,9 +3970,11 @@ public class MainActivity extends Activity {
      * and Tree (parent/child relationships), Flow lays out every planned month, all active
      * monthly goals and dated milestones in one continuous vertical sequence.
      */
+
     private void renderRoadmapFlow() {
         if (roadmapFlowContent == null) return;
         roadmapFlowContent.removeAllViews();
+        roadmapFlowMonthViews.clear();
 
         ArrayList<MonthlyGoal> allGoals = readMonthlyGoals();
         allGoals.sort(monthlyGoalOrderComparator(allGoals));
@@ -3988,22 +3998,27 @@ public class MainActivity extends Activity {
         }
         Collections.sort(months);
 
-        int total = 0, completed = 0;
-        for (MonthlyGoal goal : allGoals) {
-            if (MonthlyGoalLifecycle.showInMonthlyPanel(goal.lifecycleStatus)) {
-                total++;
-                if (goal.done) completed++;
-            }
-        }
-        for (RoadmapMilestone milestone : allMilestones) {
-            total++;
-            if (milestone.done) completed++;
-        }
-
         final String currentMonth = currentMonthKey();
+        if (!roadmapFlowExpansionInitialized) {
+            expandedRoadmapFlowMonths.clear();
+            expandedRoadmapFlowMonths.add(months.contains(currentMonth)
+                    ? currentMonth : (months.isEmpty() ? currentMonth : months.get(0)));
+            roadmapFlowExpansionInitialized = true;
+        }
         final String selectedMonth = selectedGoalMonth == null ? currentMonth : selectedGoalMonth;
 
-        // Flow sits below the Roadmap page title; keep its own summary short and useful.
+        int goalsTotal = 0, goalsDone = 0, milestonesTotal = allMilestones.size(), milestonesDone = 0;
+        for (MonthlyGoal goal : allGoals) {
+            if (MonthlyGoalLifecycle.showInMonthlyPanel(goal.lifecycleStatus)) {
+                goalsTotal++;
+                if (goal.done) goalsDone++;
+            }
+        }
+        for (RoadmapMilestone milestone : allMilestones) if (milestone.done) milestonesDone++;
+        final int total = goalsTotal + milestonesTotal;
+        final int completed = goalsDone + milestonesDone;
+
+        // Compact overview with separate goal and milestone counts.
         LinearLayout summary = vertical();
         summary.setPadding(dp(12), dp(10), dp(12), dp(10));
         GradientDrawable summaryBg = bg("#FFFFFF", 14);
@@ -4024,9 +4039,12 @@ public class MainActivity extends Activity {
         summaryHeader.addView(rangeLabels, new LinearLayout.LayoutParams(0, -2, 1f));
 
         Button jumpNow = secondaryButton("Jump to now", () -> {
-            View target = roadmapFlowCurrentMonthView;
-            if (target != null) target.post(() -> target.requestRectangleOnScreen(
-                    new android.graphics.Rect(0, 0, target.getWidth(), target.getHeight()), true));
+            selectedGoalMonth = currentMonth;
+            expandedRoadmapFlowMonths.add(currentMonth);
+            renderRoadmapFocus();
+            renderRoadmapJourneyMonthStrip();
+            renderRoadmapFlow();
+            scrollRoadmapFlowToMonth(currentMonth);
         });
         jumpNow.setTextSize(10);
         jumpNow.setPadding(dp(7), 0, dp(7), 0);
@@ -4037,15 +4055,34 @@ public class MainActivity extends Activity {
         summaryHeader.addView(jumpNow, jumpLp);
         summary.addView(summaryHeader);
 
+        LinearLayout countRow = horizontal();
+        countRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout goalCount = vertical();
+        goalCount.addView(text("GOALS", 9, color("#28765C"), true));
+        goalCount.addView(text(goalsDone + " / " + goalsTotal + " complete", 11,
+                color("#18372E"), true));
+        countRow.addView(goalCount, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        LinearLayout milestoneCount = vertical();
+        milestoneCount.setGravity(Gravity.RIGHT);
+        milestoneCount.addView(text("MILESTONES", 9, color("#A76821"), true));
+        milestoneCount.addView(text(milestonesDone + " / " + milestonesTotal + " complete", 11,
+                color("#18372E"), true));
+        countRow.addView(milestoneCount, new LinearLayout.LayoutParams(0, -2, 1f));
+        LinearLayout.LayoutParams countRowLp = new LinearLayout.LayoutParams(-1, -2);
+        countRowLp.topMargin = dp(9);
+        summary.addView(countRow, countRowLp);
+
         LinearLayout progressMeta = horizontal();
         progressMeta.setGravity(Gravity.CENTER_VERTICAL);
-        TextView progressLabel = text("PLAN PROGRESS", 9, color("#28765C"), true);
+        TextView progressLabel = text("OVERALL PLAN", 9, color("#687A70"), true);
         progressLabel.setLetterSpacing(0.04f);
         progressMeta.addView(progressLabel, new LinearLayout.LayoutParams(0, -2, 1f));
-        progressMeta.addView(text(completed + " of " + total + " complete", 11,
+        int percent = total == 0 ? 0 : Math.round(completed * 100f / total);
+        progressMeta.addView(text(percent + "% · " + completed + " of " + total, 10,
                 color("#18372E"), true));
         LinearLayout.LayoutParams progressMetaLp = new LinearLayout.LayoutParams(-1, -2);
-        progressMetaLp.topMargin = dp(9);
+        progressMetaLp.topMargin = dp(8);
         summary.addView(progressMeta, progressMetaLp);
 
         ProgressBar overall = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -4054,36 +4091,209 @@ public class MainActivity extends Activity {
         overall.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#328264")));
         overall.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(color("#E1EAE4")));
         LinearLayout.LayoutParams overallLp = new LinearLayout.LayoutParams(-1, dp(4));
-        overallLp.topMargin = dp(6);
+        overallLp.topMargin = dp(5);
         summary.addView(overall, overallLp);
         LinearLayout.LayoutParams summaryLp = new LinearLayout.LayoutParams(-1, -2);
-        summaryLp.bottomMargin = dp(12);
+        summaryLp.bottomMargin = dp(10);
         roadmapFlowContent.addView(summary, summaryLp);
 
-        roadmapFlowCurrentMonthView = null;
         if (months.isEmpty()) {
-            TextView empty = text("No plan months yet. Add goals in Tree to start the flow.",
-                    13, color("#687A70"), false);
-            empty.setPadding(dp(4), dp(8), dp(4), dp(8));
-            roadmapFlowContent.addView(empty);
+            roadmapFlowContent.addView(text("No plan months yet. Add goals in Tree to start the flow.",
+                    13, color("#687A70"), false));
+            roadmapFlowCurrentMonthView = null;
             return;
         }
 
+        // Month jump strip. It stays compact; tapping a month selects, expands and scrolls to it.
+        LinearLayout jumpHeader = horizontal();
+        jumpHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView jumpLabel = text("JUMP TO MONTH", 9, color("#28765C"), true);
+        jumpLabel.setLetterSpacing(0.06f);
+        jumpHeader.addView(jumpLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        jumpHeader.addView(text("TAP TO OPEN", 9, color("#77877E"), true));
+        roadmapFlowContent.addView(jumpHeader);
+
+        roadmapFlowMonthScroll = new HorizontalScrollView(this);
+        roadmapFlowMonthScroll.setHorizontalScrollBarEnabled(false);
+        roadmapFlowMonthScroll.setClipToPadding(false);
+        roadmapFlowMonthScroll.setPadding(0, dp(5), 0, dp(2));
+        roadmapFlowMonthStrip = horizontal();
+        roadmapFlowMonthStrip.setGravity(Gravity.CENTER_VERTICAL);
+        roadmapFlowMonthScroll.addView(roadmapFlowMonthStrip,
+                new android.view.ViewGroup.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams monthScrollLp = new LinearLayout.LayoutParams(-1, dp(45));
+        monthScrollLp.bottomMargin = dp(10);
+        roadmapFlowContent.addView(roadmapFlowMonthScroll, monthScrollLp);
+
+        View selectedMonthChip = null;
+        for (String month : months) {
+            boolean isSelected = month.equals(selectedMonth);
+            boolean isCurrent = month.equals(currentMonth);
+            String fullLabel = monthLabelForKey(month);
+            int labelSpace = fullLabel.indexOf(' ');
+            String shortMonth = labelSpace > 0
+                    ? fullLabel.substring(0, Math.min(3, labelSpace)) : month.substring(5, 7);
+            TextView chip = text(shortMonth.toUpperCase(Locale.US) + " '" + month.substring(2, 4),
+                    10, color("#18372E"), isSelected || isCurrent);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(dp(10), 0, dp(10), 0);
+            GradientDrawable chipBg = bg(isSelected ? "#DCEBE2" : "#FFFFFF", 10);
+            chipBg.setStroke(dp(isSelected ? 2 : 1), color(isSelected ? "#28765C"
+                    : isCurrent ? "#80A994" : "#DDE5DF"));
+            chip.setBackground(chipBg);
+            chip.setContentDescription("Jump to " + fullLabel);
+            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(-2, dp(34));
+            chipLp.rightMargin = dp(5);
+            roadmapFlowMonthStrip.addView(chip, chipLp);
+            chip.setOnClickListener(v -> {
+                selectedGoalMonth = month;
+                expandedRoadmapFlowMonths.add(month);
+                renderRoadmapFocus();
+                renderRoadmapJourneyMonthStrip();
+                renderRoadmapFlow();
+                scrollRoadmapFlowToMonth(month);
+            });
+            if (isSelected) selectedMonthChip = chip;
+        }
+        if (selectedMonthChip != null) {
+            final View chipToCenter = selectedMonthChip;
+            roadmapFlowMonthScroll.post(() -> roadmapFlowMonthScroll.smoothScrollTo(
+                    Math.max(0, chipToCenter.getLeft()
+                            - Math.max(0, (roadmapFlowMonthScroll.getWidth() - chipToCenter.getWidth()) / 2)), 0));
+        }
+
+        // Filters are deliberately independent: a workstream can be combined with Open only.
+        TextView filterLabel = text("SHOW", 9, color("#28765C"), true);
+        filterLabel.setLetterSpacing(0.06f);
+        roadmapFlowContent.addView(filterLabel);
+        roadmapFlowFilterScroll = new HorizontalScrollView(this);
+        roadmapFlowFilterScroll.setHorizontalScrollBarEnabled(false);
+        roadmapFlowFilterScroll.setClipToPadding(false);
+        roadmapFlowFilterScroll.setPadding(0, dp(4), 0, dp(2));
+        roadmapFlowFilterStrip = horizontal();
+        roadmapFlowFilterStrip.setGravity(Gravity.CENTER_VERTICAL);
+        roadmapFlowFilterScroll.addView(roadmapFlowFilterStrip,
+                new android.view.ViewGroup.LayoutParams(-2, -2));
+        roadmapFlowContent.addView(roadmapFlowFilterScroll,
+                new LinearLayout.LayoutParams(-1, dp(38)));
+
+        String[][] filterChoices = {
+                {"All", "All"}, {"General Studies", "General Studies"},
+                {"Maths Optional", "Maths Optional"}, {"Interview Prep", "Software Interview Prep"},
+                {"Other", "Other"}, {"Milestones", "Milestones"}
+        };
+        for (String[] choice : filterChoices) {
+            final String value = choice[1];
+            boolean active = roadmapFlowTrackFilter.equals(value);
+            TextView chip = text(choice[0], 10, color(active ? "#245D48" : "#586A60"), active);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(dp(11), 0, dp(11), 0);
+            GradientDrawable filterBg = bg(active ? "#DCEBE2" : "#FFFFFF", 18);
+            filterBg.setStroke(dp(1), color(active ? "#80A994" : "#DDE5DF"));
+            chip.setBackground(filterBg);
+            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(-2, dp(30));
+            chipLp.rightMargin = dp(5);
+            roadmapFlowFilterStrip.addView(chip, chipLp);
+            chip.setOnClickListener(v -> {
+                roadmapFlowTrackFilter = value;
+                renderRoadmapFlow();
+                scrollRoadmapFlowToMonth(selectedGoalMonth == null ? currentMonth : selectedGoalMonth);
+            });
+        }
+
+        LinearLayout actionRow = horizontal();
+        actionRow.setGravity(Gravity.CENTER_VERTICAL);
+        Button openOnly = secondaryButton(roadmapFlowIncompleteOnly ? "✓ Open only" : "○ Open only", () -> {
+            roadmapFlowIncompleteOnly = !roadmapFlowIncompleteOnly;
+            renderRoadmapFlow();
+            scrollRoadmapFlowToMonth(selectedGoalMonth == null ? currentMonth : selectedGoalMonth);
+        });
+        openOnly.setTextSize(10);
+        openOnly.setMinHeight(dp(32));
+        openOnly.setTextColor(color(roadmapFlowIncompleteOnly ? "#245D48" : "#586A60"));
+        openOnly.setBackground(bg(roadmapFlowIncompleteOnly ? "#DCEBE2" : "#FFFFFF", 10));
+        LinearLayout.LayoutParams openOnlyLp = new LinearLayout.LayoutParams(0, dp(34), 1f);
+        openOnlyLp.rightMargin = dp(5);
+        actionRow.addView(openOnly, openOnlyLp);
+
+        Button expandAll = secondaryButton("Expand all", () -> {
+            expandedRoadmapFlowMonths.addAll(months);
+            renderRoadmapFlow();
+            scrollRoadmapFlowToMonth(selectedGoalMonth == null ? currentMonth : selectedGoalMonth);
+        });
+        expandAll.setTextSize(9);
+        expandAll.setMinHeight(dp(32));
+        actionRow.addView(expandAll, new LinearLayout.LayoutParams(-2, dp(34)));
+
+        Button collapseAll = secondaryButton("Collapse all", () -> {
+            expandedRoadmapFlowMonths.clear();
+            renderRoadmapFlow();
+            scrollRoadmapFlowToMonth(selectedGoalMonth == null ? currentMonth : selectedGoalMonth);
+        });
+        collapseAll.setTextSize(9);
+        collapseAll.setMinHeight(dp(32));
+        LinearLayout.LayoutParams collapseLp = new LinearLayout.LayoutParams(-2, dp(34));
+        collapseLp.leftMargin = dp(5);
+        actionRow.addView(collapseAll, collapseLp);
+
+        LinearLayout.LayoutParams actionRowLp = new LinearLayout.LayoutParams(-1, dp(38));
+        actionRowLp.bottomMargin = dp(8);
+        roadmapFlowContent.addView(actionRow, actionRowLp);
+
+        roadmapFlowCurrentMonthView = null;
+        String lastQuarter = "";
         for (int monthIndex = 0; monthIndex < months.size(); monthIndex++) {
             final String month = months.get(monthIndex);
+            int monthNumber = 1;
+            try { monthNumber = Integer.parseInt(month.substring(5, 7)); } catch (Exception ignored) {}
+            String year = month.length() >= 4 ? month.substring(0, 4) : "";
+            String quarterKey = year + "-Q" + (((monthNumber - 1) / 3) + 1);
+            if (!quarterKey.equals(lastQuarter)) {
+                lastQuarter = quarterKey;
+                LinearLayout quarterHeader = horizontal();
+                quarterHeader.setGravity(Gravity.CENTER_VERTICAL);
+                TextView quarterLabel = text("Q" + (((monthNumber - 1) / 3) + 1) + " · " + year,
+                        10, color("#687A70"), true);
+                quarterLabel.setLetterSpacing(0.05f);
+                quarterHeader.addView(quarterLabel, new LinearLayout.LayoutParams(-2, -2));
+                View line = new View(this);
+                line.setBackgroundColor(color("#E0E8E2"));
+                LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(0, dp(1), 1f);
+                lineLp.leftMargin = dp(9);
+                quarterHeader.addView(line, lineLp);
+                LinearLayout.LayoutParams quarterLp = new LinearLayout.LayoutParams(-1, -2);
+                quarterLp.topMargin = dp(5);
+                quarterLp.bottomMargin = dp(4);
+                roadmapFlowContent.addView(quarterHeader, quarterLp);
+            }
+
             ArrayList<MonthlyGoal> monthGoals = new ArrayList<>();
+            ArrayList<MonthlyGoal> visibleGoals = new ArrayList<>();
             for (MonthlyGoal goal : allGoals) {
                 if (month.equals(goal.month)
-                        && MonthlyGoalLifecycle.showInMonthlyPanel(goal.lifecycleStatus)) monthGoals.add(goal);
+                        && MonthlyGoalLifecycle.showInMonthlyPanel(goal.lifecycleStatus)) {
+                    monthGoals.add(goal);
+                    boolean matchesTrack = "All".equals(roadmapFlowTrackFilter)
+                            || (goal.track != null && goal.track.equals(roadmapFlowTrackFilter));
+                    if (!"Milestones".equals(roadmapFlowTrackFilter) && matchesTrack
+                            && (!roadmapFlowIncompleteOnly || !goal.done)) visibleGoals.add(goal);
+                }
             }
             monthGoals.sort(monthlyGoalOrderComparator(allGoals));
+            visibleGoals.sort(monthlyGoalOrderComparator(allGoals));
 
             ArrayList<RoadmapMilestone> monthMilestones = new ArrayList<>();
+            ArrayList<RoadmapMilestone> visibleMilestones = new ArrayList<>();
             for (RoadmapMilestone milestone : allMilestones) {
                 if (milestone.date != null && milestone.date.length() >= 7
-                        && month.equals(monthKeyFromDate(milestone.date))) monthMilestones.add(milestone);
+                        && month.equals(monthKeyFromDate(milestone.date))) {
+                    monthMilestones.add(milestone);
+                    if (("All".equals(roadmapFlowTrackFilter) || "Milestones".equals(roadmapFlowTrackFilter))
+                            && (!roadmapFlowIncompleteOnly || !milestone.done)) visibleMilestones.add(milestone);
+                }
             }
             monthMilestones.sort(Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
+            visibleMilestones.sort(Comparator.comparing(m -> m.date == null ? "9999-12-31" : m.date));
 
             int monthTotal = monthGoals.size() + monthMilestones.size();
             int monthDone = 0;
@@ -4093,11 +4303,10 @@ public class MainActivity extends Activity {
             boolean isCurrent = month.equals(currentMonth);
             boolean isPast = month.compareTo(currentMonth) < 0;
             boolean isSelected = month.equals(selectedMonth);
+            boolean expanded = expandedRoadmapFlowMonths.contains(month);
 
             LinearLayout monthSection = horizontal();
             monthSection.setGravity(Gravity.TOP);
-
-            // The slim spine anchors each month; its dot sits on top of the line.
             android.widget.FrameLayout rail = new android.widget.FrameLayout(this);
             LinearLayout.LayoutParams railLp = new LinearLayout.LayoutParams(dp(18), -1);
             monthSection.addView(rail, railLp);
@@ -4132,14 +4341,15 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams monthSectionLp = new LinearLayout.LayoutParams(-1, -2);
             monthSectionLp.bottomMargin = dp(1);
             roadmapFlowContent.addView(monthSection, monthSectionLp);
+            roadmapFlowMonthViews.put(month, monthSection);
+            if (isCurrent) roadmapFlowCurrentMonthView = monthSection;
 
             LinearLayout monthHeader = horizontal();
             monthHeader.setGravity(Gravity.CENTER_VERTICAL);
             monthHeader.setPadding(0, 0, 0, dp(3));
             LinearLayout monthTitles = vertical();
             monthHeader.addView(monthTitles, new LinearLayout.LayoutParams(0, -2, 1f));
-            TextView monthTitle = text(monthLabelForKey(month), 14, color("#18372E"), true);
-            monthTitles.addView(monthTitle);
+            monthTitles.addView(text(monthLabelForKey(month), 14, color("#18372E"), true));
             TextView status = text(isCurrent ? "CURRENT MONTH" : isPast ? "PAST" : "UPCOMING",
                     9, color(isCurrent ? "#28765C" : "#77877E"), true);
             status.setLetterSpacing(0.04f);
@@ -4148,16 +4358,20 @@ public class MainActivity extends Activity {
             monthTitles.addView(status, statusLp);
             monthHeader.addView(text(monthDone + " / " + monthTotal, 10,
                     color(monthDone == monthTotal && monthTotal > 0 ? "#28765C" : "#687A70"), true));
+            monthHeader.addView(text(expanded ? "⌄" : "›", 18, color("#779688"), true),
+                    new LinearLayout.LayoutParams(dp(20), dp(26)));
             monthHeader.setContentDescription(monthLabelForKey(month) + ", " + monthDone
-                    + " of " + monthTotal + " plan items complete. Tap to select this month.");
+                    + " of " + monthTotal + " plan items complete. "
+                    + (expanded ? "Tap to collapse month." : "Tap to expand month."));
             monthHeader.setOnClickListener(v -> {
                 selectedGoalMonth = month;
+                if (expandedRoadmapFlowMonths.contains(month)) expandedRoadmapFlowMonths.remove(month);
+                else expandedRoadmapFlowMonths.add(month);
                 renderRoadmapFocus();
                 renderRoadmapJourneyMonthStrip();
                 renderRoadmapFlow();
             });
             monthBody.addView(monthHeader);
-            if (isCurrent) roadmapFlowCurrentMonthView = monthHeader;
 
             ProgressBar monthProgress = new ProgressBar(this, null,
                     android.R.attr.progressBarStyleHorizontal);
@@ -4169,13 +4383,21 @@ public class MainActivity extends Activity {
             monthProgressLp.bottomMargin = dp(5);
             monthBody.addView(monthProgress, monthProgressLp);
 
+            LinearLayout items = vertical();
+            items.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            monthBody.addView(items);
+
             if (monthTotal == 0) {
-                TextView empty = text("No goals scheduled", 10, color("#84948A"), false);
-                empty.setPadding(dp(1), dp(2), dp(1), dp(3));
-                monthBody.addView(empty);
+                items.addView(text("No goals scheduled", 10, color("#84948A"), false));
+            } else if (visibleGoals.isEmpty() && visibleMilestones.isEmpty()) {
+                TextView noMatch = text("No items match these filters", 10, color("#84948A"), false);
+                noMatch.setPadding(0, dp(4), 0, dp(4));
+                items.addView(noMatch);
             } else {
+                int visibleItemTotal = visibleGoals.size() + visibleMilestones.size();
                 int itemIndex = 0;
-                for (MonthlyGoal goal : monthGoals) {
+                for (MonthlyGoal goal : visibleGoals) {
+                    LinearLayout block = vertical();
                     LinearLayout row = horizontal();
                     row.setGravity(Gravity.CENTER_VERTICAL);
                     row.setPadding(dp(goal.parentGoalId > 0L ? 10 : 0), dp(6), 0, dp(6));
@@ -4203,53 +4425,88 @@ public class MainActivity extends Activity {
                     int trackColor = color("Software Interview Prep".equals(goal.track) ? "#A76821"
                             : "Other".equals(goal.track) ? "#687A70" : "#347B60");
                     details.addView(text(goal.track.toUpperCase(Locale.US), 8, trackColor, true));
-
-                    TextView title = text(goal.title, 12,
-                            color(goal.done ? "#718178" : "#203B31"), true);
+                    TextView title = text(goal.title, 12, color(goal.done ? "#718178" : "#203B31"), true);
                     title.setMaxLines(2);
                     title.setEllipsize(android.text.TextUtils.TruncateAt.END);
                     if (goal.done) title.setPaintFlags(title.getPaintFlags()
                             | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
-                    LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-                    titleLp.topMargin = dp(1);
-                    details.addView(title, titleLp);
-
-                    if (goal.parentGoalId > 0L) {
-                        TextView parent = text("SUBGOAL · " + monthlyGoalParentTitle(allGoals, goal),
-                                9, color("#77877E"), false);
-                        LinearLayout.LayoutParams parentLp = new LinearLayout.LayoutParams(-1, -2);
-                        parentLp.topMargin = dp(2);
-                        details.addView(parent, parentLp);
-                    }
-                    if (goal.originalMonth != null && !goal.originalMonth.equals(goal.month)) {
-                        TextView moved = text("Moved from " + monthLabelForKey(goal.originalMonth),
-                                9, color("#77877E"), false);
-                        LinearLayout.LayoutParams movedLp = new LinearLayout.LayoutParams(-1, -2);
-                        movedLp.topMargin = dp(2);
-                        details.addView(moved, movedLp);
-                    }
-
-                    TextView open = text("›", 20, color("#779688"), true);
+                    details.addView(title);
+                    TextView open = text(expandedRoadmapFlowGoalIds.contains(goal.id) ? "⌄" : "›",
+                            20, color("#779688"), true);
                     open.setGravity(Gravity.CENTER);
                     row.addView(open, new LinearLayout.LayoutParams(dp(20), dp(32)));
+
                     row.setContentDescription(goal.track + ": " + goal.title
                             + (goal.done ? ". Complete." : ". Open.")
-                            + ". Tap to open this goal in the roadmap tree.");
-                    row.setOnClickListener(v -> openMonthlyGoalInRoadmap(goal));
+                            + (expandedRoadmapFlowGoalIds.contains(goal.id)
+                                ? ". Tap to hide details." : ". Tap to show details."));
+                    row.setOnClickListener(v -> {
+                        selectedGoalMonth = goal.month;
+                        if (expandedRoadmapFlowGoalIds.contains(goal.id)) expandedRoadmapFlowGoalIds.remove(goal.id);
+                        else expandedRoadmapFlowGoalIds.add(goal.id);
+                        expandedRoadmapFlowMonths.add(goal.month);
+                        renderRoadmapFlow();
+                        scrollRoadmapFlowToMonth(goal.month);
+                    });
                     mark.setOnClickListener(v -> toggleMonthlyGoal(goal));
-                    monthBody.addView(row, new LinearLayout.LayoutParams(-1, -2));
+                    block.addView(row);
 
+                    if (expandedRoadmapFlowGoalIds.contains(goal.id)) {
+                        LinearLayout detailPanel = vertical();
+                        detailPanel.setPadding(dp(40), dp(2), dp(4), dp(8));
+                        TextView target = text(goal.target == null || goal.target.trim().isEmpty()
+                                ? "No additional goal instructions." : goal.target,
+                                11, color("#586A60"), false);
+                        target.setLineSpacing(dp(2), 1f);
+                        detailPanel.addView(target);
+
+                        appendRoadmapFlowDetail(detailPanel, "SOURCE", goal.source);
+                        appendRoadmapFlowDetail(detailPanel, "PAGES", goal.pages);
+                        appendRoadmapFlowDetail(detailPanel, "ESTIMATED TIME", goal.estimatedTime);
+                        if (goal.parentGoalId > 0L) {
+                            appendRoadmapFlowDetail(detailPanel, "PARENT GOAL",
+                                    monthlyGoalParentTitle(allGoals, goal));
+                        }
+                        if (goal.originalMonth != null && !goal.originalMonth.equals(goal.month)) {
+                            appendRoadmapFlowDetail(detailPanel, "ORIGINALLY PLANNED",
+                                    monthLabelForKey(goal.originalMonth));
+                        }
+
+                        LinearLayout detailActions = horizontal();
+                        detailActions.setGravity(Gravity.CENTER_VERTICAL);
+                        Button openTree = secondaryButton("Open in Tree", () -> openMonthlyGoalInRoadmap(goal));
+                        openTree.setTextSize(10);
+                        openTree.setMinHeight(dp(32));
+                        detailActions.addView(openTree, new LinearLayout.LayoutParams(-2, dp(34)));
+                        PlanCatalog.Document sourceDocument = roadmapSourceDocument(goal);
+                        if (sourceDocument != null) {
+                            Button openSource = secondaryButton(sourceDocument.originalPdfBundled
+                                    ? "Open source PDF" : "Open offline plan",
+                                    () -> openRoadmapSourceDocument(sourceDocument));
+                            openSource.setTextSize(10);
+                            openSource.setMinHeight(dp(32));
+                            LinearLayout.LayoutParams sourceLp = new LinearLayout.LayoutParams(-2, dp(34));
+                            sourceLp.leftMargin = dp(5);
+                            detailActions.addView(openSource, sourceLp);
+                        }
+                        LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(-1, -2);
+                        actionsLp.topMargin = dp(7);
+                        detailPanel.addView(detailActions, actionsLp);
+                        block.addView(detailPanel);
+                    }
+
+                    items.addView(block, new LinearLayout.LayoutParams(-1, -2));
                     itemIndex++;
-                    if (itemIndex < monthTotal) {
+                    if (itemIndex < visibleItemTotal) {
                         View divider = new View(this);
                         divider.setBackgroundColor(color("#E5ECE7"));
                         LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
                         dividerLp.leftMargin = dp(40);
-                        monthBody.addView(divider, dividerLp);
+                        items.addView(divider, dividerLp);
                     }
                 }
 
-                for (RoadmapMilestone milestone : monthMilestones) {
+                for (RoadmapMilestone milestone : visibleMilestones) {
                     LinearLayout row = horizontal();
                     row.setGravity(Gravity.CENTER_VERTICAL);
                     row.setPadding(0, dp(6), 0, dp(6));
@@ -4285,19 +4542,17 @@ public class MainActivity extends Activity {
                             + " Tap to edit.");
                     row.setOnClickListener(v -> editRoadmapMilestone(milestone));
                     mark.setOnClickListener(v -> toggleRoadmapMilestone(milestone));
-                    monthBody.addView(row, new LinearLayout.LayoutParams(-1, -2));
-
+                    items.addView(row, new LinearLayout.LayoutParams(-1, -2));
                     itemIndex++;
-                    if (itemIndex < monthTotal) {
+                    if (itemIndex < visibleItemTotal) {
                         View divider = new View(this);
                         divider.setBackgroundColor(color("#E5ECE7"));
                         LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
                         dividerLp.leftMargin = dp(40);
-                        monthBody.addView(divider, dividerLp);
+                        items.addView(divider, dividerLp);
                     }
                 }
             }
-
             if (monthIndex < months.size() - 1) {
                 View connector = new View(this);
                 connector.setBackgroundColor(color("#D4E0D8"));
@@ -4311,6 +4566,32 @@ public class MainActivity extends Activity {
                 roadmapFlowContent.addView(end);
             }
         }
+    }
+
+    private void appendRoadmapFlowDetail(LinearLayout parent, String label, String value) {
+        if (parent == null || value == null || value.trim().isEmpty()) return;
+        LinearLayout line = vertical();
+        TextView heading = text(label, 8, color("#28765C"), true);
+        heading.setLetterSpacing(0.04f);
+        line.addView(heading);
+        TextView content = text(value, 10, color("#586A60"), false);
+        content.setLineSpacing(dp(1), 1f);
+        LinearLayout.LayoutParams contentLp = new LinearLayout.LayoutParams(-1, -2);
+        contentLp.topMargin = dp(1);
+        line.addView(content, contentLp);
+        LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(-1, -2);
+        lineLp.topMargin = dp(5);
+        parent.addView(line, lineLp);
+    }
+
+    private void scrollRoadmapFlowToMonth(String month) {
+        if (month == null) return;
+        View target = roadmapFlowMonthViews.get(month);
+        if (target == null) target = roadmapFlowCurrentMonthView;
+        if (target == null) return;
+        final View targetView = target;
+        targetView.post(() -> targetView.requestRectangleOnScreen(
+                new android.graphics.Rect(0, 0, targetView.getWidth(), targetView.getHeight()), true));
     }
 
     private void setRoadmapDisplayMode(String mode) {
