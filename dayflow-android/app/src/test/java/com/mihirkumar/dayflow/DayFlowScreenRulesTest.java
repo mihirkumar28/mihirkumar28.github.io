@@ -21,12 +21,15 @@ public class DayFlowScreenRulesTest {
         assertEquals("wfh", DayFlowScreenRules.normalizeWorkArrangement("weekend", "weekend"));
     }
 
-    @Test public void routineProfileDefaultsFromCalendarButHonorsPerDateOverride() {
-        assertEquals("weekday", DayFlowScreenRules.resolveRoutineProfile(null, false));
-        assertEquals("weekend", DayFlowScreenRules.resolveRoutineProfile(null, true));
-        assertEquals("weekend", DayFlowScreenRules.resolveRoutineProfile("weekend", false));
-        assertEquals("weekday", DayFlowScreenRules.resolveRoutineProfile("weekday", true));
-        assertEquals("weekend", DayFlowScreenRules.resolveRoutineProfile("invalid", true));
+    @Test public void routineProfileIsExactlyWfhWfoOrWeekend() {
+        assertEquals("wfh", DayFlowScreenRules.resolveRoutineProfile(null, false, "wfh"));
+        assertEquals("office", DayFlowScreenRules.resolveRoutineProfile(null, false, "office"));
+        assertEquals("weekend", DayFlowScreenRules.resolveRoutineProfile(null, true, "office"));
+        assertEquals("weekend", DayFlowScreenRules.resolveRoutineProfile("weekend", false, "office"));
+        assertEquals("office", DayFlowScreenRules.resolveRoutineProfile("office", true, "wfh"));
+        assertEquals("wfh", DayFlowScreenRules.resolveRoutineProfile("wfh", true, "office"));
+        assertEquals("office", DayFlowScreenRules.resolveRoutineProfile("weekday", false, "office"));
+        assertEquals("wfh", DayFlowScreenRules.resolveRoutineProfile("invalid", false, "unknown"));
     }
 
     @Test public void emptyPlanIsNotMarkedComplete() {
