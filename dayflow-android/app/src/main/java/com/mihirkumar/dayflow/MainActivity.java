@@ -584,6 +584,7 @@ public class MainActivity extends Activity {
             v.setPadding(dp(18), dp(10), dp(18), dp(20));
             return insets;
         });
+        scroll.requestApplyInsets();
 
         buildHeader();
         buildModeRow();
