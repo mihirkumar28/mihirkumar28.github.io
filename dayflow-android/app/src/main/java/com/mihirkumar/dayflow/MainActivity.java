@@ -4182,7 +4182,7 @@ public class MainActivity extends Activity {
 
                     Button mark = actionButton(goal.done ? "✓" : "○",
                             color(goal.done ? "#FFFFFF" : "#84968C"),
-                            color(goal.done ? "#28765C" : "#FFFFFF"));
+                            goal.done ? "#28765C" : "#FFFFFF");
                     mark.setTextSize(10);
                     mark.setPadding(0, 0, 0, 0);
                     mark.setElevation(0f);
@@ -4255,7 +4255,7 @@ public class MainActivity extends Activity {
                     row.setPadding(0, dp(6), 0, dp(6));
                     Button mark = actionButton(milestone.done ? "✓" : "○",
                             color(milestone.done ? "#FFFFFF" : "#84968C"),
-                            color(milestone.done ? "#28765C" : "#FFFFFF"));
+                            milestone.done ? "#28765C" : "#FFFFFF");
                     mark.setTextSize(10);
                     mark.setPadding(0, 0, 0, 0);
                     mark.setElevation(0f);
