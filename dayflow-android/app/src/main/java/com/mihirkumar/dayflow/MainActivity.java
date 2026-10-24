@@ -1838,7 +1838,7 @@ public class MainActivity extends Activity {
         LinearLayout monthlyHeader = horizontal();
         monthlyHeader.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout monthlyHeaderText = vertical();
-        monthlyHeaderText.addView(text("THIS MONTH", 12, color("#2E8060"), true));
+        monthlyHeaderText.addView(text("MONTHLY FOCUS", 12, color("#2E8060"), true));
         roadmapFocusCount = text("", 10, color("#687A70"), false);
         roadmapFocusCount.setSingleLine(true);
         roadmapFocusCount.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -3630,6 +3630,8 @@ public class MainActivity extends Activity {
             expandedRoadmapNodeIds.addAll(path);
             persistRoadmapExpansionState();
         }
+        // A goal opened from Overview or Timeline must appear in the visible Structure view.
+        setRoadmapDisplayMode("structure");
         refreshRoadmapSummary();
         if (roadmapTreeContainer != null) {
             roadmapTreeContainer.post(() -> {
@@ -3873,8 +3875,9 @@ public class MainActivity extends Activity {
             card.addView(bar, barLp);
 
             RoadmapNode next = nextIncompleteRoadmapAction(rootNode);
-            TextView nextLine = text(next == null ? "All visible actions complete"
-                    : "Next up  ·  " + next.title, 11, color("#50635A"), false);
+            String nextStatus = progress[1] == 0 ? "No actions added yet"
+                    : next == null ? "All actions complete" : "Next up  ·  " + next.title;
+            TextView nextLine = text(nextStatus, 11, color("#50635A"), false);
             nextLine.setMaxLines(2);
             nextLine.setEllipsize(android.text.TextUtils.TruncateAt.END);
             card.addView(nextLine);
@@ -3888,13 +3891,38 @@ public class MainActivity extends Activity {
             footerLp.topMargin = dp(8);
             card.addView(footer, footerLp);
             card.setOnClickListener(v -> {
-                expandedRoadmapNodeIds.add(rootNode.id);
+                // Track shortcuts should clear stale filters/search and reveal the correct path.
+                roadmapActiveFilter = "All";
+                roadmapSearchText = "";
+                if (roadmapSearchInput != null && roadmapSearchInput.getText() != null
+                        && roadmapSearchInput.getText().length() > 0) {
+                    roadmapSearchInput.setText("");
+                }
+                if (roadmapSearchRow != null && roadmapSearchRow.getVisibility() == View.VISIBLE) {
+                    setRoadmapSearchExpanded(false);
+                }
+                refreshRoadmapFilterStyles();
+                ArrayList<RoadmapNode> currentRoots = buildRoadmapTreeNodes();
+                ArrayList<String> path = new ArrayList<>();
+                if (collectRoadmapPath(currentRoots, rootNode.id, path)) {
+                    expandedRoadmapNodeIds.addAll(path);
+                } else {
+                    expandedRoadmapNodeIds.add(rootNode.id);
+                }
                 persistRoadmapExpansionState();
                 setRoadmapDisplayMode("structure");
+                if (roadmapTreeContainer != null) {
+                    roadmapTreeContainer.post(() -> {
+                        View target = roadmapTreeContainer.findViewWithTag(rootNode.id);
+                        if (target != null) target.requestRectangleOnScreen(
+                                new android.graphics.Rect(0, 0, target.getWidth(), target.getHeight()), true);
+                    });
+                }
             });
             card.setContentDescription(rootNode.title + ", " + progress[0] + " of " + progress[1]
-                    + " complete. Next up: " + (next == null ? "none" : next.title)
-                    + ". Tap to open track.");
+                    + " complete. " + (progress[1] == 0 ? "No actions added yet."
+                        : next == null ? "All actions complete." : "Next up: " + next.title + ".")
+                    + " Tap to open track.");
         }
 
         LinearLayout summary = vertical();
