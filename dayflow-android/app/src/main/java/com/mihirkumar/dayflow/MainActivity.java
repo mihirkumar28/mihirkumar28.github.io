@@ -4379,14 +4379,29 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
             statusLp.topMargin = dp(1);
             monthTitles.addView(status, statusLp);
+            // Keep completion count visually separate from the expand/collapse affordance.
+            // A compact pill gives "0 / 4" its own visual boundary instead of letting it
+            // read like part of the chevron glyph on narrow Android screens.
+            LinearLayout countPill = horizontal();
+            countPill.setGravity(Gravity.CENTER);
+            countPill.setPadding(dp(8), dp(4), dp(8), dp(4));
+            boolean monthComplete = monthTotal > 0 && monthDone == monthTotal;
+            GradientDrawable countPillBg = bg(monthComplete ? "#DCEBE2" : "#EEF2EE", 9);
+            countPillBg.setStroke(dp(1), color(monthComplete ? "#B9D7C5" : "#DEE6E0"));
+            countPill.setBackground(countPillBg);
             TextView monthCount = text(monthDone + " / " + monthTotal, 10,
-                    color(monthDone == monthTotal && monthTotal > 0 ? "#28765C" : "#687A70"), true);
-            LinearLayout.LayoutParams monthCountLp = new LinearLayout.LayoutParams(-2, -2);
-            monthCountLp.rightMargin = dp(7);
-            monthHeader.addView(monthCount, monthCountLp);
+                    color(monthComplete ? "#246247" : "#50635A"), true);
+            monthCount.setGravity(Gravity.CENTER);
+            countPill.addView(monthCount);
+            LinearLayout.LayoutParams monthCountLp = new LinearLayout.LayoutParams(-2, dp(28));
+            monthCountLp.rightMargin = dp(8);
+            monthHeader.addView(countPill, monthCountLp);
+
             TextView monthChevron = text(expanded ? "⌄" : "›", 18, color("#779688"), true);
             monthChevron.setGravity(Gravity.CENTER);
-            monthHeader.addView(monthChevron, new LinearLayout.LayoutParams(dp(22), dp(28)));
+            monthChevron.setMinWidth(dp(24));
+            monthChevron.setContentDescription(expanded ? "Collapse month" : "Expand month");
+            monthHeader.addView(monthChevron, new LinearLayout.LayoutParams(dp(26), dp(30)));
             monthHeader.setContentDescription(monthLabelForKey(month) + ", " + monthDone
                     + " of " + monthTotal + " plan items complete. "
                     + (expanded ? "Tap to collapse month." : "Tap to expand month."));
