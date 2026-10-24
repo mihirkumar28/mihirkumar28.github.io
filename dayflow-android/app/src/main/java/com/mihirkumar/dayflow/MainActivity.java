@@ -8399,10 +8399,12 @@ public class MainActivity extends Activity {
     private void chooseRoutineProfile(String profile) {
         if (!"weekday".equals(profile) && !"weekend".equals(profile)) return;
         String currentProfile = routineProfileForDate(selectedDateKey);
-        if (profile.equals(currentProfile)) return;
-
         final String templateKey = "weekend".equals(profile)
                 ? "weekend" : ("office".equals(mode) ? "office" : "wfh");
+        // Re-tapping the selected profile is useful when the date's hand-edited schedule
+        // has drifted from its reusable routine. Avoid prompting when it already matches.
+        if (profile.equals(currentProfile) && scheduleMatchesTemplate(templateKey)) return;
+
         final String routineLabel = "weekend".equals(profile)
                 ? "Weekend" : ("office".equals(templateKey) ? "Weekday (WFO)" : "Weekday (WFH)");
         final String dateLabel = selectedDateKey.equals(todayKey())
