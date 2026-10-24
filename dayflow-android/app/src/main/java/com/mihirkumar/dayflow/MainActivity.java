@@ -1951,7 +1951,7 @@ public class MainActivity extends Activity {
         roadmapJourneyMonthStrip = horizontal();
         roadmapJourneyMonthStrip.setGravity(Gravity.CENTER_VERTICAL);
         roadmapJourneyMonthScroll.addView(roadmapJourneyMonthStrip,
-                new ViewGroup.LayoutParams(-2, -2));
+                new android.view.ViewGroup.LayoutParams(-2, -2));
         LinearLayout.LayoutParams journeyMonthStripLp = new LinearLayout.LayoutParams(-1, dp(54));
         journeyMonthStripLp.bottomMargin = dp(10);
         roadmapOverviewContent.addView(roadmapJourneyMonthScroll, journeyMonthStripLp);
