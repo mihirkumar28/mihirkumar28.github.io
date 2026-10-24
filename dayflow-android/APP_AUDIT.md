@@ -124,3 +124,11 @@ Source changes on `fix/today-tab-usability`:
 - [x] Add horizontal spacing between monthly completion counts and the expand/collapse chevron.
 - [ ] Run unit tests, Android emulator PDF verification and signed release build.
 - [ ] Confirm on the user's physical device that the status bar no longer overlaps controls and collapsed months have compact spacing.
+
+## Roadmap Flow month count spacing — 2026-10-24
+
+- [x] Put the monthly completion count (for example, 0 / 4) in its own compact rounded pill.
+- [x] Increase separation from the expand/collapse chevron and give the chevron a predictable touch target.
+- [x] Use a subtle completion-state treatment for the count pill without changing the underlying goal count or progress logic.
+- [ ] Run Android unit tests and signed APK build.
+- [ ] Verify count/chevron appearance on a physical device.
