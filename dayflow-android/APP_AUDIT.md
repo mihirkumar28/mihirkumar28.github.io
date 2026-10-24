@@ -115,3 +115,12 @@ Source changes on `fix/today-tab-usability`:
 - [x] Keep existing completion handlers, source catalog and offline PDF viewer pathways.
 - [ ] Verify CI unit tests, signed APK build and offline-PDF emulator checks.
 - [ ] Verify physical-device scroll behavior, filter interactions and font scaling.
+
+## Roadmap Flow screenshot fixes — 2026-10-24
+
+- [x] Move the status-bar inset to the ScrollView viewport and clip its children to the viewport padding, so Flow filters do not scroll under the system clock.
+- [x] Keep page padding content-only to avoid double-counting the system inset.
+- [x] Remove MATCH_PARENT height from the timeline rail's initial measurement; size the line after the month row is measured so collapsed months stay compact.
+- [x] Add horizontal spacing between monthly completion counts and the expand/collapse chevron.
+- [ ] Run unit tests, Android emulator PDF verification and signed release build.
+- [ ] Confirm on the user's physical device that the status bar no longer overlaps controls and collapsed months have compact spacing.
