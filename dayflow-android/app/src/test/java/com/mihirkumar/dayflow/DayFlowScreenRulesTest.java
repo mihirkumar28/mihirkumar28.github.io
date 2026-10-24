@@ -21,6 +21,14 @@ public class DayFlowScreenRulesTest {
         assertEquals("wfh", DayFlowScreenRules.normalizeWorkArrangement("weekend", "weekend"));
     }
 
+    @Test public void routineProfileDefaultsFromCalendarButHonorsPerDateOverride() {
+        assertEquals("weekday", DayFlowScreenRules.resolveRoutineProfile(null, false));
+        assertEquals("weekend", DayFlowScreenRules.resolveRoutineProfile(null, true));
+        assertEquals("weekend", DayFlowScreenRules.resolveRoutineProfile("weekend", false));
+        assertEquals("weekday", DayFlowScreenRules.resolveRoutineProfile("weekday", true));
+        assertEquals("weekend", DayFlowScreenRules.resolveRoutineProfile("invalid", true));
+    }
+
     @Test public void emptyPlanIsNotMarkedComplete() {
         assertEquals(DayFlowScreenRules.TodayState.EMPTY,
                 DayFlowScreenRules.resolveTodayState(0, 0, false, false));
