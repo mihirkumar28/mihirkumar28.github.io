@@ -94,3 +94,13 @@ Source changes on `fix/today-tab-usability`:
 - [x] Replace the dark selected-month fill with a light sage highlight and stronger outline; keep text dark and improve miniature progress-track contrast.
 - [ ] Run unit tests and signed APK build on the PR revision.
 - [ ] Verify Journey/Flow/Tree on-device, including month selection contrast, screen width and enlarged accessibility text.
+
+## Roadmap Flow UI refinement — 2026-10-24
+
+- [x] Replace the oversized repeated Flow intro with a compact date-range/progress summary and a Jump to now action.
+- [x] Organize each month as a connected timeline node with a slim vertical spine, compact month status and local completion bar.
+- [x] Visually emphasize only the current/selected month; keep future and past sections calmer to reduce long-page clutter.
+- [x] Simplify goal rows to track, title and only material subgoal/reschedule metadata; open the Tree for full goal detail rather than clipping long target excerpts into every row.
+- [x] Retain completion controls for goals/milestones and existing saved-state pathways.
+- [ ] Run Android unit tests and signed APK build.
+- [ ] Check the screen on a physical device for text scaling, bottom-navigation overlap, long titles and scroll-to-current behavior.
