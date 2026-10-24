@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
     private static final String PREFS = "dayflow";
     private static final String KEY = "blocks";
     private static final String MODE_KEY = "mode";
+    private static final String ROUTINE_PROFILE_KEY_PREFIX = "routineProfile_";
     private static final String COMMUTE_IN_START = "commuteInStart";
     private static final String COMMUTE_IN_END = "commuteInEnd";
     private static final String COMMUTE_OUT_START = "commuteOutStart";
@@ -588,20 +589,22 @@ public class MainActivity extends Activity {
 
         buildHeader();
         buildModeRow();
-        buildCurrentCard();
-        buildTodaySummary();
 
+        // Keep office actions close to the date/routine controls, but let the task
+        // timeline appear before the statistics panel so the day reads top-to-bottom.
         officeCard = vertical();
-        officeCard.setPadding(dp(16), dp(16), dp(16), dp(16));
-        officeCard.setBackground(bg("#17231D", 18));
+        officeCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+        officeCard.setBackground(bg("#17231D", 16));
         LinearLayout.LayoutParams ocp = new LinearLayout.LayoutParams(-1, -2);
-        ocp.bottomMargin = dp(16);
+        ocp.bottomMargin = dp(10);
         root.addView(officeCard, ocp);
         buildOfficeCardContents();
 
+        buildCurrentCard();
         buildScheduleHeader();
         timeline = vertical();
         root.addView(timeline, new LinearLayout.LayoutParams(-1, -2));
+        buildTodaySummary();
         root.addView(spacer(8));
 
         TextView footer = text("Saved privately on this device", 11, color("#82948A"), false);
@@ -6741,112 +6744,151 @@ public class MainActivity extends Activity {
     private void buildModeRow() {
         LinearLayout wrapper = vertical();
         LinearLayout.LayoutParams wrapperLp = new LinearLayout.LayoutParams(-1, -2);
-        wrapperLp.bottomMargin = dp(10);
+        wrapperLp.bottomMargin = dp(9);
         root.addView(wrapper, wrapperLp);
 
-        // Calendar day type and work arrangement are deliberately separate concepts.
-        LinearLayout heading = horizontal();
-        heading.setGravity(Gravity.CENTER_VERTICAL);
-        modeView = text("WEEKDAY", 10, color("#286B55"), true);
-        modeView.setLetterSpacing(0.06f);
-        modeView.setPadding(dp(9), dp(6), dp(9), dp(6));
-        modeView.setBackground(bg("#EAF0E9", 10));
+        // Calendar date type is factual; the routine profile below is selectable.
+        LinearLayout calendarHeading = horizontal();
+        calendarHeading.setGravity(Gravity.CENTER_VERTICAL);
+        modeView = text("WEEKDAY", 9, color("#286B55"), true);
+        modeView.setLetterSpacing(0.05f);
+        modeView.setPadding(dp(9), dp(5), dp(9), dp(5));
+        modeView.setBackground(bg("#EAF0E9", 9));
         modeView.setContentDescription("Automatically detected calendar day type");
-        heading.addView(modeView);
+        calendarHeading.addView(modeView);
+        TextView calendarHint = text("CALENDAR DAY", 9, color("#687A70"), true);
+        calendarHint.setLetterSpacing(0.05f);
+        LinearLayout.LayoutParams calendarHintLp = new LinearLayout.LayoutParams(-2, -2);
+        calendarHintLp.leftMargin = dp(8);
+        calendarHeading.addView(calendarHint, calendarHintLp);
+        wrapper.addView(calendarHeading);
 
+        LinearLayout routineHeading = horizontal();
+        routineHeading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView routineLabel = text("ROUTINE TYPE", 10, color("#687A70"), true);
+        routineLabel.setLetterSpacing(0.06f);
+        routineHeading.addView(routineLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        routineHeading.addView(text("APPLIES TO THIS DATE ONLY", 8, color("#87968D"), false));
+        LinearLayout.LayoutParams routineHeadingLp = new LinearLayout.LayoutParams(-1, -2);
+        routineHeadingLp.topMargin = dp(8);
+        wrapper.addView(routineHeading, routineHeadingLp);
+
+        LinearLayout profileRow = horizontal();
+        LinearLayout.LayoutParams profileRowLp = new LinearLayout.LayoutParams(-1, dp(40));
+        profileRowLp.topMargin = dp(5);
+        wrapper.addView(profileRow, profileRowLp);
+        String[][] profiles = {{"Weekday routine", "weekday"}, {"Weekend routine", "weekend"}};
+        for (String[] profile : profiles) {
+            String profileKey = profile[1];
+            Button button = secondaryButton(profile[0], () -> chooseRoutineProfile(profileKey));
+            button.setTag("routine-profile-chip-" + profileKey);
+            button.setTextSize(11);
+            button.setMinHeight(dp(40));
+            button.setPadding(dp(6), 0, dp(6), 0);
+            button.setContentDescription("Use " + profile[0].toLowerCase(Locale.US)
+                    + " for the selected date. This replaces only that date's schedule after confirmation.");
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1f);
+            if (profileRow.getChildCount() > 0) lp.leftMargin = dp(7);
+            profileRow.addView(button, lp);
+        }
+
+        LinearLayout arrangementHeading = horizontal();
+        arrangementHeading.setGravity(Gravity.CENTER_VERTICAL);
         TextView arrangementLabel = text("WORK ARRANGEMENT", 10, color("#687A70"), true);
         arrangementLabel.setLetterSpacing(0.06f);
-        LinearLayout.LayoutParams arrangementLabelLp = new LinearLayout.LayoutParams(-2, -2);
-        arrangementLabelLp.leftMargin = dp(9);
-        heading.addView(arrangementLabel, arrangementLabelLp);
-        wrapper.addView(heading);
+        arrangementHeading.addView(arrangementLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        arrangementHeading.addView(text("WFH / WFO", 9, color("#87968D"), false));
+        LinearLayout.LayoutParams arrangementHeadingLp = new LinearLayout.LayoutParams(-1, -2);
+        arrangementHeadingLp.topMargin = dp(9);
+        wrapper.addView(arrangementHeading, arrangementHeadingLp);
 
-        LinearLayout row = horizontal();
-        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(48));
-        rp.topMargin = dp(7);
-        wrapper.addView(row, rp);
+        LinearLayout arrangementRow = horizontal();
+        LinearLayout.LayoutParams arrangementRowLp = new LinearLayout.LayoutParams(-1, dp(42));
+        arrangementRowLp.topMargin = dp(5);
+        wrapper.addView(arrangementRow, arrangementRowLp);
         String[][] options = {{"WFH", "wfh"}, {"WFO", "office"}};
         for (String[] option : options) {
             String modeKey = option[1];
-            Button b = chip(option[0]);
-            b.setTag("mode-chip-" + modeKey);
-            b.setTextSize(13);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), 1);
-            if (row.getChildCount() > 0) lp.leftMargin = dp(8);
-            row.addView(b, lp);
-            b.setContentDescription(option[0] + " work arrangement");
-            b.setOnClickListener(v -> chooseMode(modeKey));
+            Button button = chip(option[0]);
+            button.setTag("mode-chip-" + modeKey);
+            button.setTextSize(12);
+            button.setMinHeight(dp(42));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+            if (arrangementRow.getChildCount() > 0) lp.leftMargin = dp(7);
+            arrangementRow.addView(button, lp);
+            button.setContentDescription(option[0] + " work arrangement");
+            button.setOnClickListener(v -> chooseMode(modeKey));
         }
 
         todayRoutineEditButton = secondaryButton("Modify & Save Today's Routine", this::openTodayRoutineEditor);
-        todayRoutineEditButton.setTextSize(12);
-        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(-1, dp(48));
-        editLp.topMargin = dp(7);
+        todayRoutineEditButton.setTextSize(11);
+        todayRoutineEditButton.setMinHeight(dp(40));
+        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(-1, dp(40));
+        editLp.topMargin = dp(6);
         wrapper.addView(todayRoutineEditButton, editLp);
         todayRoutineEditButton.setVisibility(View.VISIBLE);
     }
 
-    
     private void buildCurrentCard() {
         LinearLayout card = vertical();
-        card.setPadding(dp(16), dp(14), dp(16), dp(13));
-        card.setBackground(bg("#DCEBE2", 20));
+        card.setPadding(dp(13), dp(11), dp(13), dp(10));
+        GradientDrawable cardSurface = bg("#E5EFE8", 16);
+        cardSurface.setStroke(dp(1), color("#D5E4DA"));
+        card.setBackground(cardSurface);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.bottomMargin = dp(10);
         root.addView(card, cp);
 
         TextView label = text("CURRENT TASK", 9, color("#286B55"), true);
         label.setTag("currentTaskEyebrow");
-        label.setLetterSpacing(0.1f);
-        label.setPadding(0, 0, 0, dp(2));
+        label.setLetterSpacing(0.08f);
         card.addView(label);
 
-        currentTitle = text("Loading…", 22, Color.WHITE, true);
+        currentTitle = text("Loading…", 18, color("#18372E"), true);
         currentTitle.setMaxLines(2);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
-        tp.topMargin = dp(3);
+        tp.topMargin = dp(2);
         card.addView(currentTitle, tp);
 
-        LinearLayout row = horizontal();
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
-        rp.topMargin = dp(5);
-        card.addView(row, rp);
-        currentTime = text("—", 12, color("#496257"), false);
-        currentCountdown = text("—", 13, color("#18372E"), true);
+        LinearLayout timeRow = horizontal();
+        timeRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams timeRowLp = new LinearLayout.LayoutParams(-1, -2);
+        timeRowLp.topMargin = dp(3);
+        card.addView(timeRow, timeRowLp);
+        currentTime = text("—", 11, color("#496257"), false);
+        currentCountdown = text("—", 11, color("#18372E"), true);
         currentCountdown.setGravity(Gravity.RIGHT);
-        row.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1f));
-        row.addView(currentCountdown);
+        timeRow.addView(currentTime, new LinearLayout.LayoutParams(0, -2, 1f));
+        timeRow.addView(currentCountdown);
 
-        focusAction = actionButton("Start focus", Color.WHITE, "#23845F");
-        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(48));
-        focusLp.topMargin = dp(10);
+        focusAction = actionButton("Start focus", Color.WHITE, "#286B55");
+        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(40));
+        focusLp.topMargin = dp(8);
         card.addView(focusAction, focusLp);
         focusAction.setTag("focusAction");
         focusAction.setOnClickListener(v -> toggleFocusCurrent());
 
         LinearLayout secondaryActions = horizontal();
         secondaryActions.setTag("currentSecondaryActions");
-        LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(-1, dp(48));
-        secondaryLp.topMargin = dp(6);
+        LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(-1, dp(38));
+        secondaryLp.topMargin = dp(5);
         card.addView(secondaryActions, secondaryLp);
 
         Button markDone = actionButton("Mark complete", color("#496257"), "#FFFFFF");
-        markDone.setTextSize(12);
+        markDone.setTextSize(11);
         markDone.setTag("currentDone");
         markDone.setOnClickListener(v -> completeCurrent());
-        secondaryActions.addView(markDone, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        secondaryActions.addView(markDone, new LinearLayout.LayoutParams(0, dp(38), 1f));
 
         Button recover = actionButton("Catch up", color("#496257"), "#FFFFFF");
-        recover.setTextSize(12);
+        recover.setTextSize(11);
         recover.setTag("recoveryButton");
         recover.setOnClickListener(v -> recoveryMode());
-        LinearLayout.LayoutParams recoverLp = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        recoverLp.leftMargin = dp(8);
+        LinearLayout.LayoutParams recoverLp = new LinearLayout.LayoutParams(0, dp(38), 1f);
+        recoverLp.leftMargin = dp(7);
         secondaryActions.addView(recover, recoverLp);
     }
 
-    
     private void buildTodaySummary() {
         LinearLayout summary = vertical();
         summary.setPadding(dp(14), dp(12), dp(14), dp(12));
