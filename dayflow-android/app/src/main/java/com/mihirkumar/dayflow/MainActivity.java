@@ -27,6 +27,7 @@ import android.view.Gravity;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.provider.Settings;
