@@ -3004,11 +3004,11 @@ public class MainActivity extends Activity {
     private void showRoadmapGoalDetailsDialog(MonthlyGoal goal) {
         if (goal == null) return;
         PlanCatalog.Document sourceDocument = roadmapSourceDocument(goal);
-        String message = "SOURCE\\n" + goalInfoValue(goal.source, "Not specified — edit goal")
-                + "\\n\\nPAGES\\n" + goalInfoValue(goal.pages, "Not listed")
-                + "\\n\\nESTIMATED TIME\\n" + goalInfoValue(goal.estimatedTime, "Not estimated — edit goal");
+        String message = "SOURCE\n" + goalInfoValue(goal.source, "Not specified — edit goal")
+                + "\n\nPAGES\n" + goalInfoValue(goal.pages, "Not listed")
+                + "\n\nESTIMATED TIME\n" + goalInfoValue(goal.estimatedTime, "Not estimated — edit goal");
         if (sourceDocument != null) {
-            message += "\\n\\nBUNDLED REFERENCE\\n" + sourceDocument.title
+            message += "\n\nBUNDLED REFERENCE\n" + sourceDocument.title
                     + (sourceDocument.originalPdfBundled ? "" : " (offline reading copy)");
         }
         AlertDialog.Builder dialog = new AlertDialog.Builder(this)
