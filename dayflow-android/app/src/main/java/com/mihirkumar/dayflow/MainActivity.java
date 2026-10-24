@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
     private Button roadmapMonthlyGoalsToggle, roadmapTreeEditButton;
     private String roadmapDisplayMode = "overview";
     private LinearLayout roadmapViewSwitcher, roadmapOverviewContent, roadmapTrackCards,
-            roadmapOverviewProgress, roadmapTimelineContent, roadmapStructureContent;
+            roadmapOverviewProgress, roadmapStructureContent;
     private HorizontalScrollView roadmapJourneyMonthScroll;
     private LinearLayout roadmapJourneyMonthStrip;
     private final Map<String, Button> roadmapViewButtons = new LinkedHashMap<>();
@@ -1822,9 +1822,6 @@ public class MainActivity extends Activity {
 
         roadmapOverviewContent = vertical();
         pageSyllabus.addView(roadmapOverviewContent, new LinearLayout.LayoutParams(-1, -2));
-        roadmapTimelineContent = vertical();
-        roadmapTimelineContent.setVisibility(View.GONE);
-        pageSyllabus.addView(roadmapTimelineContent, new LinearLayout.LayoutParams(-1, -2));
         roadmapStructureContent = vertical();
         roadmapStructureContent.setVisibility(View.GONE);
         pageSyllabus.addView(roadmapStructureContent, new LinearLayout.LayoutParams(-1, -2));
@@ -3710,7 +3707,7 @@ public class MainActivity extends Activity {
             expandedRoadmapNodeIds.addAll(path);
             persistRoadmapExpansionState();
         }
-        // A goal opened from Overview or Timeline must appear in the visible Structure view.
+        // A goal opened from Journey must appear in the visible Tree view.
         setRoadmapDisplayMode("structure");
         refreshRoadmapSummary();
         if (roadmapTreeContainer != null) {
@@ -3958,13 +3955,10 @@ public class MainActivity extends Activity {
         roadmapDisplayMode = mode;
         if (roadmapOverviewContent != null) roadmapOverviewContent.setVisibility(
                 "overview".equals(mode) ? View.VISIBLE : View.GONE);
-        if (roadmapTimelineContent != null) roadmapTimelineContent.setVisibility(
-                "timeline".equals(mode) ? View.VISIBLE : View.GONE);
         if (roadmapStructureContent != null) roadmapStructureContent.setVisibility(
                 "structure".equals(mode) ? View.VISIBLE : View.GONE);
         refreshRoadmapViewStyles();
         if ("overview".equals(mode)) renderRoadmapOverview();
-        else if ("timeline".equals(mode)) renderRoadmapTimeline();
         else renderRoadmapTreeBody();
     }
 
@@ -4152,125 +4146,6 @@ public class MainActivity extends Activity {
         summary.addView(nextDetail, nextLp);
     }
 
-    private void renderRoadmapTimeline() {
-        if (roadmapTimelineContent == null) return;
-        roadmapTimelineContent.removeAllViews();
-
-        TextView heading = text("PLAN ACROSS MONTHS", 10, color("#2E8060"), true);
-        heading.setLetterSpacing(0.08f);
-        roadmapTimelineContent.addView(heading);
-        TextView title = text("Timeline", 23, color("#18372E"), true);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.topMargin = dp(2);
-        roadmapTimelineContent.addView(title, titleLp);
-        TextView subtitle = text("See how your goals unfold over time. Select a month to focus its goals.", 11,
-                color("#687A70"), false);
-        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
-        subtitleLp.topMargin = dp(3);
-        subtitleLp.bottomMargin = dp(10);
-        roadmapTimelineContent.addView(subtitle, subtitleLp);
-
-        ArrayList<MonthlyGoal> allGoals = readMonthlyGoals();
-        ArrayList<String> months = new ArrayList<>();
-        for (int i = 0; i < RoadmapMonthlyPlan.monthCount(); i++) {
-            String key = RoadmapMonthlyPlan.monthKeyAt(i);
-            if (key != null && !months.contains(key)) months.add(key);
-        }
-        for (MonthlyGoal goal : allGoals) if (goal.month != null && !months.contains(goal.month)) months.add(goal.month);
-        if (selectedGoalMonth != null && !months.contains(selectedGoalMonth)) months.add(selectedGoalMonth);
-        Collections.sort(months);
-        String selected = selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth;
-        int start = months.indexOf(selected);
-        if (start < 0) start = 0;
-        int end = Math.min(months.size(), start + 12);
-        if (months.isEmpty()) {
-            roadmapTimelineContent.addView(text("No planned months yet. Add goals from Structure.", 12,
-                    color("#687A70"), false));
-            return;
-        }
-        TextView window = text(monthLabelForKey(months.get(start)).toUpperCase(Locale.US)
-                + "  —  " + monthLabelForKey(months.get(end - 1)).toUpperCase(Locale.US),
-                9, color("#687A70"), true);
-        window.setMaxLines(2);
-        LinearLayout.LayoutParams windowLp = new LinearLayout.LayoutParams(-1, -2);
-        windowLp.bottomMargin = dp(7);
-        roadmapTimelineContent.addView(window, windowLp);
-
-        for (int index = start; index < end; index++) {
-            String month = months.get(index);
-            ArrayList<MonthlyGoal> monthGoals = new ArrayList<>();
-            for (MonthlyGoal goal : allGoals) {
-                if (month.equals(goal.month) && goal.parentGoalId == 0L
-                        && MonthlyGoalLifecycle.showInMonthlyPanel(goal.lifecycleStatus)) monthGoals.add(goal);
-            }
-            monthGoals.sort(monthlyGoalOrderComparator(allGoals));
-            int done = 0;
-            for (MonthlyGoal goal : monthGoals) if (goal.done) done++;
-
-            LinearLayout card = vertical();
-            card.setPadding(dp(13), dp(12), dp(13), dp(12));
-            GradientDrawable cardBg = bg(month.equals(selected) ? "#EAF3EC" : "#FFFFFF", 14);
-            cardBg.setStroke(dp(month.equals(selected) ? 2 : 1),
-                    color(month.equals(selected) ? "#8EB6A0" : "#E1E9E2"));
-            card.setBackground(cardBg);
-            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
-            cardLp.bottomMargin = dp(8);
-            roadmapTimelineContent.addView(card, cardLp);
-
-            LinearLayout monthHeader = horizontal();
-            monthHeader.setGravity(Gravity.CENTER_VERTICAL);
-            monthHeader.addView(text(monthLabelForKey(month), 14, color("#18372E"), true),
-                    new LinearLayout.LayoutParams(0, -2, 1f));
-            monthHeader.addView(text(done + "/" + monthGoals.size() + " complete", 10,
-                    color("#286B55"), true));
-            card.addView(monthHeader);
-            card.setOnClickListener(v -> {
-                selectedGoalMonth = month;
-                renderRoadmapFocus();
-                renderRoadmapTimeline();
-            });
-
-            ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-            progress.setMax(Math.max(1, monthGoals.size()));
-            progress.setProgress(Math.min(done, Math.max(1, monthGoals.size())));
-            progress.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#398267")));
-            progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(color("#DCE6DE")));
-            LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(4));
-            progressLp.topMargin = dp(7);
-            progressLp.bottomMargin = dp(6);
-            card.addView(progress, progressLp);
-
-            if (monthGoals.isEmpty()) {
-                card.addView(text("No goals scheduled", 11, color("#687A70"), false));
-            } else {
-                for (int i = 0; i < Math.min(3, monthGoals.size()); i++) {
-                    MonthlyGoal goal = monthGoals.get(i);
-                    LinearLayout goalRow = horizontal();
-                    goalRow.setGravity(Gravity.CENTER_VERTICAL);
-                    goalRow.addView(text(goal.done ? "✓" : "•", 13,
-                            color(goal.done ? "#398267" : "#82948A"), true),
-                            new LinearLayout.LayoutParams(dp(20), -2));
-                    TextView goalTitle = text(goal.title, 11,
-                            color(goal.done ? "#687A70" : "#344A40"), goal.done);
-                    goalTitle.setMaxLines(2);
-                    goalTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    goalRow.addView(goalTitle, new LinearLayout.LayoutParams(0, -2, 1f));
-                    goalRow.setOnClickListener(v -> openMonthlyGoalInRoadmap(goal));
-                    LinearLayout.LayoutParams goalLp = new LinearLayout.LayoutParams(-1, -2);
-                    goalLp.topMargin = dp(5);
-                    card.addView(goalRow, goalLp);
-                }
-                if (monthGoals.size() > 3) {
-                    TextView more = text("+" + (monthGoals.size() - 3) + " more goals", 10,
-                            color("#286B55"), true);
-                    LinearLayout.LayoutParams moreLp = new LinearLayout.LayoutParams(-1, -2);
-                    moreLp.topMargin = dp(5);
-                    card.addView(more, moreLp);
-                }
-            }
-        }
-    }
-
     private void refreshRoadmapSummary() {
         ArrayList<SyllabusTopic> topics = readSyllabusTopics();
         int cseTotal = 0, cseDone = 0, interviewTotal = 0, interviewDone = 0;
@@ -4317,7 +4192,6 @@ public class MainActivity extends Activity {
         if (roadmapFocusMonthLabel != null) renderRoadmapFocus();
         if (roadmapTreeContainer != null) renderRoadmapTreeBody();
         if (roadmapTrackCards != null) renderRoadmapOverview();
-        if (roadmapTimelineContent != null) renderRoadmapTimeline();
         refreshRoadmapViewStyles();
         // Roadmap edits also change the Today screen's connected progress label.
         refreshTodaySummaryProgress();
