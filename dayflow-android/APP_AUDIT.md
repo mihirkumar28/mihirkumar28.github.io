@@ -82,6 +82,6 @@ Source changes on `fix/today-tab-usability`:
 - [x] Consolidate Roadmap navigation into two modes: Journey (chronological planning and progress) and Tree (full goal hierarchy).
 - [x] Add a compact horizontal month navigator to Journey. Planned month slots remain visible when empty; the selected month, focus list and mini progress indicators stay synchronized.
 - [x] Simplify monthly focus and workstream presentation by removing nested card borders, redundant previous/next controls and repeated workstream footers.
-- [x] Preserve the existing tree, completion store, source plan catalog and drag/drop business rules.
+- [x] Preserve the existing tree, completion store and drag/drop business rules; expose catalog-linked offline reading copies from source-linked goal details.
 - [ ] Run PR CI, unit tests and offline PDF emulator verification.
 - [ ] Verify month-strip interaction, layout at narrow widths, accessibility text scaling, and Journey/Tree state synchronization on an Android device.
