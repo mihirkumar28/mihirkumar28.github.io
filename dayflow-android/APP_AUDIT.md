@@ -143,3 +143,13 @@ Source changes on `fix/today-tab-usability`:
 - [x] Reduce free-time row height and add unit coverage for default and overridden weekday/weekend routine profiles.
 - [ ] Verify Android regression tests and signed APK build.
 - [ ] Verify the Weekend selector and linear list on a physical device, including longer task titles and WFO visibility.
+
+## Correct Today routine model — 2026-10-24
+
+- [x] Replace the nested Weekday/Weekend plus WFH/WFO controls with exactly three mutually exclusive routine choices: WFH, WFO and Weekend.
+- [x] Persist the selected routine per date using the matching template key (`wfh`, `office`, `weekend`); legacy ambiguous `weekday` values fall back to the calendar day and valid WFH/WFO setting.
+- [x] Weekend is never written to the internal WFH/WFO arrangement field and hides office attendance actions while selected.
+- [x] Keep apply confirmation, date-only schedule replacement, matching block history, and reusable templates unchanged.
+- [x] Add unit coverage for all three allowed routine types and per-date overrides.
+- [ ] Run Android regression tests, offline-PDF emulator verification and signed release build.
+- [ ] Verify the three-option selector and Weekend behavior on a physical device.
