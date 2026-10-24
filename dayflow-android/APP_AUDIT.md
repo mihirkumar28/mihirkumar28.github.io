@@ -104,3 +104,14 @@ Source changes on `fix/today-tab-usability`:
 - [x] Retain completion controls for goals/milestones and existing saved-state pathways.
 - [ ] Run Android unit tests and signed APK build.
 - [ ] Check the screen on a physical device for text scaling, bottom-navigation overlap, long titles and scroll-to-current behavior.
+
+## Roadmap Flow navigation, filtering and inline details — 2026-10-24
+
+- [x] Expand the current month by default; provide per-month expand/collapse and Expand all / Collapse all controls.
+- [x] Add a horizontally scrollable month-jump strip that selects, expands and scrolls to a month.
+- [x] Add workstream filters plus an independent Open only toggle; preserve month order and month-level progress.
+- [x] Add inline goal details including target, source, pages, estimated time, parent/reschedule metadata, Open in Tree and bundled offline source actions.
+- [x] Add quarter labels and separate goal, milestone and overall progress counts.
+- [x] Keep existing completion handlers, source catalog and offline PDF viewer pathways.
+- [ ] Verify CI unit tests, signed APK build and offline-PDF emulator checks.
+- [ ] Verify physical-device scroll behavior, filter interactions and font scaling.
