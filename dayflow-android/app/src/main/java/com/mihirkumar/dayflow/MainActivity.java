@@ -3668,8 +3668,9 @@ public class MainActivity extends Activity {
 
         int done = 0;
         for (MonthlyGoal goal : focus) if (goal.done) done++;
-        roadmapFocusCount.setText(done + "/" + focus.size() + " complete · "
-                + Math.max(0, focus.size() - done) + " left");
+        roadmapFocusCount.setText(focus.isEmpty() ? "No goals planned"
+                : done + "/" + focus.size() + " complete · "
+                        + Math.max(0, focus.size() - done) + " left");
 
         int overdueCount = unfinishedLeafCountFromEarlierMonths();
         boolean viewingCurrentMonth = month.equals(currentMonthKey());
@@ -3683,9 +3684,21 @@ public class MainActivity extends Activity {
         }
 
         if (focus.isEmpty()) {
-            TextView empty = text("No goals planned for this month yet. Add goals from + Add item in the Roadmap tree.",
-                    12, color("#687A70"), false);
+            LinearLayout empty = vertical();
             empty.setPadding(dp(2), dp(10), dp(2), dp(8));
+            empty.addView(text("Nothing planned for this month yet", 12, color("#18372E"), true));
+            TextView hint = text("Add a goal to give this month a clear next step.", 11,
+                    color("#687A70"), false);
+            LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+            hintLp.topMargin = dp(3);
+            empty.addView(hint, hintLp);
+            Button addGoal = primaryButton("＋  Add a goal", () -> {
+                setRoadmapDisplayMode("structure");
+                showRoadmapAddMenu();
+            });
+            LinearLayout.LayoutParams addGoalLp = new LinearLayout.LayoutParams(-1, dp(42));
+            addGoalLp.topMargin = dp(10);
+            empty.addView(addGoal, addGoalLp);
             roadmapFocusGoalList.addView(empty);
             return;
         }
