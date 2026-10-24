@@ -2070,7 +2070,7 @@ public class MainActivity extends Activity {
             roadmapMonthlyGoalsContent.setVisibility(collapsed ? View.GONE : View.VISIBLE);
         }
         if (roadmapMonthlyGoalsToggle != null) {
-            roadmapMonthlyGoalsToggle.setText(collapsed ? "›" : "⌄");
+            roadmapMonthlyGoalsToggle.setText(collapsed ? "+" : "−");
             roadmapMonthlyGoalsToggle.setContentDescription(collapsed
                     ? "Expand monthly goals" : "Collapse monthly goals");
         }
