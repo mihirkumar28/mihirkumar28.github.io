@@ -8418,6 +8418,7 @@ public class MainActivity extends Activity {
                         + "Your WFH/WFO setting remains separate from the routine type.")
                 .setPositiveButton("Apply routine", (dialog, which) -> {
                     getPrefs().edit().putString(routineProfileKey(selectedDateKey), profile).apply();
+                    planPreviewMode = templateKey;
                     loadTemplate(templateKey);
                     setPlanDayScheduleExpanded(true);
                     render();
