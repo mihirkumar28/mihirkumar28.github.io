@@ -3668,7 +3668,8 @@ public class MainActivity extends Activity {
 
         int done = 0;
         for (MonthlyGoal goal : focus) if (goal.done) done++;
-        roadmapFocusCount.setText(monthLabelForKey(month) + " · " + done + "/" + focus.size() + " complete");
+        roadmapFocusCount.setText(done + "/" + focus.size() + " complete · "
+                + Math.max(0, focus.size() - done) + " left");
 
         int overdueCount = unfinishedLeafCountFromEarlierMonths();
         boolean viewingCurrentMonth = month.equals(currentMonthKey());
@@ -3860,8 +3861,9 @@ public class MainActivity extends Activity {
             card.addView(bar, barLp);
 
             RoadmapNode next = nextIncompleteRoadmapAction(rootNode);
-            TextView nextLine = text(next == null ? "No open actions in this track"
-                    : "Next up  ·  " + next.title, 11, color("#50635A"), false);
+            String nextStatus = progress[1] == 0 ? "No actions added yet"
+                    : next == null ? "All actions complete" : "Next up  ·  " + next.title;
+            TextView nextLine = text(nextStatus, 11, color("#50635A"), false);
             nextLine.setMaxLines(2);
             nextLine.setEllipsize(android.text.TextUtils.TruncateAt.END);
             card.addView(nextLine);
@@ -3904,8 +3906,9 @@ public class MainActivity extends Activity {
                 }
             });
             card.setContentDescription(rootNode.title + ", " + progress[0] + " of " + progress[1]
-                    + " complete. Next up: " + (next == null ? "none" : next.title)
-                    + ". Tap to open track.");
+                    + " complete. " + (progress[1] == 0 ? "No actions added yet."
+                        : next == null ? "All actions complete." : "Next up: " + next.title + ".")
+                    + " Tap to open track.");
         }
 
         LinearLayout summary = vertical();
