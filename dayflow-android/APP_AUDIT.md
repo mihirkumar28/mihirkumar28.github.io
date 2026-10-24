@@ -86,3 +86,11 @@ Source changes on `fix/today-tab-usability`:
 - [x] Preserve the existing tree, completion store and drag/drop business rules; expose catalog-linked offline reading copies from source-linked goal details.
 - [ ] Run PR CI, unit tests and offline PDF emulator verification.
 - [ ] Verify month-strip interaction, layout at narrow widths, accessibility text scaling, and Journey/Tree state synchronization on an Android device.
+
+## Roadmap Flow and month selector polish — 2026-10-24
+
+- [x] Add a Flow view that lays out all planned months in chronological order, with active monthly goals, nested goals, dated milestones and completion controls in one continuous vertical sequence.
+- [x] Keep Flow synchronized with saved completion state and use the existing goal/milestone persistence pathways.
+- [x] Replace the dark selected-month fill with a light sage highlight and stronger outline; keep text dark and improve miniature progress-track contrast.
+- [ ] Run unit tests and signed APK build on the PR revision.
+- [ ] Verify Journey/Flow/Tree on-device, including month selection contrast, screen width and enlarged accessibility text.
