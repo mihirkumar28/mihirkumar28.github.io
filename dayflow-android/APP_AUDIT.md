@@ -76,3 +76,13 @@ Source changes on `fix/today-tab-usability`:
 - [x] Improve widget label/value readability and reclaim vertical space while preserving a transparent outer surface and content-wrapping card.
 - [x] Normalize legacy widget mode values so a saved "weekend" label cannot create a false work arrangement.
 - [ ] Verify the rendered Android UI and widget in emulator/device screenshots at narrow widths, widget sizes, and enlarged accessibility text.
+
+## Roadmap Journey + Tree redesign — 2026-10-24
+
+- [x] Consolidate Roadmap navigation into two modes: Journey (chronological planning and progress) and Tree (full goal hierarchy).
+- [x] Remove the obsolete standalone timeline renderer so Journey has one chronological navigation surface instead of duplicate hidden UI.
+- [x] Add a compact horizontal month navigator to Journey. Planned month slots remain visible when empty; the selected month, focus list and mini progress indicators stay synchronized.
+- [x] Simplify monthly focus and workstream presentation by removing nested card borders, redundant previous/next controls and repeated workstream footers.
+- [x] Preserve the existing tree, completion store and drag/drop business rules; expose catalog-linked offline reading copies from source-linked goal details.
+- [ ] Run PR CI, unit tests and offline PDF emulator verification.
+- [ ] Verify month-strip interaction, layout at narrow widths, accessibility text scaling, and Journey/Tree state synchronization on an Android device.
