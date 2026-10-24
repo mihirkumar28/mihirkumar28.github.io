@@ -558,7 +558,10 @@ public class MainActivity extends Activity {
         shell.setBackgroundColor(color("#0D1512"));
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setClipToPadding(false);
+        // Keep scrolled content below the transparent status-bar region. Putting the inset
+        // on the ScrollView (not inside each page) prevents sticky-looking controls from
+        // sliding behind the system clock as the user scrolls.
+        scroll.setClipToPadding(true);
         scroll.setBackgroundColor(color("#0D1512"));
 
         screenFrame = new FrameLayout(this);
@@ -569,9 +572,15 @@ public class MainActivity extends Activity {
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(shell);
 
+        scroll.setOnApplyWindowInsetsListener((v, insets) -> {
+            int top = statusBarInsetTop(insets);
+            v.setPadding(0, top, 0, 0);
+            return insets;
+        });
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            int top = Math.max(dp(10), statusBarInsetTop(insets) + dp(4));
-            v.setPadding(dp(18), top, dp(18), dp(20));
+            // System-bar spacing is owned by the viewport. Keep this padding content-only
+            // so it scrolls normally without carrying the status-bar inset with it.
+            v.setPadding(dp(18), dp(10), dp(18), dp(20));
             return insets;
         });
 
@@ -608,10 +617,9 @@ public class MainActivity extends Activity {
         for (LinearLayout page : new LinearLayout[]{pagePlan,pageProgress,pageOffice,pageMore,pageSyllabus,pageScreenTime}) {
             page.setPadding(dp(18), dp(18), dp(18), dp(24));
             page.setOnApplyWindowInsetsListener((v, insets) -> {
-                // Secondary tabs share the same edge-to-edge window as Today.
-                // Reserve the system status-bar height plus normal page spacing.
-                int top = Math.max(dp(18), statusBarInsetTop(insets) + dp(18));
-                v.setPadding(dp(18), top, dp(18), dp(24));
+                // The ScrollView now reserves and clips the system status-bar inset.
+                // Page padding is only for content spacing.
+                v.setPadding(dp(18), dp(18), dp(18), dp(24));
                 return insets;
             });
             page.setVisibility(View.GONE);
@@ -4308,13 +4316,26 @@ public class MainActivity extends Activity {
             LinearLayout monthSection = horizontal();
             monthSection.setGravity(Gravity.TOP);
             android.widget.FrameLayout rail = new android.widget.FrameLayout(this);
-            LinearLayout.LayoutParams railLp = new LinearLayout.LayoutParams(dp(18), -1);
+            // Start with a compact marker height. MATCH_PARENT here made the horizontal
+            // row measure against the entire ScrollView viewport, creating huge gaps
+            // between collapsed months. Once the row is measured, extend the spine to
+            // exactly the row's real height without affecting that measurement.
+            LinearLayout.LayoutParams railLp = new LinearLayout.LayoutParams(dp(18), dp(28));
             monthSection.addView(rail, railLp);
 
             View spine = new View(this);
             spine.setBackgroundColor(color("#D4E0D8"));
             rail.addView(spine, new android.widget.FrameLayout.LayoutParams(dp(2), -1,
                     Gravity.CENTER_HORIZONTAL));
+            monthSection.addOnLayoutChangeListener((v, left, top, right, bottom,
+                    oldLeft, oldTop, oldRight, oldBottom) -> {
+                int sectionHeight = bottom - top;
+                ViewGroup.LayoutParams params = rail.getLayoutParams();
+                if (sectionHeight > 0 && params.height != sectionHeight) {
+                    params.height = sectionHeight;
+                    rail.setLayoutParams(params);
+                }
+            });
 
             View dot = new View(this);
             GradientDrawable dotBg = new GradientDrawable();
@@ -4356,10 +4377,14 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
             statusLp.topMargin = dp(1);
             monthTitles.addView(status, statusLp);
-            monthHeader.addView(text(monthDone + " / " + monthTotal, 10,
-                    color(monthDone == monthTotal && monthTotal > 0 ? "#28765C" : "#687A70"), true));
-            monthHeader.addView(text(expanded ? "⌄" : "›", 18, color("#779688"), true),
-                    new LinearLayout.LayoutParams(dp(20), dp(26)));
+            TextView monthCount = text(monthDone + " / " + monthTotal, 10,
+                    color(monthDone == monthTotal && monthTotal > 0 ? "#28765C" : "#687A70"), true);
+            LinearLayout.LayoutParams monthCountLp = new LinearLayout.LayoutParams(-2, -2);
+            monthCountLp.rightMargin = dp(7);
+            monthHeader.addView(monthCount, monthCountLp);
+            TextView monthChevron = text(expanded ? "⌄" : "›", 18, color("#779688"), true);
+            monthChevron.setGravity(Gravity.CENTER);
+            monthHeader.addView(monthChevron, new LinearLayout.LayoutParams(dp(22), dp(28)));
             monthHeader.setContentDescription(monthLabelForKey(month) + ", " + monthDone
                     + " of " + monthTotal + " plan items complete. "
                     + (expanded ? "Tap to collapse month." : "Tap to expand month."));
