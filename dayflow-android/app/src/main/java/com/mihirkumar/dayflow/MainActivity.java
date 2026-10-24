@@ -1847,6 +1847,14 @@ public class MainActivity extends Activity {
         monthlyHeaderText.addView(roadmapFocusCount, focusCountLp);
         monthlyHeader.addView(monthlyHeaderText, new LinearLayout.LayoutParams(0, -2, 1f));
 
+        Button addMonthGoal = secondaryButton("+ Goal", () -> editMonthlyGoal(null, null,
+                selectedGoalMonth == null ? monthKeyFromDate(todayKey()) : selectedGoalMonth));
+        addMonthGoal.setTextSize(10);
+        addMonthGoal.setMinHeight(dp(36));
+        addMonthGoal.setContentDescription("Add a goal to the selected roadmap month");
+        LinearLayout.LayoutParams addMonthGoalLp = new LinearLayout.LayoutParams(dp(66), dp(36));
+        addMonthGoalLp.leftMargin = dp(5);
+        monthlyHeader.addView(addMonthGoal, addMonthGoalLp);
 
         roadmapMonthlyGoalsToggle = secondaryButton(roadmapMonthlyGoalsCollapsed ? "›" : "⌄",
                 () -> setRoadmapMonthlyGoalsCollapsed(!roadmapMonthlyGoalsCollapsed));
@@ -3666,7 +3674,7 @@ public class MainActivity extends Activity {
 
         int done = 0;
         for (MonthlyGoal goal : focus) if (goal.done) done++;
-        roadmapFocusCount.setText(monthLabelForKey(month) + " · " + done + "/" + focus.size() + " complete");
+        roadmapFocusCount.setText(done + " of " + focus.size() + " goals complete");
 
         int overdueCount = unfinishedLeafCountFromEarlierMonths();
         boolean viewingCurrentMonth = month.equals(currentMonthKey());
@@ -3680,9 +3688,16 @@ public class MainActivity extends Activity {
         }
 
         if (focus.isEmpty()) {
-            TextView empty = text("No goals planned for this month yet. Add goals from + Add item in the Roadmap tree.",
-                    12, color("#687A70"), false);
-            empty.setPadding(dp(2), dp(10), dp(2), dp(8));
+            LinearLayout empty = vertical();
+            empty.setPadding(dp(2), dp(12), dp(2), dp(10));
+            empty.addView(text("Nothing planned for " + monthLabelForKey(month) + " yet.",
+                    12, color("#344A40"), true));
+            TextView hint = text("Use + Goal above to add the first concrete outcome for this month.",
+                    11, color("#687A70"), false);
+            hint.setLineSpacing(dp(1), 1f);
+            LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+            hintLp.topMargin = dp(3);
+            empty.addView(hint, hintLp);
             roadmapFocusGoalList.addView(empty);
             return;
         }
@@ -3963,7 +3978,10 @@ public class MainActivity extends Activity {
                     color("#687A70"), false));
             return;
         }
-        TextView window = text("NEXT " + (end - start) + " MONTHS", 9, color("#687A70"), true);
+        TextView window = text(monthLabelForKey(months.get(start)).toUpperCase(Locale.US)
+                + "  —  " + monthLabelForKey(months.get(end - 1)).toUpperCase(Locale.US),
+                9, color("#687A70"), true);
+        window.setMaxLines(2);
         LinearLayout.LayoutParams windowLp = new LinearLayout.LayoutParams(-1, -2);
         windowLp.bottomMargin = dp(7);
         roadmapTimelineContent.addView(window, windowLp);
