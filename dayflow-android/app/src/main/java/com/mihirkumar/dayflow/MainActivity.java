@@ -2977,17 +2977,50 @@ public class MainActivity extends Activity {
         return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
+    private PlanCatalog.Document roadmapSourceDocument(MonthlyGoal goal) {
+        if (goal == null || goal.sourcePlanId == null || goal.sourcePlanId.trim().isEmpty()) return null;
+        PlanCatalog.Goal catalogGoal = PlanCatalog.findGoalById(goal.sourcePlanId);
+        if (catalogGoal == null || catalogGoal.sourceIds.isEmpty()) return null;
+        for (String sourceId : catalogGoal.sourceIds) {
+            for (PlanCatalog.Document document : PlanCatalog.documents()) {
+                if (sourceId.equals(document.id)
+                        && (document.originalPdfBundled || document.offlinePdfCopyBundled)) {
+                    return document;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void openRoadmapSourceDocument(PlanCatalog.Document document) {
+        if (document == null) return;
+        Intent intent = new Intent(this, OfflinePdfViewerActivity.class);
+        intent.putExtra(OfflinePdfViewerActivity.EXTRA_FILENAME, document.filename);
+        intent.putExtra(OfflinePdfViewerActivity.EXTRA_TITLE,
+                document.title + (document.originalPdfBundled ? "" : " · Offline reading copy"));
+        startActivity(intent);
+    }
+
     private void showRoadmapGoalDetailsDialog(MonthlyGoal goal) {
         if (goal == null) return;
-        String message = "SOURCE\n" + goalInfoValue(goal.source, "Not specified — edit goal")
-                + "\n\nPAGES\n" + goalInfoValue(goal.pages, "Not listed")
-                + "\n\nESTIMATED TIME\n" + goalInfoValue(goal.estimatedTime, "Not estimated — edit goal");
-        new AlertDialog.Builder(this)
+        PlanCatalog.Document sourceDocument = roadmapSourceDocument(goal);
+        String message = "SOURCE\\n" + goalInfoValue(goal.source, "Not specified — edit goal")
+                + "\\n\\nPAGES\\n" + goalInfoValue(goal.pages, "Not listed")
+                + "\\n\\nESTIMATED TIME\\n" + goalInfoValue(goal.estimatedTime, "Not estimated — edit goal");
+        if (sourceDocument != null) {
+            message += "\\n\\nBUNDLED REFERENCE\\n" + sourceDocument.title
+                    + (sourceDocument.originalPdfBundled ? "" : " (offline reading copy)");
+        }
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this)
                 .setTitle(goal.title)
                 .setMessage(message)
-                .setPositiveButton("Edit goal", (dialog, which) -> editMonthlyGoal(goal))
-                .setNegativeButton("Done", null)
-                .show();
+                .setPositiveButton("Edit goal", (whichDialog, which) -> editMonthlyGoal(goal))
+                .setNegativeButton("Done", null);
+        if (sourceDocument != null) {
+            dialog.setNeutralButton(sourceDocument.originalPdfBundled ? "Open source PDF" : "Open offline plan",
+                    (whichDialog, which) -> openRoadmapSourceDocument(sourceDocument));
+        }
+        dialog.show();
     }
 
     private void addRoadmapGoalDetailPanel(LinearLayout parent, MonthlyGoal goal) {
