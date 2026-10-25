@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "app/src/main/assets"
 CATALOG = ASSETS / "plans_catalog.json"
 PLANS = ASSETS / "plans"
+SOURCE_ARCHIVE = ASSETS / "original_source_pdfs.zip"
 OUT = ASSETS / "plan_pdfs.zip"
 NOTICE = "Condensed offline reading copy generated from DayFlow's catalog; not the original source PDF."
 ORIGINAL_IDS = set()
@@ -98,15 +99,25 @@ def original_pdf_bytes_for(doc):
     if candidate.is_file():
         data = candidate.read_bytes()
     else:
-        # Keep the source bytes compressed in git to reduce repository growth.
-        # The APK receives the decompressed, byte-for-byte original PDF.
+        # Prefer a directly-stored gzipped file if present.
         compressed = candidate.with_name(candidate.name + ".gz")
-        if not compressed.is_file():
+        if compressed.is_file():
+            try:
+                data = gzip.decompress(compressed.read_bytes())
+            except (OSError, EOFError) as exc:
+                raise SystemExit(f"Cannot decompress original PDF asset {compressed}: {exc}")
+        elif SOURCE_ARCHIVE.is_file():
+            # The git repository keeps the source PDFs in a compressed ZIP to
+            # reduce repository size; this reads bytes from the original entries.
+            try:
+                with zipfile.ZipFile(SOURCE_ARCHIVE) as archive:
+                    if doc["filename"] not in archive.namelist():
+                        return None
+                    data = archive.read(doc["filename"])
+            except (OSError, zipfile.BadZipFile, KeyError) as exc:
+                raise SystemExit(f"Cannot read original source PDF archive {SOURCE_ARCHIVE}: {exc}")
+        else:
             return None
-        try:
-            data = gzip.decompress(compressed.read_bytes())
-        except (OSError, EOFError) as exc:
-            raise SystemExit(f"Cannot decompress original PDF asset {compressed}: {exc}")
     if not data.startswith(b"%PDF-"):
         raise SystemExit(f"Original asset is not a PDF: {candidate}")
     return data
