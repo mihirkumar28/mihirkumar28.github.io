@@ -40,6 +40,8 @@ final class BodyCompositionPlanner {
         double totalWeightLossRequiredKg;
         double requiredWeightLossPerWeekKg;
         double requiredIntakeKcal;
+        double startingBmi;
+        double projectedBmi;
         String requiredIntakeStatus;
     }
 
@@ -115,6 +117,9 @@ final class BodyCompositionPlanner {
         out.projectedWeightChangeKg = projectedWeight - in.startWeightKg;
         out.projectedFatMassKg = projectedFatMass;
         out.projectedBodyFatPct = projectedBodyFat;
+        double heightMeters = in.heightCm / 100.0;
+        out.startingBmi = in.startWeightKg / (heightMeters * heightMeters);
+        out.projectedBmi = projectedWeight / (heightMeters * heightMeters);
         out.estimatedTdeeAtTargetKcal = tdeeAtTarget;
         out.targetWeightKg = targetWeight;
         out.totalWeightLossRequiredKg = targetLoss;

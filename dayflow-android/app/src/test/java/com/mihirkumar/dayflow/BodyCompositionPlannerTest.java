@@ -37,6 +37,13 @@ public class BodyCompositionPlannerTest {
                 < BodyCompositionPlanner.simulateWeight(in, 2200));
     }
 
+    @Test public void bmiReflectsHeightAndWeight() {
+        BodyCompositionPlanner.Inputs in = new BodyCompositionPlanner.Inputs();
+        BodyCompositionPlanner.Result result = BodyCompositionPlanner.calculate(in);
+        assertEquals(38.8, result.startingBmi, 0.2);
+        assertTrue(result.projectedBmi < result.startingBmi);
+    }
+
     @Test public void invalidGoalIsRejected() {
         BodyCompositionPlanner.Inputs in = new BodyCompositionPlanner.Inputs();
         in.targetBodyFatPct = 40;

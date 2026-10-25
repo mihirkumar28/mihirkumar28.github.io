@@ -6882,6 +6882,8 @@ public class MainActivity extends Activity {
             addBodyMetric(projection, "Estimated TDEE today", bodyKcal(result.estimatedTdeeTodayKcal));
             addBodyMetric(projection, "Initial estimated deficit", bodyKcal(result.initialDailyDeficitKcal));
             addBodyMetric(projection, "Projected weight on target date", bodyKg(result.projectedWeightKg));
+            addBodyMetric(projection, "Starting BMI", String.format(Locale.US, "%.1f", result.startingBmi));
+            addBodyMetric(projection, "Projected BMI", String.format(Locale.US, "%.1f", result.projectedBmi));
             addBodyMetric(projection, "Projected body fat", String.format(Locale.US, "%.1f%%", result.projectedBodyFatPct));
             addBodyMetric(projection, "Estimated fat mass on target date", bodyKg(result.projectedFatMassKg));
             addBodyMetric(projection, "Weight change in model", String.format(Locale.US, "%+.1f kg", result.projectedWeightChangeKg));
