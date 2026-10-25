@@ -11,7 +11,7 @@ ASSETS = ROOT / "app/src/main/assets"
 CATALOG = ASSETS / "plans_catalog.json"
 PLANS = ASSETS / "plans"
 ARCHIVE = ASSETS / "plan_pdfs.zip"
-MONTH_RE = re.compile(r"^\\d{4}-(0[1-9]|1[0-2])$")
+MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
 def fail(message):
