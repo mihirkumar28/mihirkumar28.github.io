@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Validate structured roadmap references, PDF archive integrity, and truthful source flags."""
 import argparse
+import gzip
 import json
 import re
 import zipfile
@@ -65,7 +66,17 @@ def main():
             candidate = (ASSETS / Path(*relative.parts)).resolve()
             if not candidate.is_relative_to(PLANS.resolve()):
                 fail(f"original asset path escapes plans/ for {doc_id}")
-            exists = candidate.is_file() and candidate.read_bytes().startswith(b"%PDF-")
+            compressed = candidate.with_name(candidate.name + ".gz")
+            try:
+                if candidate.is_file():
+                    raw_pdf = candidate.read_bytes()
+                elif compressed.is_file():
+                    raw_pdf = gzip.decompress(compressed.read_bytes())
+                else:
+                    raw_pdf = b""
+            except (OSError, EOFError) as exc:
+                fail(f"cannot read/decompress original asset for {doc_id}: {exc}")
+            exists = raw_pdf.startswith(b"%PDF-")
         if original:
             original_count += 1
             if not exists:
