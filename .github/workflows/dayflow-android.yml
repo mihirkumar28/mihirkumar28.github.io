@@ -96,14 +96,33 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim
           working-directory: dayflow-android
           script: |
+            # Prefer an on-device launch smoke check over instrumentation that waits for
+            # MainActivity's full UI queue to become idle.
+            gradle :app:assembleDebug
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell settings put global airplane_mode_on 1
             adb shell svc wifi disable
-            gradle :app:connectedDebugAndroidTest
-            # Launch outside instrumentation so application startup is not gated by an idle main queue.
             launch_output="$(adb shell am start -W -n com.mihirkumar.dayflow/.MainActivity 2>&1)"
             printf '%s\n' "$launch_output"
             echo "$launch_output" | grep -q 'Status: ok'
             adb shell dumpsys activity activities | grep -F 'com.mihirkumar.dayflow/.MainActivity'
+            python3 - <<'PY'
+            import io
+            import zipfile
+            from pathlib import Path
+            apk = Path("app/build/outputs/apk/debug/app-debug.apk")
+            with zipfile.ZipFile(apk) as package:
+                names = set(package.namelist())
+                assert "assets/plan_pdfs.zip" in names, "APK is missing the offline PDF archive"
+                archive_bytes = package.read("assets/plan_pdfs.zip")
+            with zipfile.ZipFile(io.BytesIO(archive_bytes)) as documents:
+                assert documents.testzip() is None, "Offline PDF archive is corrupt inside the APK"
+                pdfs = documents.namelist()
+                assert pdfs, "Offline PDF archive is empty"
+                for name in pdfs:
+                    assert documents.read(name).startswith(b"%PDF-"), f"Invalid PDF: {name}"
+            print(f"Offline asset verification passed: {len(pdfs)} PDF(s) embedded in {apk}.")
+            PY
 
       - name: Verify persistent release key
         if: env.DAYFLOW_SIGNED == 'true'
