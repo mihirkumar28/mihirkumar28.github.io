@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "app/src/main/assets"
 CATALOG = ASSETS / "plans_catalog.json"
 PLANS = ASSETS / "plans"
-SOURCE_ARCHIVE = ASSETS / "original_source_pdfs.zip"
+SOURCE_ARCHIVE = ROOT / "source_docs" / "original_source_pdfs.zip"
 ARCHIVE = ASSETS / "plan_pdfs.zip"
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
@@ -20,11 +20,25 @@ def fail(message):
     raise SystemExit("Plan catalog validation failed: " + message)
 
 
+def assemble_source_archive():
+    """Reassemble the checked-in binary parts into a transient build-time ZIP."""
+    if SOURCE_ARCHIVE.is_file():
+        return
+    parts = sorted(SOURCE_ARCHIVE.parent.glob("original_source_pdfs.zip.part[0-9][0-9]"))
+    if not parts:
+        return
+    SOURCE_ARCHIVE.parent.mkdir(parents=True, exist_ok=True)
+    with SOURCE_ARCHIVE.open("wb") as output:
+        for part in parts:
+            output.write(part.read_bytes())
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-originals", action="store_true",
                         help="Fail unless every document resolves to an original source PDF.")
     args = parser.parse_args()
+    assemble_source_archive()
     if not CATALOG.is_file():
         fail("catalog not found: " + str(CATALOG))
     try:
