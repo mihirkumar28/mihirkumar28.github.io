@@ -1,6 +1,7 @@
 package com.mihirkumar.dayflow;
 
 import android.app.Activity;
+import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
 import android.view.View;
@@ -20,23 +21,35 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class DayFlowP0SmokeTest {
     @Test public void launcherActivityStartsAndRendersContent() throws Exception {
-        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Context context = instrumentation.getTargetContext();
         Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         assertNotNull("Application must expose a launcher activity", launch);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-        Activity activity = InstrumentationRegistry.getInstrumentation().startActivitySync(launch);
+        // Do not call startActivitySync(): it waits for the entire main queue to become idle,
+        // which can time out on MainActivity even after Android has resumed the screen.
+        Instrumentation.ActivityMonitor monitor =
+                instrumentation.addMonitor(MainActivity.class.getName(), null, false);
         try {
-            View content = activity.findViewById(android.R.id.content);
-            assertNotNull("Activity must attach its content root", content);
-            assertTrue("Launcher must render a screen rather than an empty container",
-                    content instanceof ViewGroup && ((ViewGroup) content).getChildCount() > 0);
+            context.startActivity(launch);
+            Activity activity = instrumentation.waitForMonitorWithTimeout(monitor, 45000);
+            assertNotNull("Launcher activity did not reach its lifecycle monitor", activity);
+            try {
+                final View[] content = new View[1];
+                instrumentation.runOnMainSync(() -> content[0] = activity.findViewById(android.R.id.content));
+                assertNotNull("Activity must attach its content root", content[0]);
+                assertTrue("Launcher must render a screen rather than an empty container",
+                        content[0] instanceof ViewGroup && ((ViewGroup) content[0]).getChildCount() > 0);
+            } finally {
+                instrumentation.runOnMainSync(activity::finish);
+            }
         } finally {
-            InstrumentationRegistry.getInstrumentation().runOnMainSync(activity::finish);
+            instrumentation.removeMonitor(monitor);
         }
     }
 
-    @Test public void widgetRemoteViewsInflateAndExposeItsPrimaryControls() throws Exception {
+    @Test public void widgetRemoteViewsInflateAndExposeItsPrimaryControls() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteViews remoteViews = new RemoteViews(context.getPackageName(), R.layout.widget_dayflow);
         View rendered = remoteViews.apply(context, new FrameLayout(context));
