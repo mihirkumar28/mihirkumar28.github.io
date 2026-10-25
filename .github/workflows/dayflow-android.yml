@@ -17,15 +17,16 @@ on:
 permissions:
   contents: write
 
-# Only one build for a branch may publish artifacts/release assets at a time.
-# New commits cancel older in-flight builds so a stale APK cannot overwrite latest.
+# Keep this concurrency namespace distinct from older hung emulator runs.
+# New commits cancel stale builds so an older APK cannot overwrite latest.
 concurrency:
-  group: dayflow-android-${{ github.ref }}
+  group: dayflow-android-p0-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: dayflow-android
