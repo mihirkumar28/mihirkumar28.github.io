@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "app/src/main/assets"
 CATALOG = ASSETS / "plans_catalog.json"
 PLANS = ASSETS / "plans"
+SOURCE_ARCHIVE = ASSETS / "original_source_pdfs.zip"
 ARCHIVE = ASSETS / "plan_pdfs.zip"
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
@@ -72,9 +73,12 @@ def main():
                     raw_pdf = candidate.read_bytes()
                 elif compressed.is_file():
                     raw_pdf = gzip.decompress(compressed.read_bytes())
+                elif SOURCE_ARCHIVE.is_file():
+                    with zipfile.ZipFile(SOURCE_ARCHIVE) as source_zip:
+                        raw_pdf = source_zip.read(filename) if filename in source_zip.namelist() else b""
                 else:
                     raw_pdf = b""
-            except (OSError, EOFError) as exc:
+            except (OSError, EOFError, zipfile.BadZipFile, KeyError) as exc:
                 fail(f"cannot read/decompress original asset for {doc_id}: {exc}")
             exists = raw_pdf.startswith(b"%PDF-")
         if original:
@@ -100,6 +104,20 @@ def main():
             for source_id in goal.get("sourceIds", []):
                 if source_id not in by_id:
                     fail(f"goal {goal_id} references unknown source document {source_id}")
+
+    if SOURCE_ARCHIVE.is_file():
+        try:
+            with zipfile.ZipFile(SOURCE_ARCHIVE) as source_zip:
+                if source_zip.testzip() is not None:
+                    fail("original source PDF archive failed ZIP integrity")
+                allowed = set(filenames)
+                for name in source_zip.namelist():
+                    if name not in allowed:
+                        fail("unexpected original source PDF archive entry: " + name)
+                    if not source_zip.read(name).startswith(b"%PDF-"):
+                        fail("original source archive entry is not a PDF: " + name)
+        except zipfile.BadZipFile as exc:
+            fail("invalid original source PDF ZIP: " + str(exc))
 
     if not ARCHIVE.is_file():
         fail("missing plan_pdfs.zip; run generate_offline_plan_pdfs.py first")
