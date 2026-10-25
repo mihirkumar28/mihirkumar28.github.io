@@ -1,6 +1,5 @@
 package com.mihirkumar.dayflow;
 
-import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
@@ -9,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.RemoteViews;
 
+import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
@@ -20,32 +20,24 @@ import static org.junit.Assert.*;
 /** Lightweight device-level coverage for the app entry point and launcher widget layout. */
 @RunWith(AndroidJUnit4.class)
 public class DayFlowP0SmokeTest {
-    @Test public void launcherActivityStartsAndRendersContent() throws Exception {
+    @Test public void launcherActivityStartsAndRendersContent() {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Context context = instrumentation.getTargetContext();
         Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         assertNotNull("Application must expose a launcher activity", launch);
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        assertEquals("Launcher intent must resolve to MainActivity",
+                MainActivity.class.getName(), launch.getComponent().getClassName());
 
-        // Do not call startActivitySync(): it waits for the entire main queue to become idle,
-        // which can time out on MainActivity even after Android has resumed the screen.
-        Instrumentation.ActivityMonitor monitor =
-                instrumentation.addMonitor(MainActivity.class.getName(), null, false);
-        try {
-            context.startActivity(launch);
-            Activity activity = instrumentation.waitForMonitorWithTimeout(monitor, 45000);
-            assertNotNull("Launcher activity did not reach its lifecycle monitor", activity);
-            try {
-                final View[] content = new View[1];
-                instrumentation.runOnMainSync(() -> content[0] = activity.findViewById(android.R.id.content));
-                assertNotNull("Activity must attach its content root", content[0]);
+        // ActivityScenario waits on lifecycle callbacks instead of requiring the whole main
+        // message queue to become idle. MainActivity owns periodic/background work, so an
+        // ActivityMonitor plus startActivitySync can time out even when the launch is valid.
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                View content = activity.findViewById(android.R.id.content);
+                assertNotNull("Activity must attach its content root", content);
                 assertTrue("Launcher must render a screen rather than an empty container",
-                        content[0] instanceof ViewGroup && ((ViewGroup) content[0]).getChildCount() > 0);
-            } finally {
-                instrumentation.runOnMainSync(activity::finish);
-            }
-        } finally {
-            instrumentation.removeMonitor(monitor);
+                        content instanceof ViewGroup && ((ViewGroup) content).getChildCount() > 0);
+            });
         }
     }
 
