@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build the offline PDF archive, preferring original assets when present."""
+import gzip
 import json
 import textwrap
 import zipfile
@@ -82,7 +83,7 @@ def make_pdf(title, subtitle, body):
     return bytes(out)
 
 
-def original_path_for(doc):
+def original_pdf_bytes_for(doc):
     relative = doc.get("originalAssetPath")
     if not relative:
         return None
@@ -94,11 +95,21 @@ def original_path_for(doc):
         raise SystemExit(f"Original PDF path must be inside {PLANS}: {relative}")
     if candidate.name != doc["filename"]:
         raise SystemExit(f"Original asset name must match catalog filename for {doc['id']}")
-    if not candidate.is_file():
-        return None
-    if not candidate.read_bytes().startswith(b"%PDF-"):
+    if candidate.is_file():
+        data = candidate.read_bytes()
+    else:
+        # Keep the source bytes compressed in git to reduce repository growth.
+        # The APK receives the decompressed, byte-for-byte original PDF.
+        compressed = candidate.with_name(candidate.name + ".gz")
+        if not compressed.is_file():
+            return None
+        try:
+            data = gzip.decompress(compressed.read_bytes())
+        except (OSError, EOFError) as exc:
+            raise SystemExit(f"Cannot decompress original PDF asset {compressed}: {exc}")
+    if not data.startswith(b"%PDF-"):
         raise SystemExit(f"Original asset is not a PDF: {candidate}")
-    return candidate
+    return data
 
 
 def sync_flags(catalog):
@@ -137,10 +148,10 @@ def main():
             if Path(filename).name != filename or not filename.lower().endswith(".pdf"):
                 raise SystemExit(f"Unsafe PDF filename for {doc.get('id')}: {filename}")
             expected.add(filename)
-            original = original_path_for(doc)
-            if original:
+            original_bytes = original_pdf_bytes_for(doc)
+            if original_bytes:
                 ORIGINAL_IDS.add(doc["id"])
-                archive.writestr(filename, original.read_bytes())
+                archive.writestr(filename, original_bytes)
             else:
                 if doc.get("originalAssetPath"):
                     missing.append(f"{doc['id']} -> {doc['originalAssetPath']}")
