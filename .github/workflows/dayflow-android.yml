@@ -99,6 +99,11 @@ jobs:
             adb shell settings put global airplane_mode_on 1
             adb shell svc wifi disable
             gradle :app:connectedDebugAndroidTest
+            # Launch outside instrumentation so application startup is not gated by an idle main queue.
+            launch_output="$(adb shell am start -W -n com.mihirkumar.dayflow/.MainActivity 2>&1)"
+            printf '%s\n' "$launch_output"
+            echo "$launch_output" | grep -q 'Status: ok'
+            adb shell dumpsys activity activities | grep -F 'com.mihirkumar.dayflow/.MainActivity'
 
       - name: Verify persistent release key
         if: env.DAYFLOW_SIGNED == 'true'
