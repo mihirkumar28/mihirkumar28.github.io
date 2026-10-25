@@ -153,3 +153,14 @@ Source changes on `fix/today-tab-usability`:
 - [x] Add unit coverage for all three allowed routine types and per-date overrides.
 - [ ] Run Android regression tests, offline-PDF emulator verification and signed release build.
 - [ ] Verify the three-option selector and Weekend behavior on a physical device.
+
+
+## P0 reliability and offline source-document work — 2026-10-25
+
+- [x] Add a build-time catalog/archive validator for month keys, duplicate IDs/filenames, goal-to-document source references, PDF archive integrity, and truthful original-vs-condensed metadata.
+- [x] Update the PDF packaging script to prefer original PDFs under app/src/main/assets/plans/ when present and package the actual source bytes into plan_pdfs.zip; generated catalog-based copies remain the explicit fallback until original files are checked in.
+- [x] Synchronize document flags during the build so the APK UI labels a file as an original only when its original asset exists and has a valid PDF header.
+- [x] Add a physical-device P0 smoke-test checklist. This is a checklist, not evidence that physical-device checks have been performed.
+- [ ] Add and commit all five authoritative original PDFs under app/src/main/assets/plans/; the repository snapshot contains only plans_catalog.json, not the original PDF assets.
+- [ ] Run and inspect PR CI (unit tests, lint, offline PDF emulator test and APK build).
+- [ ] Perform the physical-device smoke checklist, including widget behavior, routine isolation, Today/Plan synchronization, Roadmap Flow/Tree and airplane-mode access to every original PDF.

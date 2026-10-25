@@ -29,7 +29,7 @@ public class PlanDocumentsActivity extends Activity {
     }
     private void open(String title, String filename, String body) {
         ScrollView sc = new ScrollView(this);
-        LinearLayout box = new LinearLayout(this); box.setOrientation(1);
+        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(20), dp(18), dp(20), dp(24)); box.setBackgroundColor(Color.WHITE);
         box.addView(label(title, 22, Color.parseColor("#18372E"), true));
         TextView f = label(filename, 11, Color.parseColor("#687A70"), false);
@@ -40,7 +40,7 @@ public class PlanDocumentsActivity extends Activity {
     }
     private void add(LinearLayout parent, String title, String detail, String filename, String body,
                      boolean offlinePdfCopyBundled, boolean originalPdfBundled) {
-        LinearLayout card = new LinearLayout(this); card.setOrientation(1);
+        LinearLayout card = new LinearLayout(this); card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(15), dp(14), dp(15), dp(13)); card.setBackground(bg("#FFFFFF"));
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.bottomMargin = dp(10); parent.addView(card, cp);
         card.addView(label(title, 16, Color.parseColor("#18372E"), true));
@@ -69,7 +69,7 @@ public class PlanDocumentsActivity extends Activity {
         getWindow().setNavigationBarColor(Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         ScrollView scroll = new ScrollView(this);
-        LinearLayout page = new LinearLayout(this); page.setOrientation(1);
+        LinearLayout page = new LinearLayout(this); page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(18), dp(22), dp(18), dp(24)); page.setBackgroundColor(Color.parseColor("#0D1512"));
         page.addView(label("DAYFLOW  /  OFFLINE LIBRARY", 10, Color.parseColor("#65C5A0"), true));
         TextView h = label("Plans & Documents", 28, Color.parseColor("#F2F7F3"), true);

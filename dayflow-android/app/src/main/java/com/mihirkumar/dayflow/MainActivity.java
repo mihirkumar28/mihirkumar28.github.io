@@ -6889,7 +6889,7 @@ public class MainActivity extends Activity {
         todayPlanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(color("#23845F")));
         todayPlanProgress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(color("#DDE6DE")));
         todayPlanProgress.setMinimumHeight(dp(4));
-        todayPlanProgress.setMaxHeight(dp(4));
+        // The 4dp layout-param height below constrains this bar on API 26+; setMaxHeight requires API 29.
         LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(4));
         progressLp.topMargin = dp(7);
         progressLp.bottomMargin = dp(10);

@@ -26,10 +26,13 @@ public class RoadmapMonthlyPlanTest {
         assertEquals(51, goals);
         assertEquals(5, PlanCatalog.documents().size());
         assertNotNull(PlanCatalog.documents().stream().filter(d -> d.id.equals("technical_interview_readiness")).findFirst().orElse(null));
-        assertTrue(PlanCatalog.documents().stream().allMatch(d -> d.offlinePdfCopyBundled));
-        assertTrue(PlanCatalog.documents().stream().noneMatch(d -> d.originalPdfBundled));
         assertTrue(PlanCatalog.sourcePlanVersion() >= 4);
-        assertFalse(PlanCatalog.documents().get(0).originalPdfBundled);
+        for (PlanCatalog.Document document : PlanCatalog.documents()) {
+            assertTrue("Each document must resolve to an original PDF or an offline copy: " + document.id,
+                    document.originalPdfBundled || document.offlinePdfCopyBundled);
+            assertEquals(document.originalPdfBundled ? "original_source_pdf" : "condensed_reading_copy",
+                    document.sourceKind);
+        }
         assertEquals("unified_master", PlanCatalog.documents().get(0).id);
         assertTrue(PlanCatalog.findGoalById("general-studies-prelims-gs-polity-i-ii").sourceIds
                 .contains("upsc_gs_monthly"));
