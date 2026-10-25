@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "app/src/main/assets"
 CATALOG = ASSETS / "plans_catalog.json"
 PLANS = ASSETS / "plans"
-SOURCE_ARCHIVE = ASSETS / "original_source_pdfs.zip"
+SOURCE_ARCHIVE = ROOT / "source_docs" / "original_source_pdfs.zip"
 OUT = ASSETS / "plan_pdfs.zip"
 NOTICE = "Condensed offline reading copy generated from DayFlow's catalog; not the original source PDF."
 ORIGINAL_IDS = set()
@@ -84,6 +84,19 @@ def make_pdf(title, subtitle, body):
     return bytes(out)
 
 
+def assemble_source_archive():
+    """Reassemble the checked-in binary parts into a transient build-time ZIP."""
+    if SOURCE_ARCHIVE.is_file():
+        return
+    parts = sorted(SOURCE_ARCHIVE.parent.glob("original_source_pdfs.zip.part[0-9][0-9]"))
+    if not parts:
+        return
+    SOURCE_ARCHIVE.parent.mkdir(parents=True, exist_ok=True)
+    with SOURCE_ARCHIVE.open("wb") as output:
+        for part in parts:
+            output.write(part.read_bytes())
+
+
 def original_pdf_bytes_for(doc):
     relative = doc.get("originalAssetPath")
     if not relative:
@@ -140,6 +153,7 @@ def sync_flags(catalog):
 
 def main():
     global ORIGINAL_IDS
+    assemble_source_archive()
     catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     docs = catalog.get("documents", [])
     if not docs:
