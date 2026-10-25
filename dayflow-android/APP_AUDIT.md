@@ -171,3 +171,12 @@ Source changes on `fix/today-tab-usability`:
 - [x] Add a dedicated Body bottom-navigation tab with locally saved starting measurements, calorie/activity inputs, target-date selection, estimated TDEE/deficit, projected weight/body-fat output, and sensitivity to the assumed fat-loss partition.
 - [x] Extract the scenario arithmetic into a pure Java calculator and cover the core equations with unit tests.
 - [ ] Run and inspect Android CI (lint, unit tests, APK build); visually verify the Body tab on a physical device. The calculator is intentionally labelled as a simplified scenario model, not a clinical prediction.
+
+
+## Four-destination navigation consolidation — 2026-10-26
+
+- [x] Reduce the persistent bottom navigation from six destinations to Today, Plan, Roadmap and More.
+- [x] Move Body and Office into the grouped More hub; nested tool pages retain the More selected state so users can return to the hub using the same destination.
+- [x] Group tracking, routines/library, data/app and careful actions instead of presenting one flat settings list.
+- [x] Combine four routine-template shortcuts into one template picker and combine backup export/import into one entry.
+- [ ] Run PR CI (unit tests, lint and APK build) and verify the four-tab layout and More-hub flows on a physical device.

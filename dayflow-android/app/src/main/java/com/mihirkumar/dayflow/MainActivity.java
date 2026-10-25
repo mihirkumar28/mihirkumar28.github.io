@@ -720,7 +720,7 @@ public class MainActivity extends Activity {
             v.setPadding(dp(8),dp(4),dp(8),dp(6) + bottomInset);
             return insets;
         });
-        String[][] items={{"⌂","Today","home"},{"▤","Plan","plan"},{"◉","Body","body"},{"◔","Roadmap","syllabus"},{"◷","Office","office"},{"•••","More","more"}};
+        String[][] items={{"⌂","Today","home"},{"▤","Plan","plan"},{"◔","Roadmap","syllabus"},{"•••","More","more"}};
         for(String[] item:items){
             LinearLayout tab=vertical();tab.setGravity(Gravity.CENTER);tab.setPadding(dp(3),dp(5),dp(3),dp(4));
             TextView icon=text(item[0],19,color("#687A70"),true);icon.setGravity(Gravity.CENTER);
@@ -729,7 +729,7 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.leftMargin=dp(2);lp.rightMargin=dp(2);bottomNavigation.addView(tab,lp);navItems.put(item[2],label);
         }
         // WRAP_CONTENT lets the view grow by the system-bar inset while preserving
-        // a 64dp row for the six tabs, with a white background behind the system bar.
+        // a 64dp row for the four main destinations, with a white background behind the system bar.
         shell.addView(bottomNavigation,new LinearLayout.LayoutParams(-1,-2));
         bottomNavigation.requestApplyInsets();
     }
@@ -1503,30 +1503,54 @@ public class MainActivity extends Activity {
     }
 
     private void buildMorePage() {
-        pageHeading(pageMore,"Tools & preferences","More","Routines, data management and less-frequent settings.");
+        pageHeading(pageMore,"Tools & preferences","More",
+                "Your occasional tools, grouped so the daily workflow stays simple.");
         moreContent=vertical();pageMore.addView(moreContent);renderMorePage();
     }
     private void addMoreRow(String title,String subtitle,String symbol,Runnable action) {
-        LinearLayout row=horizontal();row.setPadding(dp(14),dp(12),dp(10),dp(12));row.setBackground(bg("#18231E",16));
-        LinearLayout details=vertical();details.addView(text(title,14,color("#F2F7F3"),true));TextView sub=text(subtitle,11,color("#9AABA0"),false);sub.setPadding(0,dp(3),0,0);details.addView(sub);
-        row.addView(details,new LinearLayout.LayoutParams(0,-2,1));TextView arrow=text(symbol,18,color("#65C5A0"),true);arrow.setGravity(Gravity.CENTER);row.addView(arrow,new LinearLayout.LayoutParams(dp(32),dp(36)));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(9);moreContent.addView(row,lp);row.setOnClickListener(v->action.run());
+        LinearLayout row=horizontal();row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14),dp(11),dp(10),dp(11));row.setBackground(bg("#18231E",16));
+        LinearLayout details=vertical();details.addView(text(title,14,color("#F2F7F3"),true));
+        TextView sub=text(subtitle,11,color("#9AABA0"),false);sub.setPadding(0,dp(3),0,0);details.addView(sub);
+        row.addView(details,new LinearLayout.LayoutParams(0,-2,1));
+        TextView arrow=text(symbol,18,color("#65C5A0"),true);arrow.setGravity(Gravity.CENTER);
+        row.addView(arrow,new LinearLayout.LayoutParams(dp(32),dp(36)));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(7);
+        moreContent.addView(row,lp);row.setOnClickListener(v->action.run());
     }
     private void renderMorePage() {
         if(moreContent==null)return;moreContent.removeAllViews();
-        addMoreRow("Focus & screen time","Actual focus sessions and phone-use history","↗",()->switchPage("progress"));
-        addMoreRow("Plans & Documents","Read your study and career plans offline","↗",()->startActivity(new Intent(MainActivity.this, PlanDocumentsActivity.class)));
-        addMoreRow("Edit shared routine","Blocks inherited by WFH, office and weekend days","↗",()->openTemplateEditor("common"));
-        addMoreRow("Edit WFH routine","Change WFH-specific blocks alongside the shared routine","↗",()->openTemplateEditor("wfh"));
-        addMoreRow("Edit office routine","Change office-specific blocks alongside the shared routine","↗",()->openTemplateEditor("office"));
-        addMoreRow("Edit weekend routine","Change weekend-specific blocks alongside the shared routine","↗",()->openTemplateEditor("weekend"));
-        addMoreRow("Precise widget timing","Schedule-boundary alarm setting","↗",()->enablePreciseLiveWidgetUpdates());
-        addMoreRow("Attendance history","Review and correct office hours","↗",()->showAttendanceHistory());
-        addMoreRow("Export backup","Save plans, attendance, syllabus and screen-time history","↗",()->requestExportBackup());
-        addMoreRow("Import backup","Restore a previously exported DayFlow backup","↗",()->requestImportBackup());
+
+        sectionLabel(moreContent,"TRACK & MEASURE");
+        addMoreRow("Study progress","Actual focus time and study execution","↗",()->switchPage("progress"));
+        addMoreRow("Body-fat planner","Calorie, activity and target-date projections","↗",()->switchPage("body"));
+        addMoreRow("Office & commute","Check-in, commute tracking and attendance history","↗",()->switchPage("office"));
+        addMoreRow("Screen-time history","Review saved daily phone-use totals","↗",()->switchPage("screenTime"));
+
+        sectionLabel(moreContent,"ROUTINES & LIBRARY");
+        addMoreRow("Edit routine templates","Manage shared, WFH, office and weekend routines","↗",()->showTemplateEditorPicker());
+        addMoreRow("Plans & documents","Read your study and career plans offline","↗",()->startActivity(new Intent(MainActivity.this, PlanDocumentsActivity.class)));
+
+        sectionLabel(moreContent,"DATA & APP");
+        addMoreRow("Widget timing","Schedule-boundary alarm setting","↗",()->enablePreciseLiveWidgetUpdates());
+        addMoreRow("Backup & restore","Export or import routines, attendance and progress","↗",()->showBackupRestorePicker());
         addMoreRow("Check for updates","Find and install the latest DayFlow version","↻",()->checkForAppUpdate(true));
         addMoreRow("Diagnostics","Inspect app and widget event logs","↗",()->showDiagnostics());
-        addMoreRow("Clear selected plan","Remove blocks from the selected date","↗",()->clearDay());
+
+        sectionLabel(moreContent,"CAREFUL ACTIONS");
+        addMoreRow("Clear selected plan","Remove blocks from the selected date only","↗",()->clearDay());
+    }
+
+    private void showBackupRestorePicker() {
+        String[] actions={"Export backup","Import backup"};
+        new AlertDialog.Builder(this)
+                .setTitle("Backup & restore")
+                .setItems(actions,(dialog,which)->{
+                    if(which==0) requestExportBackup();
+                    else requestImportBackup();
+                })
+                .setNegativeButton("Cancel",null)
+                .show();
     }
 
 
@@ -6947,7 +6971,7 @@ public class MainActivity extends Activity {
 
     private void buildScreenTimePage() {
         pageHeading(pageScreenTime,"Digital wellbeing","Screen time","A local historical ledger of phone screen-interactive time. Android permission is required; older days are available only while Android exposes events.");
-        LinearLayout controls=horizontal();controls.addView(secondaryButton("‹ Progress",()->switchPage("progress")),new LinearLayout.LayoutParams(dp(105),dp(40)));
+        LinearLayout controls=horizontal();controls.addView(secondaryButton("‹ More",()->switchPage("more")),new LinearLayout.LayoutParams(dp(105),dp(40)));
         Button refresh=primaryButton("Refresh history",()->{if(ScreenTimeTracker.hasUsageAccess(this))ScreenTimeTracker.refreshRecentDays(this,7);renderScreenTimePage();});
         LinearLayout.LayoutParams refreshLp=new LinearLayout.LayoutParams(0,dp(40),1);refreshLp.leftMargin=dp(8);controls.addView(refresh,refreshLp);pageScreenTime.addView(controls);
         screenTimeSummaryView=text("",13,color("#B7C7BC"),false);screenTimeSummaryView.setPadding(dp(14),dp(12),dp(14),dp(12));screenTimeSummaryView.setBackground(bg("#18231E",16));
@@ -6977,7 +7001,7 @@ public class MainActivity extends Activity {
     private String dayOffsetKey(int offset){Calendar c=Calendar.getInstance();c.add(Calendar.DAY_OF_YEAR,-offset);return keyForDate(c.getTime());}
 
     private void renderBottomNavOnly() {
-        String tab=activePage.equals("progress")||activePage.equals("screenTime")?"more":activePage;
+        String tab=("progress".equals(activePage)||"screenTime".equals(activePage)||"body".equals(activePage)||"office".equals(activePage))?"more":activePage;
         for(Map.Entry<String,TextView> e:navItems.entrySet()){
             boolean selected=e.getKey().equals(tab);
             int foreground=color(selected?"#286B55":"#687A70");
