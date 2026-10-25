@@ -61,24 +61,24 @@ def make_pdf(title, subtitle, body):
             ops.append(f"<{pdf_text(line)}> Tj")
         ops += ["ET", "BT", "/F1 8 Tf", "520 24 Td",
                 f"<{pdf_text('Page ' + str(idx + 1) + ' of ' + str(len(chunks)))}> Tj", "ET"]
-        stream = zlib.compress(("\\n".join(ops) + "\\n").encode("ascii"), level=9)
-        objects[content_id] = (f"<< /Length {len(stream)} /Filter /FlateDecode >>\\nstream\\n".encode("ascii")
-                               + stream + b"\\nendstream")
+        stream = zlib.compress(("\n".join(ops) + "\n").encode("ascii"), level=9)
+        objects[content_id] = (f"<< /Length {len(stream)} /Filter /FlateDecode >>\nstream\n".encode("ascii")
+                               + stream + b"\nendstream")
     objects[2] = ("<< /Type /Pages /Kids [" + " ".join(f"{n} 0 R" for n in page_ids)
                   + f"] /Count {len(page_ids)} >>").encode("ascii")
     max_id = max(objects)
-    out = bytearray(b"%PDF-1.4\\n%\\xe2\\xe3\\xcf\\xd3\\n")
+    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
     offsets = [0] * (max_id + 1)
     for object_id in range(1, max_id + 1):
         offsets[object_id] = len(out)
-        out.extend(f"{object_id} 0 obj\\n".encode("ascii"))
-        out.extend(objects[object_id] + b"\\nendobj\\n")
+        out.extend(f"{object_id} 0 obj\n".encode("ascii"))
+        out.extend(objects[object_id] + b"\nendobj\n")
     xref_offset = len(out)
-    out.extend(f"xref\\n0 {max_id + 1}\\n".encode("ascii"))
-    out.extend(b"0000000000 65535 f \\n")
+    out.extend(f"xref\n0 {max_id + 1}\n".encode("ascii"))
+    out.extend(b"0000000000 65535 f \n")
     for object_id in range(1, max_id + 1):
-        out.extend(f"{offsets[object_id]:010d} 00000 n \\n".encode("ascii"))
-    out.extend(f"trailer\\n<< /Size {max_id + 1} /Root 1 0 R >>\\nstartxref\\n{xref_offset}\\n%%EOF\\n".encode("ascii"))
+        out.extend(f"{offsets[object_id]:010d} 00000 n \n".encode("ascii"))
+    out.extend(f"trailer\n<< /Size {max_id + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode("ascii"))
     return bytes(out)
 
 
@@ -147,7 +147,7 @@ def main():
                 archive.writestr(filename, make_pdf(doc["title"], doc["subtitle"], doc["content"]))
 
     sync_flags(catalog)
-    CATALOG.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+    CATALOG.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with zipfile.ZipFile(OUT, "r") as archive:
         if archive.testzip() is not None or set(archive.namelist()) != expected:
             raise SystemExit("Offline PDF archive failed ZIP integrity or filename validation")
