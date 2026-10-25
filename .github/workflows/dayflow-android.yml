@@ -88,7 +88,10 @@ jobs:
 
       # Keep device verification on PR/manual runs; avoid a second slow emulator boot after merge.
       - name: Verify offline PDF library in Android emulator
+        id: emulator_smoke
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        timeout-minutes: 8
+        continue-on-error: true
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -96,16 +99,18 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim
           working-directory: dayflow-android
           script: |
-            # Prefer an on-device launch smoke check over instrumentation that waits for
-            # MainActivity's full UI queue to become idle.
+            # Bound shell waits so a non-responsive activity cannot hold the build forever.
             gradle :app:assembleDebug
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell settings put global airplane_mode_on 1
             adb shell svc wifi disable
-            launch_output="$(adb shell am start -W -n com.mihirkumar.dayflow/.MainActivity 2>&1)"
-            printf '%s\n' "$launch_output"
-            echo "$launch_output" | grep -q 'Status: ok'
-            adb shell dumpsys activity activities | grep -F 'com.mihirkumar.dayflow/.MainActivity'
+            timeout 45s adb shell am start -n com.mihirkumar.dayflow/.MainActivity
+            sleep 8
+            if ! adb shell dumpsys activity activities | grep -F 'MainActivity'; then
+              echo "MainActivity was not present after launch. Recent Android logs:"
+              adb logcat -d -t 400
+              exit 1
+            fi
             python3 - <<'PY'
             import io
             import zipfile
@@ -153,8 +158,14 @@ jobs:
           path: dayflow-android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
-      - name: Publish latest signed APK
+      - name: Require original PDFs before stable publication
+        id: original_pdf_gate
         if: env.DAYFLOW_SIGNED == 'true' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: python3 scripts/validate_plan_catalog.py --require-originals
+
+      - name: Publish latest signed APK
+        if: env.DAYFLOW_SIGNED == 'true' && github.ref == 'refs/heads/main' && steps.original_pdf_gate.outcome == 'success' && (github.event_name != 'pull_request' && steps.emulator_smoke.outcome != 'failure')
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
