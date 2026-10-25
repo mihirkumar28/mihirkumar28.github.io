@@ -12,6 +12,7 @@ Native Android implementation of DayFlow. The app stores its timetable in Androi
 - Office check-in/out and commute actions, plus WFH/weekend Done/Skip actions
 - Recovery mode
 - Daily execution metrics
+- Body-composition planner tab with locally saved inputs, target-date selection, TDEE/deficit estimates and fat-loss-partition scenarios
 - Offline-first: no backend required
 
 ## Build

@@ -39,6 +39,7 @@ Run this checklist on the installed APK after CI emulator tests pass. A successf
 - [ ] Verify missing assets produce an actionable error rather than a misleading successful open.
 
 ## Backup, navigation and accessibility
+- [ ] Open the Body tab, change inputs and target date, calculate estimates, leave the tab and return; verify saved inputs persist and all scenarios refresh correctly.
 - [ ] Restore a valid backup and verify saved data; attempt a malformed backup and verify existing data is preserved.
 - [ ] Navigate through Today, Plan, Progress, Office, Roadmap/Syllabus, Screen Time and More; no screen should overlap system bars or bottom navigation.
 - [ ] Test larger fonts, long task names, TalkBack focus order and primary-action touch targets.

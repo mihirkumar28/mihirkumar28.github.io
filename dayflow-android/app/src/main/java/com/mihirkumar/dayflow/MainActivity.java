@@ -102,9 +102,12 @@ public class MainActivity extends Activity {
 
     private LinearLayout root, timeline, officeCard;
     private FrameLayout screenFrame;
-    private LinearLayout pagePlan, pageProgress, pageOffice, pageMore, pageSyllabus, pageScreenTime;
-    private LinearLayout planList, planTemplatePreview, actualScheduleContent, progressContent, officePageContent, moreContent, syllabusList, screenTimeList;
-    private Button planDayScheduleToggle, todayRoutineEditButton;
+    private LinearLayout pagePlan, pageProgress, pageOffice, pageMore, pageSyllabus, pageScreenTime, pageBody;
+    private LinearLayout planList, planTemplatePreview, actualScheduleContent, progressContent, officePageContent, moreContent, syllabusList, screenTimeList, bodyResultsContent;
+    private Button planDayScheduleToggle, todayRoutineEditButton, bodyTargetDateButton;
+    private EditText bodyWeightInput, bodyHeightInput, bodyFatInput, bodyBmrInput, bodyIntakeInput, bodyTargetFatInput;
+    private EditText bodyStairsInput, bodyGymBurnInput, bodyGymDaysInput, bodyMultiplierInput, bodyFatShareInput, bodyExerciseCreditInput, bodyAdaptationInput;
+    private String bodyTargetDateKey;
     private LinearLayout bottomNavigation;
     private TextView syllabusSummaryView, screenTimeSummaryView, syllabusCoverageSummary;
     private LinearLayout syllabusDetailContent;
@@ -618,8 +621,8 @@ public class MainActivity extends Activity {
 
     private void buildSecondaryPages() {
         pagePlan = vertical(); pageProgress = vertical(); pageOffice = vertical();
-        pageMore = vertical(); pageSyllabus = vertical(); pageScreenTime = vertical();
-        for (LinearLayout page : new LinearLayout[]{pagePlan,pageProgress,pageOffice,pageMore,pageSyllabus,pageScreenTime}) {
+        pageMore = vertical(); pageSyllabus = vertical(); pageScreenTime = vertical(); pageBody = vertical();
+        for (LinearLayout page : new LinearLayout[]{pagePlan,pageProgress,pageOffice,pageMore,pageSyllabus,pageScreenTime,pageBody}) {
             page.setPadding(dp(18), dp(18), dp(18), dp(24));
             page.setOnApplyWindowInsetsListener((v, insets) -> {
                 // The ScrollView now reserves and clips the system status-bar inset.
@@ -630,7 +633,7 @@ public class MainActivity extends Activity {
             page.setVisibility(View.GONE);
             screenFrame.addView(page,new FrameLayout.LayoutParams(-1,-2));
         }
-        buildPlanPage(); buildProgressPage(); buildOfficePage(); buildMorePage(); buildSyllabusPage(); buildScreenTimePage();
+        buildPlanPage(); buildProgressPage(); buildOfficePage(); buildMorePage(); buildSyllabusPage(); buildScreenTimePage(); buildBodyPlannerPage();
     }
 
     private void pageHeading(LinearLayout page,String eyebrow,String title,String subtitle) {
@@ -717,7 +720,7 @@ public class MainActivity extends Activity {
             v.setPadding(dp(8),dp(4),dp(8),dp(6) + bottomInset);
             return insets;
         });
-        String[][] items={{"⌂","Today","home"},{"▤","Plan","plan"},{"◔","Roadmap","syllabus"},{"◷","Office","office"},{"•••","More","more"}};
+        String[][] items={{"⌂","Today","home"},{"▤","Plan","plan"},{"◉","Body","body"},{"◔","Roadmap","syllabus"},{"◷","Office","office"},{"•••","More","more"}};
         for(String[] item:items){
             LinearLayout tab=vertical();tab.setGravity(Gravity.CENTER);tab.setPadding(dp(3),dp(5),dp(3),dp(4));
             TextView icon=text(item[0],19,color("#687A70"),true);icon.setGravity(Gravity.CENTER);
@@ -726,7 +729,7 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.leftMargin=dp(2);lp.rightMargin=dp(2);bottomNavigation.addView(tab,lp);navItems.put(item[2],label);
         }
         // WRAP_CONTENT lets the view grow by the system-bar inset while preserving
-        // a 64dp row for the five tabs, with a white background behind the system bar.
+        // a 64dp row for the six tabs, with a white background behind the system bar.
         shell.addView(bottomNavigation,new LinearLayout.LayoutParams(-1,-2));
         bottomNavigation.requestApplyInsets();
     }
@@ -739,6 +742,7 @@ public class MainActivity extends Activity {
         else if ("more".equals(activePage)) renderMorePage();
         else if ("syllabus".equals(activePage)) refreshRoadmapTabContent();
         else if ("screenTime".equals(activePage)) renderScreenTimePage();
+        else if ("body".equals(activePage)) calculateBodyPlanner(false);
         renderBottomNavOnly();
     }
 
@@ -755,6 +759,7 @@ public class MainActivity extends Activity {
         pageMore.setVisibility("more".equals(page)?View.VISIBLE:View.GONE);
         pageSyllabus.setVisibility("syllabus".equals(page)?View.VISIBLE:View.GONE);
         pageScreenTime.setVisibility("screenTime".equals(page)?View.VISIBLE:View.GONE);
+        pageBody.setVisibility("body".equals(page)?View.VISIBLE:View.GONE);
         renderBottomNavOnly();
         if("plan".equals(page))renderPlanPage();
         else if("progress".equals(page))renderProgressPage();
@@ -762,6 +767,7 @@ public class MainActivity extends Activity {
         else if("more".equals(page))renderMorePage();
         else if("syllabus".equals(page))refreshRoadmapTabContent();
         else if("screenTime".equals(page))renderScreenTimePage();
+        else if("body".equals(page))calculateBodyPlanner(false);
         else if("home".equals(page))refreshTodaySummaryProgress();
     }
 
@@ -6642,6 +6648,299 @@ public class MainActivity extends Activity {
 
     private ArrayList<SyllabusTopic> readSyllabusTopicsWith(SyllabusTopic changed) {
         ArrayList<SyllabusTopic> all=readSyllabusTopics();for(int i=0;i<all.size();i++)if(all.get(i).id==changed.id){all.set(i,changed);break;}return all;
+    }
+
+
+    private EditText bodyNumericField(LinearLayout row, String label, String preferenceKey, String fallback) {
+        LinearLayout column = vertical();
+        TextView caption = text(label, 11, color("#687A70"), true);
+        caption.setMaxLines(2);
+        column.addView(caption);
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setTextSize(14);
+        input.setTextColor(color("#18372E"));
+        input.setHintTextColor(color("#687A70"));
+        input.setPadding(dp(10), dp(4), dp(10), dp(4));
+        input.setBackground(surfaceBackground(10));
+        input.setText(getPrefs().getString(preferenceKey, fallback));
+        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(-1, dp(45));
+        inputLp.topMargin = dp(5);
+        column.addView(input, inputLp);
+        LinearLayout.LayoutParams columnLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        if (row.getChildCount() > 0) columnLp.leftMargin = dp(8);
+        row.addView(column, columnLp);
+        return input;
+    }
+
+    private LinearLayout bodyFieldRow(LinearLayout parent) {
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.TOP);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.bottomMargin = dp(10);
+        parent.addView(row, lp);
+        return row;
+    }
+
+    private void buildBodyPlannerPage() {
+        bodyTargetDateKey = getPrefs().getString("bodyPlanner_targetDate", "2027-05-26");
+        pageHeading(pageBody, "Health & fitness", "Body-fat planner",
+                "Model your path to a body-fat target using your starting measurements, nutrition and training plan. All values are saved locally.");
+        LinearLayout inputsCard = surfaceCard();
+        sectionLabel(inputsCard, "STARTING COMPOSITION");
+        LinearLayout row = bodyFieldRow(inputsCard);
+        bodyWeightInput = bodyNumericField(row, "Weight (kg)", "bodyPlanner_weightKg", "135.8");
+        bodyHeightInput = bodyNumericField(row, "Height (cm)", "bodyPlanner_heightCm", "187.1");
+        row = bodyFieldRow(inputsCard);
+        bodyFatInput = bodyNumericField(row, "Body fat (%)", "bodyPlanner_bodyFatPct", "37.2");
+        bodyBmrInput = bodyNumericField(row, "BMR (kcal/day)", "bodyPlanner_bmrKcal", "2212");
+
+        sectionLabel(inputsCard, "DAILY NUTRITION & ACTIVITY");
+        row = bodyFieldRow(inputsCard);
+        bodyIntakeInput = bodyNumericField(row, "Food intake (kcal/day)", "bodyPlanner_intakeKcal", "1800");
+        bodyTargetFatInput = bodyNumericField(row, "Goal body fat (%)", "bodyPlanner_targetBodyFatPct", "15");
+        row = bodyFieldRow(inputsCard);
+        bodyStairsInput = bodyNumericField(row, "Stairs (kcal/day)", "bodyPlanner_stairsKcal", "300");
+        bodyGymBurnInput = bodyNumericField(row, "Gym (kcal/session)", "bodyPlanner_gymKcalPerSession", "500");
+        row = bodyFieldRow(inputsCard);
+        bodyGymDaysInput = bodyNumericField(row, "Gym sessions/week", "bodyPlanner_gymDaysPerWeek", "5");
+        bodyMultiplierInput = bodyNumericField(row, "Baseline multiplier", "bodyPlanner_baselineMultiplier", "1.2");
+        row = bodyFieldRow(inputsCard);
+        bodyFatShareInput = bodyNumericField(row, "Weight loss from fat (%)", "bodyPlanner_fatSharePct", "85");
+        bodyExerciseCreditInput = bodyNumericField(row, "Exercise calories credited (%)", "bodyPlanner_exerciseCreditPct", "100");
+        row = bodyFieldRow(inputsCard);
+        bodyAdaptationInput = bodyNumericField(row, "Extra expenditure reduction by deadline (kcal/day)", "bodyPlanner_adaptationKcal", "100");
+        inputsCard.addView(text("The baseline multiplier estimates ordinary daily expenditure before the workouts entered above. Exercise burn is averaged over seven days; only count gym and stair sessions once.", 11, color("#687A70"), false));
+        pageBody.addView(inputsCard);
+
+        LinearLayout targetDateCard = surfaceCard();
+        sectionLabel(targetDateCard, "DEADLINE");
+        bodyTargetDateButton = secondaryButton("", () -> showBodyTargetDatePicker());
+        targetDateCard.addView(bodyTargetDateButton, new LinearLayout.LayoutParams(-1, dp(46)));
+        TextView dateHint = text("Choose the date you want to reach the target. The estimate uses the number of days remaining from today.", 11, color("#687A70"), false);
+        dateHint.setPadding(0, dp(7), 0, 0);
+        targetDateCard.addView(dateHint);
+        pageBody.addView(targetDateCard);
+        updateBodyTargetDateLabel();
+
+        Button calculate = primaryButton("Recalculate & save inputs", () -> calculateBodyPlanner(true));
+        LinearLayout.LayoutParams calculateLp = new LinearLayout.LayoutParams(-1, dp(48));
+        calculateLp.bottomMargin = dp(12);
+        pageBody.addView(calculate, calculateLp);
+
+        bodyResultsContent = vertical();
+        pageBody.addView(bodyResultsContent, new LinearLayout.LayoutParams(-1, -2));
+        calculateBodyPlanner(false);
+    }
+
+    private void updateBodyTargetDateLabel() {
+        if (bodyTargetDateButton == null) return;
+        Date target = parseDateKey(bodyTargetDateKey == null ? "" : bodyTargetDateKey);
+        String label = target == null ? "Choose target date"
+                : new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(target);
+        bodyTargetDateButton.setText("Target date  ·  " + label);
+    }
+
+    private void showBodyTargetDatePicker() {
+        Date target = parseDateKey(bodyTargetDateKey == null ? "" : bodyTargetDateKey);
+        Calendar selected = Calendar.getInstance();
+        if (target != null) selected.setTime(target);
+        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar c = Calendar.getInstance();
+            c.clear();
+            c.set(year, month, day, 12, 0, 0);
+            bodyTargetDateKey = keyForDate(c.getTime());
+            getPrefs().edit().putString("bodyPlanner_targetDate", bodyTargetDateKey).apply();
+            updateBodyTargetDateLabel();
+            calculateBodyPlanner(true);
+        }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH));
+        picker.show();
+    }
+
+    private double bodyValue(EditText field, String label, double min, double max) {
+        String raw = field == null ? "" : field.getText().toString().trim();
+        double value;
+        try {
+            value = Double.parseDouble(raw);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(label + " needs a number.");
+        }
+        if (Double.isNaN(value) || Double.isInfinite(value) || value < min || value > max) {
+            throw new IllegalArgumentException(label + " must be between " + min + " and " + max + ".");
+        }
+        return value;
+    }
+
+    private BodyCompositionPlanner.Inputs readBodyPlannerInputs() {
+        BodyCompositionPlanner.Inputs in = new BodyCompositionPlanner.Inputs();
+        in.startWeightKg = bodyValue(bodyWeightInput, "Weight", 30, 350);
+        in.heightCm = bodyValue(bodyHeightInput, "Height", 100, 240);
+        in.startBodyFatPct = bodyValue(bodyFatInput, "Body fat", 2, 70);
+        in.bmrKcal = bodyValue(bodyBmrInput, "BMR", 500, 5000);
+        in.intakeKcal = bodyValue(bodyIntakeInput, "Food intake", 800, 5000);
+        in.targetBodyFatPct = bodyValue(bodyTargetFatInput, "Goal body fat", 5, 35);
+        in.dailyStairsKcal = bodyValue(bodyStairsInput, "Stair calories", 0, 2000);
+        in.gymCaloriesPerSession = bodyValue(bodyGymBurnInput, "Gym calories", 0, 2000);
+        in.gymDaysPerWeek = bodyValue(bodyGymDaysInput, "Gym sessions/week", 0, 7);
+        in.baselineActivityMultiplier = bodyValue(bodyMultiplierInput, "Baseline multiplier", 1, 2.2);
+        in.weightLossFromFatPct = bodyValue(bodyFatShareInput, "Weight loss from fat", 50, 100);
+        in.exerciseCalorieCreditPct = bodyValue(bodyExerciseCreditInput, "Exercise calorie credit", 0, 100);
+        in.extraExpenditureReductionKcal = bodyValue(bodyAdaptationInput, "Extra expenditure reduction", 0, 500);
+        Date target = parseDateKey(bodyTargetDateKey == null ? "" : bodyTargetDateKey);
+        if (target == null) throw new IllegalArgumentException("Choose a valid target date.");
+        Calendar start = Calendar.getInstance();
+        start.setTime(new Date());
+        start.set(Calendar.HOUR_OF_DAY, 12);
+        start.set(Calendar.MINUTE, 0);
+        start.set(Calendar.SECOND, 0);
+        start.set(Calendar.MILLISECOND, 0);
+        Calendar end = Calendar.getInstance();
+        end.setTime(target);
+        end.set(Calendar.HOUR_OF_DAY, 12);
+        end.set(Calendar.MINUTE, 0);
+        end.set(Calendar.SECOND, 0);
+        end.set(Calendar.MILLISECOND, 0);
+        in.daysToTarget = (int) ((end.getTimeInMillis() - start.getTimeInMillis()) / 86400000L);
+        if (in.daysToTarget < 1) throw new IllegalArgumentException("Choose a target date in the future.");
+        return in;
+    }
+
+    private void saveBodyPlannerInputs() {
+        SharedPreferences.Editor e = getPrefs().edit();
+        e.putString("bodyPlanner_weightKg", bodyWeightInput.getText().toString().trim());
+        e.putString("bodyPlanner_heightCm", bodyHeightInput.getText().toString().trim());
+        e.putString("bodyPlanner_bodyFatPct", bodyFatInput.getText().toString().trim());
+        e.putString("bodyPlanner_bmrKcal", bodyBmrInput.getText().toString().trim());
+        e.putString("bodyPlanner_intakeKcal", bodyIntakeInput.getText().toString().trim());
+        e.putString("bodyPlanner_targetBodyFatPct", bodyTargetFatInput.getText().toString().trim());
+        e.putString("bodyPlanner_stairsKcal", bodyStairsInput.getText().toString().trim());
+        e.putString("bodyPlanner_gymKcalPerSession", bodyGymBurnInput.getText().toString().trim());
+        e.putString("bodyPlanner_gymDaysPerWeek", bodyGymDaysInput.getText().toString().trim());
+        e.putString("bodyPlanner_baselineMultiplier", bodyMultiplierInput.getText().toString().trim());
+        e.putString("bodyPlanner_fatSharePct", bodyFatShareInput.getText().toString().trim());
+        e.putString("bodyPlanner_exerciseCreditPct", bodyExerciseCreditInput.getText().toString().trim());
+        e.putString("bodyPlanner_adaptationKcal", bodyAdaptationInput.getText().toString().trim());
+        e.putString("bodyPlanner_targetDate", bodyTargetDateKey == null ? "2027-05-26" : bodyTargetDateKey);
+        e.apply();
+    }
+
+    private void addBodyMetric(LinearLayout parent, String label, String value) {
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(7), 0, dp(7));
+        TextView left = text(label, 12, color("#687A70"), false);
+        left.setLineSpacing(dp(1), 1f);
+        row.addView(left, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView right = text(value, 13, color("#18372E"), true);
+        right.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        row.addView(right, new LinearLayout.LayoutParams(-2, -2));
+        parent.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        View divider = new View(this);
+        divider.setBackgroundColor(color("#DDE6DE"));
+        parent.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+    }
+
+    private String bodyKcal(double value) {
+        return String.format(Locale.US, "%,.0f kcal/day", value);
+    }
+
+    private String bodyKg(double value) {
+        return String.format(Locale.US, "%.1f kg", value);
+    }
+
+    private BodyCompositionPlanner.Inputs copyBodyInputs(BodyCompositionPlanner.Inputs source) {
+        BodyCompositionPlanner.Inputs copy = new BodyCompositionPlanner.Inputs();
+        copy.startWeightKg = source.startWeightKg;
+        copy.heightCm = source.heightCm;
+        copy.startBodyFatPct = source.startBodyFatPct;
+        copy.bmrKcal = source.bmrKcal;
+        copy.intakeKcal = source.intakeKcal;
+        copy.dailyStairsKcal = source.dailyStairsKcal;
+        copy.gymCaloriesPerSession = source.gymCaloriesPerSession;
+        copy.gymDaysPerWeek = source.gymDaysPerWeek;
+        copy.baselineActivityMultiplier = source.baselineActivityMultiplier;
+        copy.targetBodyFatPct = source.targetBodyFatPct;
+        copy.weightLossFromFatPct = source.weightLossFromFatPct;
+        copy.exerciseCalorieCreditPct = source.exerciseCalorieCreditPct;
+        copy.extraExpenditureReductionKcal = source.extraExpenditureReductionKcal;
+        copy.daysToTarget = source.daysToTarget;
+        return copy;
+    }
+
+    private void calculateBodyPlanner(boolean saveInputs) {
+        if (bodyResultsContent == null || bodyWeightInput == null) return;
+        try {
+            BodyCompositionPlanner.Inputs in = readBodyPlannerInputs();
+            if (saveInputs) saveBodyPlannerInputs();
+            BodyCompositionPlanner.Result result = BodyCompositionPlanner.calculate(in);
+            bodyResultsContent.removeAllViews();
+
+            LinearLayout projection = surfaceCard();
+            sectionLabel(projection, "YOUR CURRENT PLAN");
+            addBodyMetric(projection, "Estimated TDEE today", bodyKcal(result.estimatedTdeeTodayKcal));
+            addBodyMetric(projection, "Initial estimated deficit", bodyKcal(result.initialDailyDeficitKcal));
+            addBodyMetric(projection, "Projected weight on target date", bodyKg(result.projectedWeightKg));
+            addBodyMetric(projection, "Projected body fat", String.format(Locale.US, "%.1f%%", result.projectedBodyFatPct));
+            addBodyMetric(projection, "Estimated fat mass on target date", bodyKg(result.projectedFatMassKg));
+            addBodyMetric(projection, "Weight change in model", String.format(Locale.US, "%+.1f kg", result.projectedWeightChangeKg));
+            addBodyMetric(projection, "TDEE near target date", bodyKcal(result.estimatedTdeeAtTargetKcal));
+            bodyResultsContent.addView(projection);
+
+            LinearLayout goal = surfaceCard();
+            sectionLabel(goal, String.format(Locale.US, "%.0f%% BODY-FAT GOAL", in.targetBodyFatPct));
+            addBodyMetric(goal, "Target scale weight at selected fat-loss share", bodyKg(result.targetWeightKg));
+            addBodyMetric(goal, "Total weight loss required", bodyKg(result.totalWeightLossRequiredKg));
+            addBodyMetric(goal, "Average loss required", String.format(Locale.US, "%.2f kg/week", result.requiredWeightLossPerWeekKg));
+            if ("below".equals(result.requiredIntakeStatus)) {
+                addBodyMetric(goal, "Model-implied intake to meet deadline", "Below 500 kcal/day");
+            } else if ("above".equals(result.requiredIntakeStatus)) {
+                addBodyMetric(goal, "Model-implied intake to meet deadline", "Above 4,000 kcal/day");
+            } else {
+                addBodyMetric(goal, "Model-implied intake to meet deadline", bodyKcal(result.requiredIntakeKcal));
+            }
+            bodyResultsContent.addView(goal);
+
+            LinearLayout sensitivity = surfaceCard();
+            sectionLabel(sensitivity, "SENSITIVITY TO FAT-LOSS PARTITION");
+            sensitivity.addView(text("The target scale weight changes depending on what share of total weight loss comes from fat. These are scenarios, not measured predictions.", 11, color("#687A70"), false));
+            double[] shares = {75, 85, 95, 100};
+            for (double share : shares) {
+                BodyCompositionPlanner.Inputs scenarioInputs = copyBodyInputs(in);
+                scenarioInputs.weightLossFromFatPct = share;
+                BodyCompositionPlanner.Result scenario = BodyCompositionPlanner.calculate(scenarioInputs);
+                String calorieText = "below".equals(scenario.requiredIntakeStatus) ? "<500 kcal/day"
+                        : "above".equals(scenario.requiredIntakeStatus) ? ">4,000 kcal/day"
+                        : String.format(Locale.US, "%,.0f kcal/day", scenario.requiredIntakeKcal);
+                addBodyMetric(sensitivity, String.format(Locale.US, "%.0f%% of loss from fat · target weight %s", share,
+                        bodyKg(scenario.targetWeightKg)), calorieText);
+            }
+            bodyResultsContent.addView(sensitivity);
+
+            LinearLayout notes = surfaceCard();
+            sectionLabel(notes, "HOW TO READ THIS");
+            notes.addView(text("This is a simplified planning model, not a clinical or NIDDK body-weight simulator. It scales baseline and exercise expenditure as body weight falls and lets you set an additional expenditure reduction. The assumed share of weight loss from fat strongly affects the body-fat result. Exercise calorie estimates and smart-scale body composition can be wrong for an individual.", 11, color("#687A70"), false));
+            if (result.requiredIntakeStatus.equals("within") && result.requiredIntakeKcal < 1500) {
+                TextView caution = text("Medical caution: the model implies a very low calorie intake to reach the deadline. Do not adopt that number without an obesity clinician and dietitian reviewing nutritional adequacy, especially given your previous low serum iron.", 12, color("#B44248"), true);
+                caution.setPadding(0, dp(10), 0, 0);
+                notes.addView(caution);
+            }
+            bodyResultsContent.addView(notes);
+        } catch (IllegalArgumentException e) {
+            if (bodyResultsContent != null) {
+                bodyResultsContent.removeAllViews();
+                LinearLayout errorCard = surfaceCard();
+                sectionLabel(errorCard, "CHECK YOUR INPUTS");
+                errorCard.addView(text(e.getMessage() == null ? "Check the values and target date." : e.getMessage(),
+                        12, color("#B44248"), true));
+                bodyResultsContent.addView(errorCard);
+            }
+            if (saveInputs) Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Log.e(DEBUG_TAG, "Body composition estimate failed", e);
+            Toast.makeText(this, "Could not calculate this scenario. Check the entered values.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void buildScreenTimePage() {

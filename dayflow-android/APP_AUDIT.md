@@ -164,3 +164,10 @@ Source changes on `fix/today-tab-usability`:
 - [ ] Add and commit all five authoritative original PDFs under app/src/main/assets/plans/; the repository snapshot contains only plans_catalog.json, not the original PDF assets.
 - [ ] Run and inspect PR CI (unit tests, lint, offline PDF emulator test and APK build).
 - [ ] Perform the physical-device smoke checklist, including widget behavior, routine isolation, Today/Plan synchronization, Roadmap Flow/Tree and airplane-mode access to every original PDF.
+
+
+## Body-composition planner tab — 2026-10-26
+
+- [x] Add a dedicated Body bottom-navigation tab with locally saved starting measurements, calorie/activity inputs, target-date selection, estimated TDEE/deficit, projected weight/body-fat output, and sensitivity to the assumed fat-loss partition.
+- [x] Extract the scenario arithmetic into a pure Java calculator and cover the core equations with unit tests.
+- [ ] Run and inspect Android CI (lint, unit tests, APK build); visually verify the Body tab on a physical device. The calculator is intentionally labelled as a simplified scenario model, not a clinical prediction.
