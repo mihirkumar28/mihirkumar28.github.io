@@ -73,10 +73,16 @@ jobs:
       - name: Validate widget RemoteViews layout
         run: python3 scripts/validate_widget_layout.py
 
-      - name: Generate and validate offline PDF reading copies
+      - name: Package original PDFs when present; otherwise generate labelled offline copies
         run: python3 scripts/generate_offline_plan_pdfs.py
 
-      - name: Run attendance regression tests
+      - name: Validate roadmap catalog and packaged PDF archive
+        run: python3 scripts/validate_plan_catalog.py
+
+      - name: Run Android lint
+        run: gradle :app:lintDebug
+
+      - name: Run Android unit tests
         run: gradle :app:testDebugUnitTest
 
       # Keep device verification on PR/manual runs; avoid a second slow emulator boot after merge.
