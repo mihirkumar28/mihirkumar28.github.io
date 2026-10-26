@@ -28,6 +28,7 @@
         </provider>
         <activity android:name=".PlanDocumentsActivity" android:exported="false" />
         <activity android:name=".OfflinePdfViewerActivity" android:exported="false" />
+        <activity android:name=".NiddkBodyWeightPlannerActivity" android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait"
