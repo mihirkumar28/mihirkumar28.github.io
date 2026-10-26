@@ -1523,7 +1523,8 @@ public class MainActivity extends Activity {
 
         sectionLabel(moreContent,"TRACK & MEASURE");
         addMoreRow("Study progress","Actual focus time and study execution","↗",()->switchPage("progress"));
-        addMoreRow("Body-fat planner","Calorie, activity and target-date projections","↗",()->switchPage("body"));
+        addMoreRow("NIDDK Body Weight Planner","Official goal-weight, timeline and maintenance-calorie calculator","↗",()->startActivity(new Intent(MainActivity.this, NiddkBodyWeightPlannerActivity.class)));
+        addMoreRow("Body-fat planner","Local body-composition scenario planner","↗",()->switchPage("body"));
         addMoreRow("Office & commute","Check-in, commute tracking and attendance history","↗",()->switchPage("office"));
         addMoreRow("Screen-time history","Review saved daily phone-use totals","↗",()->switchPage("screenTime"));
 
@@ -6712,6 +6713,12 @@ public class MainActivity extends Activity {
         bodyTargetDateKey = getPrefs().getString("bodyPlanner_targetDate", "2027-05-26");
         pageHeading(pageBody, "Health & fitness", "Body-fat planner",
                 "Model your path to a body-fat target using your starting measurements, nutrition and training plan. All values are saved locally.");
+        Button officialPlanner = secondaryButton("Open official NIDDK Body Weight Planner", () ->
+                startActivity(new Intent(MainActivity.this, NiddkBodyWeightPlannerActivity.class)));
+        officialPlanner.setMinHeight(dp(48));
+        LinearLayout.LayoutParams officialPlannerLp = new LinearLayout.LayoutParams(-1, dp(48));
+        officialPlannerLp.bottomMargin = dp(12);
+        pageBody.addView(officialPlanner, officialPlannerLp);
         LinearLayout inputsCard = surfaceCard();
         sectionLabel(inputsCard, "STARTING COMPOSITION");
         LinearLayout row = bodyFieldRow(inputsCard);
