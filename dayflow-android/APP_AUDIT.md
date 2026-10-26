@@ -180,3 +180,11 @@ Source changes on `fix/today-tab-usability`:
 - [x] Group tracking, routines/library, data/app and careful actions instead of presenting one flat settings list.
 - [x] Combine four routine-template shortcuts into one template picker and combine backup export/import into one entry.
 - [ ] Run PR CI (unit tests, lint and APK build) and verify the four-tab layout and More-hub flows on a physical device.
+
+
+## Official NIDDK Body Weight Planner integration — 2026-10-26
+
+- [x] Add an in-app screen that loads the official NIDDK-hosted Body Weight Planner rather than presenting a simplified local model as equivalent to NIDDK's dynamic model.
+- [x] Add entry points from More and the existing local Body-fat planner without adding another bottom-navigation tab.
+- [x] Include an explicit online-only notice, NIDDK attribution, retry behavior, browser fallback, WebView navigation/back handling and conservative file/mixed-content settings.
+- [ ] Verify lint, unit tests and APK build in GitHub Actions; confirm the NIDDK page loads and its inputs work on an Android device.
