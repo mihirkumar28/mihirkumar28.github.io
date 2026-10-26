@@ -195,10 +195,6 @@ public final class NiddkBodyWeightPlannerActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            webView.setSafeBrowsingEnabled(true);
-        }
-
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
