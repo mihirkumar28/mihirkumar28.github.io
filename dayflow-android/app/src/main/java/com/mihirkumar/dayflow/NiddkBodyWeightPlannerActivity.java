@@ -12,7 +12,6 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -200,7 +199,6 @@ public final class NiddkBodyWeightPlannerActivity extends Activity {
             webView.setSafeBrowsingEnabled(true);
         }
 
-        CookieManager.getInstance().setAcceptCookie(true);
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
