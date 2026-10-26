@@ -197,3 +197,11 @@ Source changes on `fix/today-tab-usability`:
 - [x] Publish signed in-app updates even while authoritative offline plan PDFs remain a separate outstanding content task; packaged copies remain labelled accurately.
 - [ ] Verify main-branch Actions publishes the APK and update.json, the Pages mirror catches up, and an existing signed installation can install the update in place.
 - [ ] Verify the one-time Android “install unknown apps” permission and system confirmation on a physical device.
+
+
+## Atomic in-app update publication — 2026-10-26
+
+- [x] Upload the signed APK asset before exposing its new version in update.json.
+- [x] Deploy the matching APK and update.json to GitHub Pages, then publish the same update.json to GitHub Releases.
+- [x] Preserve compatibility with already-installed app versions that still download updates through the Pages mirror; the manifest does not announce a new version until that mirror is live.
+- [ ] Verify the end-to-end main-branch build, Pages deployment, Release manifest update, and in-app update install.

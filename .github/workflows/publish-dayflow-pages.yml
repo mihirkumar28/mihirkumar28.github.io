@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
   actions: read
   pages: write
   id-token: write
@@ -33,7 +33,7 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Download signed APK and update metadata
+      - name: Download signed APK and prepare matching update metadata
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -41,11 +41,27 @@ jobs:
           gh release download latest \
             --repo "${GITHUB_REPOSITORY}" \
             --pattern app-release.apk \
-            --pattern update.json \
             --dir site
           test -s site/app-release.apk
+
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            VERSION_CODE="${{ github.event.workflow_run.run_number }}"
+            cat > site/update.json <<EOF
+          {
+            "versionCode": ${VERSION_CODE},
+            "versionName": "1.0.${VERSION_CODE}",
+            "releaseNotes": "Latest DayFlow Android build with bug fixes and improvements. Offline plan documents are accurately labelled as originals or condensed copies according to the assets included."
+          }
+          EOF
+          else
+            gh release download latest \
+              --repo "${GITHUB_REPOSITORY}" \
+              --pattern update.json \
+              --dir site
+          fi
+
           test -s site/update.json
-          echo "Prepared public DayFlow download files."
+          echo "Prepared matching APK and update metadata for public deployment."
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
@@ -59,3 +75,11 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           artifact_name: dayflow-pages-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Publish update metadata after matching APK is live
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Release clients only see this new version after the Pages APK has deployed.
+          gh release upload latest site/update.json --clobber

@@ -171,15 +171,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "DayFlow latest" --notes "Latest stable DayFlow APK."
-          cat > dayflow-android/update.json <<EOF
-          {
-            "versionCode": ${GITHUB_RUN_NUMBER},
-            "versionName": "1.0.${GITHUB_RUN_NUMBER}",
-            "releaseNotes": "Latest DayFlow Android build with bug fixes and improvements. Offline plan documents are accurately labelled as originals or condensed copies according to the assets included."
-          }
-          EOF
+          # Publish the APK first. The matching update manifest is published only
+          # after the GitHub Pages mirror contains this same APK, so existing clients
+          # that still download from Pages cannot see a version/APK mismatch.
           gh release upload latest dayflow-android/app/build/outputs/apk/release/app-release.apk --clobber
-          gh release upload latest dayflow-android/update.json --clobber
 
       - name: Upload debug APK
         if: env.DAYFLOW_SIGNED != 'true'
