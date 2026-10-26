@@ -1535,7 +1535,7 @@ public class MainActivity extends Activity {
         sectionLabel(moreContent,"DATA & APP");
         addMoreRow("Widget timing","Schedule-boundary alarm setting","↗",()->enablePreciseLiveWidgetUpdates());
         addMoreRow("Backup & restore","Export or import routines, attendance and progress","↗",()->showBackupRestorePicker());
-        addMoreRow("Check for updates","Find and install the latest DayFlow version","↻",()->checkForAppUpdate(true));
+        addMoreRow("Update DayFlow","Check, download and install updates inside the app","↻",()->checkForAppUpdate(true));
         addMoreRow("Diagnostics","Inspect app and widget event logs","↗",()->showDiagnostics());
 
         sectionLabel(moreContent,"CAREFUL ACTIONS");
@@ -1676,7 +1676,7 @@ public class MainActivity extends Activity {
                         + "\nAvailable: " + release.versionName
                         + "\n\n" + notes
                         + "\n\nFor a normal in-place update, Android must recognize the same signing identity. Android will ask you to approve installation.")
-                .setPositiveButton("Download & install", (dialog, which) -> {
+                .setPositiveButton("Update now", (dialog, which) -> {
                     getPrefs().edit().remove(UPDATE_SNOOZED_VERSION_KEY)
                             .remove(UPDATE_SNOOZE_UNTIL_KEY).apply();
                     downloadAndInstallUpdate(release);
@@ -1737,7 +1737,7 @@ public class MainActivity extends Activity {
         };
         updateDownloadLiveData.observeForever(updateDownloadObserver);
         Toast.makeText(this,
-                "The update is downloading in the background. DayFlow will notify you when it's ready.",
+                "Downloading the update in the background. You can keep using DayFlow; Android will ask you to confirm installation.",
                 Toast.LENGTH_LONG).show();
     }
 

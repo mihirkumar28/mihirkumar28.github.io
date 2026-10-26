@@ -34,7 +34,7 @@ public final class DayFlowUpdateDownloadWorker extends Worker {
     static final String WORK_TAG = "dayflow-update-download";
     static final String INPUT_VERSION_CODE = "versionCode";
     static final String INPUT_VERSION_NAME = "versionName";
-    private static final String APK_URL = "https://mihirkumar28.github.io/app-release.apk";
+    private static final String APK_URL = "https://github.com/mihirkumar28/mihirkumar28.github.io/releases/download/latest/app-release.apk";
     private static final String PREFS = "dayflow";
     private static final String PENDING_UPDATE_APK_KEY = "pendingUpdateApkPath";
     private static final String UPDATE_DOWNLOAD_ERROR_KEY = "appUpdateDownloadError";

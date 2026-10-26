@@ -161,7 +161,7 @@ Source changes on `fix/today-tab-usability`:
 - [x] Update the PDF packaging script to prefer original PDFs under app/src/main/assets/plans/ when present and package the actual source bytes into plan_pdfs.zip; generated catalog-based copies remain the explicit fallback until original files are checked in.
 - [x] Synchronize document flags during the build so the APK UI labels a file as an original only when its original asset exists and has a valid PDF header.
 - [x] Add a physical-device P0 smoke-test checklist. This is a checklist, not evidence that physical-device checks have been performed.
-- [ ] Add and commit all five authoritative original PDFs under app/src/main/assets/plans/; the repository snapshot contains only plans_catalog.json, not the original PDF assets.
+- [ ] Add and commit all five authoritative original PDFs under app/src/main/assets/plans/; until then the APK correctly labels condensed offline copies. App update availability is no longer blocked by this document-only follow-up.
 - [ ] Run and inspect PR CI (unit tests, lint, offline PDF emulator test and APK build).
 - [ ] Perform the physical-device smoke checklist, including widget behavior, routine isolation, Today/Plan synchronization, Roadmap Flow/Tree and airplane-mode access to every original PDF.
 
@@ -188,3 +188,12 @@ Source changes on `fix/today-tab-usability`:
 - [x] Add entry points from More and the existing local Body-fat planner without adding another bottom-navigation tab.
 - [x] Include an explicit online-only notice, NIDDK attribution, retry behavior, browser fallback, WebView navigation/back handling and conservative file/mixed-content settings.
 - [ ] Verify lint, unit tests and APK build in GitHub Actions; confirm the NIDDK page loads and its inputs work on an Android device.
+
+
+## In-app update reliability — 2026-10-26
+
+- [x] Make the More action explicit: Update DayFlow checks for an update and starts the in-app download/install flow.
+- [x] Download the APK directly from the same GitHub Release asset referenced by the update manifest, avoiding a race with the separately deployed GitHub Pages mirror.
+- [x] Publish signed in-app updates even while authoritative offline plan PDFs remain a separate outstanding content task; packaged copies remain labelled accurately.
+- [ ] Verify main-branch Actions publishes the APK and update.json, the Pages mirror catches up, and an existing signed installation can install the update in place.
+- [ ] Verify the one-time Android “install unknown apps” permission and system confirmation on a physical device.
