@@ -2076,6 +2076,10 @@ public class MainActivity extends Activity {
         addMoreRow("Edit routine templates","Manage shared, WFH, office and weekend routines","↗",()->showTemplateEditorPicker());
         addMoreRow("Plans & documents","Read your study and career plans offline","↗",()->startActivity(new Intent(MainActivity.this, PlanDocumentsActivity.class)));
 
+        sectionLabel(moreContent,"AI & AUTOMATION");
+        addMoreRow("Gemini AI assistant","Connect your Google AI Studio key and analyze today's routine","↗",
+                ()->startActivity(new Intent(MainActivity.this, GeminiAssistantActivity.class)));
+
         sectionLabel(moreContent,"DATA & APP");
         addMoreRow("Widget timing","Schedule-boundary alarm setting","↗",()->enablePreciseLiveWidgetUpdates());
         addMoreRow("Backup & restore","Export or import routines, attendance and progress","↗",()->showBackupRestorePicker());
