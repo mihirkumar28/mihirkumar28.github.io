@@ -30,4 +30,21 @@ public class OfficeMonthPlanRulesTest {
         assertTrue(OfficeMonthPlanRules.isCompliant(8,
                 OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY * OfficeMonthPlanRules.MINIMUM_DAYS));
     }
+
+    @Test public void commuteIsTwoHoursThirtyMinutesPerOfficeDay() {
+        assertEquals(75, OfficeMonthPlanRules.COMMUTE_MINUTES_EACH_WAY);
+        assertEquals(150, OfficeMonthPlanRules.DAILY_COMMUTE_MINUTES);
+        assertEquals(2.5d, OfficeMonthPlanRules.dailyCommuteHours(), 0.0001d);
+        assertEquals(20.0d, OfficeMonthPlanRules.totalCommuteHours(8), 0.0001d);
+        assertEquals(22.5d, OfficeMonthPlanRules.totalCommuteHours(9), 0.0001d);
+    }
+
+    @Test public void commuteAddsToTotalCommitmentButNeverToRequiredOfficeHours() {
+        double officeHours = OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY * 8;
+        assertTrue(OfficeMonthPlanRules.isCompliant(8, officeHours));
+        assertEquals(72.0d, OfficeMonthPlanRules.totalCommitmentHours(officeHours, 8), 0.0001d);
+
+        assertFalse(OfficeMonthPlanRules.isCompliant(8, 32.0d));
+        assertEquals(52.0d, OfficeMonthPlanRules.totalCommitmentHours(32.0d, 8) - 20.0d, 0.0001d);
+    }
 }
