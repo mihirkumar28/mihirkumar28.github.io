@@ -48,6 +48,11 @@ public class OfficeMonthPlanRulesTest {
         assertEquals(52.0d, OfficeMonthPlanRules.totalCommitmentHours(32.0d, 8), 0.0001d);
     }
 
+    @Test public void shortOfficeVisitUsesItsOwnPlannedDurationPlusFullCommute() {
+        assertEquals(4.5d, OfficeMonthPlanRules.dailyCommitmentHours(2.0d), 0.0001d);
+        assertEquals(7.5d, OfficeMonthPlanRules.dailyCommitmentHours(5.0d), 0.0001d);
+    }
+
     @Test public void nineDayPlanOf39OfficeHoursUses10Hours30MinutesLessOfficeTravelTime() {
         assertEquals(72.0d, OfficeMonthPlanRules.minimumDaysBaselineCommitmentHours(), 0.0001d);
         assertEquals(61.5d, OfficeMonthPlanRules.totalCommitmentHours(39.0d, 9), 0.0001d);
