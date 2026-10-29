@@ -1,6 +1,8 @@
 package com.mihirkumar.dayflow;
 
-import android.content.Context;\n\nimport org.json.JSONArray;
+import android.content.Context;
+
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -92,7 +94,8 @@ public final class GeminiApiClient {
         }
     }
 
-    private static String generateForModel(String apiKey, String prompt, String model) throws Exception {
+    private static String generateForModel(Context context, String apiKey, String prompt,
+            String model, int attempt) throws Exception {
         JSONObject part = new JSONObject().put("text", prompt);
         JSONObject content = new JSONObject()
                 .put("role", "user")
@@ -105,6 +108,9 @@ public final class GeminiApiClient {
                 .put("generationConfig", generationConfig);
 
         HttpURLConnection connection = null;
+        long startedAt = System.currentTimeMillis();
+        String requestId = "";
+        int status = 0;
         try {
             String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/"
                     + model + ":generateContent";
@@ -125,7 +131,20 @@ public final class GeminiApiClient {
                 output.write(body);
             }
 
-            int status = connection.getResponseCode();
+            status = connection.getResponseCode();
+            requestId = firstNonEmpty(
+                    connection.getHeaderField("x-goog-request-id"),
+                    connection.getHeaderField("x-request-id"),
+                    connection.getHeaderField("x-guploader-uploadid"));
+            String retryAfter = connection.getHeaderField("Retry-After");
+            String statusDetail = status >= 200 && status < 300
+                    ? "HTTP success response" : "HTTP error response";
+            if (retryAfter != null && !retryAfter.trim().isEmpty()) {
+                statusDetail += "; Retry-After=" + retryAfter.trim();
+            }
+            GeminiDiagnostics.record(context, "http_response", model, attempt, status,
+                    System.currentTimeMillis() - startedAt, requestId, statusDetail);
+
             InputStream stream = status >= 200 && status < 300
                     ? connection.getInputStream() : connection.getErrorStream();
             String responseText = stream == null ? "" : readBounded(stream);
@@ -134,7 +153,7 @@ public final class GeminiApiClient {
                 try {
                     response = new JSONObject(responseText);
                 } catch (Exception ignored) {
-                    // Preserve HTTP status even if an intermediary returns a non-JSON error body.
+                    // Preserve HTTP status if an intermediary returns a non-JSON error body.
                 }
             }
 
@@ -143,7 +162,7 @@ public final class GeminiApiClient {
                 String detail = error == null ? "" : error.optString("message", "");
                 String message = "Gemini API returned HTTP " + status;
                 if (!detail.trim().isEmpty()) message += ": " + detail.trim();
-                throw new GeminiApiException(status, message);
+                throw new GeminiApiException(status, message, requestId);
             }
             if (response == null) throw new IOException("Gemini returned an empty or invalid response.");
 
@@ -163,31 +182,60 @@ public final class GeminiApiClient {
                 for (int i = 0; i < parts.length(); i++) {
                     JSONObject answerPart = parts.optJSONObject(i);
                     if (answerPart != null) {
-                        String text = answerPart.optString("text", "");
-                        if (!text.isEmpty()) {
-                            if (answer.length() > 0) answer.append("\n");
-                            answer.append(text);
+                        String answerText = answerPart.optString("text", "");
+                        if (!answerText.isEmpty()) {
+                            if (answer.length() > 0) answer.append("\\n");
+                            answer.append(answerText);
                         }
                     }
                 }
             }
             if (answer.length() == 0) throw new IOException("Gemini returned an empty answer.");
+            GeminiDiagnostics.record(context, "response_parsed", model, attempt, status,
+                    System.currentTimeMillis() - startedAt, requestId, "Text response parsed successfully");
             return answer.toString().trim();
+        } catch (GeminiApiException e) {
+            throw e;
+        } catch (Exception e) {
+            GeminiDiagnostics.record(context, "transport_or_parse_error", model, attempt,
+                    status, System.currentTimeMillis() - startedAt, requestId,
+                    e.getClass().getSimpleName() + ": " + safeExceptionDetail(e));
+            throw e;
         } finally {
             if (connection != null) connection.disconnect();
         }
     }
 
+    private static String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) return value.trim();
+        }
+        return "";
+    }
+
+    private static String safeExceptionDetail(Exception error) {
+        String message = error.getMessage();
+        if (message == null || message.trim().isEmpty()) return "";
+        return message;
+    }
+
     private static final class GeminiApiException extends IOException {
         private final int statusCode;
+        private final String requestId;
 
-        GeminiApiException(int statusCode, String message) {
+        GeminiApiException(int statusCode, String message, String requestId) {
             super(message);
             this.statusCode = statusCode;
+            this.requestId = requestId == null ? "" : requestId;
         }
 
         int getStatusCode() {
             return statusCode;
+        }
+
+        String getRequestId() {
+            return requestId;
         }
     }
 
