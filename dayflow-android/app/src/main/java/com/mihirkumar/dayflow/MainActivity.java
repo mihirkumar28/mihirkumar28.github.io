@@ -1690,15 +1690,26 @@ public class MainActivity extends Activity {
     private void showOfficeRoutineImpact() {
         String monthKey = officePlanMonthKey();
         JSONArray plan = getOfficeMonthPlan(monthKey);
-        int plannedDays = plan.length();
-        double plannedOfficeHours = officePlanTotalHours(plan);
-        double commuteHours = OfficeMonthPlanRules.totalCommuteHours(plannedDays);
-        double totalCommitmentHours = OfficeMonthPlanRules.totalCommitmentHours(plannedOfficeHours, plannedDays);
-
-        RoutineImpactStats wfhStats = routineImpactStats(getCombinedTemplateBlocks("wfh"));
-        RoutineImpactStats officeStats = routineImpactStats(getCombinedTemplateBlocks("office"));
         String monthLabel = new SimpleDateFormat("MMMM yyyy", Locale.getDefault())
                 .format(attendanceCalendarMonth.getTime());
+
+        ArrayList<JSONObject> entries = new ArrayList<>();
+        for (int i = 0; i < plan.length(); i++) {
+            JSONObject item = plan.optJSONObject(i);
+            if (item != null && item.optString("date", "").length() == 10) entries.add(item);
+        }
+        Collections.sort(entries, (a, b) -> a.optString("date", "")
+                .compareTo(b.optString("date", "")));
+
+        int plannedDays = entries.size();
+        double plannedOfficeHours = officePlanTotalHours(plan);
+        double commuteHours = OfficeMonthPlanRules.totalCommuteHours(plannedDays);
+        double totalCommitmentHours = OfficeMonthPlanRules.totalCommitmentHours(
+                plannedOfficeHours, plannedDays);
+        double baselineCommitmentHours = OfficeMonthPlanRules.minimumDaysBaselineCommitmentHours();
+        double timeFreedHours = baselineCommitmentHours - totalCommitmentHours;
+        double averageOfficeHours = plannedDays == 0 ? 0d : plannedOfficeHours / plannedDays;
+        double averageCommitmentHours = plannedDays == 0 ? 0d : totalCommitmentHours / plannedDays;
 
         LinearLayout content = vertical();
         content.setPadding(dp(16), dp(8), dp(16), dp(18));
@@ -1709,104 +1720,116 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams timeCardLp = new LinearLayout.LayoutParams(-1, -2);
         timeCardLp.bottomMargin = dp(12);
         content.addView(timeCard, timeCardLp);
-        timeCard.addView(text("MONTHLY TIME BUDGET", 9, color("#2E8060"), true));
+        timeCard.addView(text("YOUR ACTUAL OFFICE PLAN", 9, color("#2E8060"), true));
         TextView monthView = text(monthLabel, 20, color("#18372E"), true);
         LinearLayout.LayoutParams monthViewLp = new LinearLayout.LayoutParams(-1, -2);
         monthViewLp.topMargin = dp(3);
         timeCard.addView(monthView, monthViewLp);
 
-        addRoutineImpactMetric(timeCard, "Planned office days", plannedDays + (plannedDays == 1 ? " day" : " days"), false);
-        addRoutineImpactMetric(timeCard, "Time in office", formatOfficePlanDuration(plannedOfficeHours), false);
-        addRoutineImpactMetric(timeCard, "Travel (75 min each way)", formatOfficePlanDuration(commuteHours), false);
-        addRoutineImpactMetric(timeCard, "Office + travel commitment", formatOfficePlanDuration(totalCommitmentHours), true);
+        addRoutineImpactMetric(timeCard, "Office days in your plan",
+                plannedDays + (plannedDays == 1 ? " day" : " days"), false);
+        addRoutineImpactMetric(timeCard, "Your planned office hours",
+                formatOfficePlanDuration(plannedOfficeHours), false);
+        addRoutineImpactMetric(timeCard, "Travel (75 min each way)",
+                formatOfficePlanDuration(commuteHours), false);
+        addRoutineImpactMetric(timeCard, "Office + travel total",
+                formatOfficePlanDuration(totalCommitmentHours), true);
+        if (plannedDays > 0) {
+            addRoutineImpactMetric(timeCard, "Average per office day",
+                    formatOfficePlanDuration(averageCommitmentHours), false);
+            addRoutineImpactMetric(timeCard, "Average time in office per day",
+                    formatOfficePlanDuration(averageOfficeHours), false);
+        }
 
-        TextView travelNote = text(plannedDays == 0
-                ? "Add office dates to calculate the monthly travel cost."
-                : "Travel alone uses " + formatOfficePlanDuration(commuteHours)
-                    + " this month; that time is away from home, not automatically study time lost.",
-                11, color("#687A70"), false);
-        travelNote.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams travelNoteLp = new LinearLayout.LayoutParams(-1, -2);
-        travelNoteLp.topMargin = dp(10);
-        timeCard.addView(travelNote, travelNoteLp);
-
-        double baselineCommitmentHours = OfficeMonthPlanRules.minimumDaysBaselineCommitmentHours();
-        double commitmentDeltaHours = OfficeMonthPlanRules.commitmentDeltaVsMinimumDaysBaseline(
-                plannedOfficeHours, plannedDays);
         LinearLayout baselineCard = vertical();
         baselineCard.setPadding(dp(15), dp(13), dp(15), dp(13));
         baselineCard.setBackground(bg("#E7F0E8", 16));
         LinearLayout.LayoutParams baselineLp = new LinearLayout.LayoutParams(-1, -2);
         baselineLp.bottomMargin = dp(12);
         content.addView(baselineCard, baselineLp);
-        baselineCard.addView(text("OFFICE + TRAVEL VS 8-DAY REFERENCE", 9,
+        baselineCard.addView(text("TIME FREED VS THE 8-DAY REFERENCE", 9,
                 color("#286B55"), true));
-        addRoutineImpactMetric(baselineCard, "Reference: 8 days, 52 office h + 20 travel h",
-                formatOfficePlanDuration(baselineCommitmentHours), false);
-        addRoutineImpactMetric(baselineCard, "Current plan: " + plannedDays + " days",
+        addRoutineImpactMetric(baselineCard,
+                "Reference: 52 office h + 20 travel h", formatOfficePlanDuration(baselineCommitmentHours), false);
+        addRoutineImpactMetric(baselineCard, "Your actual plan",
                 formatOfficePlanDuration(totalCommitmentHours), false);
-        String baselineDelta = plannedDays == 0 ? "Add planned days to compare"
-                : formatSignedImpact((int) Math.round(commitmentDeltaHours * 60d))
-                    + " vs reference";
+
+        String deltaLabel;
+        if (plannedDays == 0) {
+            deltaLabel = "Add office dates to compare";
+        } else if (Math.abs(timeFreedHours) < 0.0001d) {
+            deltaLabel = "Same total time";
+        } else if (timeFreedHours > 0d) {
+            deltaLabel = formatOfficePlanDuration(timeFreedHours) + " less committed";
+        } else {
+            deltaLabel = formatOfficePlanDuration(-timeFreedHours) + " more committed";
+        }
         addRoutineImpactMetric(baselineCard, "Difference in office + travel time",
-                baselineDelta, true);
+                deltaLabel, true);
         TextView baselineNote = text(
-                "This compares office presence + travel only. It is not a measure of total free time or study recovered.",
+                "This uses the hours you entered for each date. A shorter office visit still counts as that date's actual planned hours; travel remains 2 h 30 min.",
                 11, color("#315447"), false);
         baselineNote.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams baselineNoteLp = new LinearLayout.LayoutParams(-1, -2);
         baselineNoteLp.topMargin = dp(7);
         baselineCard.addView(baselineNote, baselineNoteLp);
 
-        LinearLayout comparisonIntro = vertical();
-        comparisonIntro.setPadding(dp(15), dp(13), dp(15), dp(12));
-        comparisonIntro.setBackground(surfaceBackground(18));
-        LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
-        introLp.bottomMargin = dp(12);
-        content.addView(comparisonIntro, introLp);
-        comparisonIntro.addView(text("YOUR SAVED ROUTINES", 9, color("#2E8060"), true));
-        TextView comparisonTitle = text("WFH vs office day", 18, color("#18372E"), true);
-        LinearLayout.LayoutParams comparisonTitleLp = new LinearLayout.LayoutParams(-1, -2);
-        comparisonTitleLp.topMargin = dp(3);
-        comparisonIntro.addView(comparisonTitle, comparisonTitleLp);
-        TextView comparisonDescription = text(
-                "These are scheduled block differences: office template minus WFH. They are not net hours gained or lost.",
-                11, color("#687A70"), false);
-        comparisonDescription.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams comparisonDescriptionLp = new LinearLayout.LayoutParams(-1, -2);
-        comparisonDescriptionLp.topMargin = dp(4);
-        comparisonIntro.addView(comparisonDescription, comparisonDescriptionLp);
+        LinearLayout dayListCard = vertical();
+        dayListCard.setPadding(dp(15), dp(13), dp(15), dp(13));
+        dayListCard.setBackground(surfaceBackground(18));
+        LinearLayout.LayoutParams dayListLp = new LinearLayout.LayoutParams(-1, -2);
+        dayListLp.bottomMargin = dp(12);
+        content.addView(dayListCard, dayListLp);
+        dayListCard.addView(text("DAY-BY-DAY BREAKDOWN", 9, color("#2E8060"), true));
+        TextView dayListTitle = text("Your selected office dates", 17, color("#18372E"), true);
+        LinearLayout.LayoutParams dayListTitleLp = new LinearLayout.LayoutParams(-1, -2);
+        dayListTitleLp.topMargin = dp(3);
+        dayListCard.addView(dayListTitle, dayListTitleLp);
 
-        addRoutineImpactComparison(content, "Study scheduled", wfhStats.studyMinutes,
-                officeStats.studyMinutes, plannedDays);
-        addRoutineImpactComparison(content, "Work scheduled", wfhStats.workMinutes,
-                officeStats.workMinutes, plannedDays);
-        addRoutineImpactComparison(content, "Exercise scheduled", wfhStats.exerciseMinutes,
-                officeStats.exerciseMinutes, plannedDays);
-        addRoutineImpactComparison(content, "Unallocated routine time",
-                wfhStats.unallocatedMinutes, officeStats.unallocatedMinutes, plannedDays);
+        if (entries.isEmpty()) {
+            TextView noDays = text("No office dates planned for this month yet.", 12,
+                    color("#687A70"), false);
+            LinearLayout.LayoutParams noDaysLp = new LinearLayout.LayoutParams(-1, -2);
+            noDaysLp.topMargin = dp(9);
+            dayListCard.addView(noDays, noDaysLp);
+        } else {
+            for (JSONObject item : entries) {
+                String dateKey = item.optString("date", "");
+                double officeHours = Math.max(0d, Math.min(24d, item.optDouble("hours",
+                        OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY)));
+                double dayTotal = officeHours + OfficeMonthPlanRules.dailyCommuteHours();
 
-        LinearLayout interpretation = vertical();
-        interpretation.setPadding(dp(15), dp(13), dp(15), dp(13));
-        interpretation.setBackground(bg("#E7F0E8", 16));
-        LinearLayout.LayoutParams interpretationLp = new LinearLayout.LayoutParams(-1, -2);
-        interpretationLp.topMargin = dp(1);
-        content.addView(interpretation, interpretationLp);
-        interpretation.addView(text("HOW TO READ THIS", 9, color("#286B55"), true));
+                View divider = new View(this);
+                divider.setBackgroundColor(color("#E3EAE3"));
+                LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
+                dividerLp.topMargin = dp(9);
+                dayListCard.addView(divider, dividerLp);
+
+                TextView dateTitle = text(formatOfficePlanDate(dateKey), 13, color("#18372E"), true);
+                dateTitle.setSingleLine(true);
+                LinearLayout.LayoutParams dateTitleLp = new LinearLayout.LayoutParams(-1, -2);
+                dateTitleLp.topMargin = dp(8);
+                dayListCard.addView(dateTitle, dateTitleLp);
+                addRoutineImpactMetric(dayListCard, "Time in office",
+                        formatOfficePlanDuration(officeHours), false);
+                addRoutineImpactMetric(dayListCard, "Travel", 
+                        formatOfficePlanDuration(OfficeMonthPlanRules.dailyCommuteHours()), false);
+                addRoutineImpactMetric(dayListCard, "Total for this date",
+                        formatOfficePlanDuration(dayTotal), true);
+            }
+        }
+
         TextView explanation = text(
-                plannedDays == 0
-                        ? "The routine comparison is ready, but monthly totals stay at zero until office dates are planned. Commute is calculated separately from the time blocks."
-                        : "Each monthly change multiplies the saved-template difference by " + plannedDays
-                            + " planned office days. This does not calculate net free time: commute is separate and the exact time blocks it replaces are not specified.",
-                11, color("#315447"), false);
+                "The previous WFH-versus-office template comparison has been removed. This screen uses your actual selected dates and their individual office-hour values.",
+                11, color("#687A70"), false);
         explanation.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams explanationLp = new LinearLayout.LayoutParams(-1, -2);
-        explanationLp.topMargin = dp(5);
-        interpretation.addView(explanation, explanationLp);
+        explanationLp.topMargin = dp(4);
+        content.addView(explanation, explanationLp);
 
-        showFullScreenViewer("ROUTINE IMPACT", "How office days affect your routine",
-                "A monthly time budget and a comparison of your saved WFH and office templates.",
-                content, "Review routines", () -> switchPage("plan"));
+        showFullScreenViewer("ROUTINE IMPACT", "Where your time goes",
+                "Actual office dates, commute time and the difference against the 8-day reference.",
+                content, "Edit office plan", () -> switchPage("office"));
     }
 
     private RoutineImpactStats routineImpactStats(ArrayList<Block> routine) {
