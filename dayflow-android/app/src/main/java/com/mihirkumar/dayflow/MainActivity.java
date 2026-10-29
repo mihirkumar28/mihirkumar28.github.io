@@ -1730,6 +1730,34 @@ public class MainActivity extends Activity {
         travelNoteLp.topMargin = dp(10);
         timeCard.addView(travelNote, travelNoteLp);
 
+        double baselineCommitmentHours = OfficeMonthPlanRules.minimumDaysBaselineCommitmentHours();
+        double commitmentDeltaHours = OfficeMonthPlanRules.commitmentDeltaVsMinimumDaysBaseline(
+                plannedOfficeHours, plannedDays);
+        LinearLayout baselineCard = vertical();
+        baselineCard.setPadding(dp(15), dp(13), dp(15), dp(13));
+        baselineCard.setBackground(bg("#E7F0E8", 16));
+        LinearLayout.LayoutParams baselineLp = new LinearLayout.LayoutParams(-1, -2);
+        baselineLp.bottomMargin = dp(12);
+        content.addView(baselineCard, baselineLp);
+        baselineCard.addView(text("OFFICE + TRAVEL VS 8-DAY REFERENCE", 9,
+                color("#286B55"), true));
+        addRoutineImpactMetric(baselineCard, "Reference: 8 days, 52 office h + 20 travel h",
+                formatOfficePlanDuration(baselineCommitmentHours), false);
+        addRoutineImpactMetric(baselineCard, "Current plan: " + plannedDays + " days",
+                formatOfficePlanDuration(totalCommitmentHours), false);
+        String baselineDelta = plannedDays == 0 ? "Add planned days to compare"
+                : formatSignedImpact((int) Math.round(commitmentDeltaHours * 60d))
+                    + " vs reference";
+        addRoutineImpactMetric(baselineCard, "Difference in office + travel time",
+                baselineDelta, true);
+        TextView baselineNote = text(
+                "This compares office presence + travel only. It is not a measure of total free time or study recovered.",
+                11, color("#315447"), false);
+        baselineNote.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams baselineNoteLp = new LinearLayout.LayoutParams(-1, -2);
+        baselineNoteLp.topMargin = dp(7);
+        baselineCard.addView(baselineNote, baselineNoteLp);
+
         LinearLayout comparisonIntro = vertical();
         comparisonIntro.setPadding(dp(15), dp(13), dp(15), dp(12));
         comparisonIntro.setBackground(surfaceBackground(18));
@@ -1742,7 +1770,7 @@ public class MainActivity extends Activity {
         comparisonTitleLp.topMargin = dp(3);
         comparisonIntro.addView(comparisonTitle, comparisonTitleLp);
         TextView comparisonDescription = text(
-                "Compares the saved shared + day-type templates. Changes below show the office template minus WFH.",
+                "These are scheduled block differences: office template minus WFH. They are not net hours gained or lost.",
                 11, color("#687A70"), false);
         comparisonDescription.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams comparisonDescriptionLp = new LinearLayout.LayoutParams(-1, -2);
@@ -1768,8 +1796,8 @@ public class MainActivity extends Activity {
         TextView explanation = text(
                 plannedDays == 0
                         ? "The routine comparison is ready, but monthly totals stay at zero until office dates are planned. Commute is calculated separately from the time blocks."
-                        : "The monthly routine change multiplies each per-day template difference by " + plannedDays
-                            + " planned office days. Commute is reported separately because DayFlow does not assume which clock-time block your journey replaces.",
+                        : "Each monthly change multiplies the saved-template difference by " + plannedDays
+                            + " planned office days. This does not calculate net free time: commute is separate and the exact time blocks it replaces are not specified.",
                 11, color("#315447"), false);
         explanation.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams explanationLp = new LinearLayout.LayoutParams(-1, -2);
