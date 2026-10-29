@@ -1541,7 +1541,7 @@ public class MainActivity extends Activity {
                 + formatOfficePlanDuration(OfficeMonthPlanRules.dailyCommuteHours()) + " per office day",
                 10, color("#496257"), true));
         double monthlyTravelHours = OfficeMonthPlanRules.totalCommuteHours(days);
-        double totalCommitmentHours = hours + monthlyTravelHours;
+        double totalCommitmentHours = OfficeMonthPlanRules.totalCommitmentHours(hours, days);
         LinearLayout.LayoutParams travelTotalLp = new LinearLayout.LayoutParams(-1, -2);
         travelTotalLp.topMargin = dp(4);
         travelSummary.addView(text("Monthly travel: " + formatOfficePlanDuration(monthlyTravelHours)
