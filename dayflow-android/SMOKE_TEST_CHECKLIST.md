@@ -31,8 +31,10 @@ Run this checklist on the installed APK after CI emulator tests pass. A successf
 - [ ] Verify Weekend/WFH states cannot create an unintended office attendance session.
 - [ ] In Office → Office-day plan, mark dates and verify planned dates are distinct from recorded attendance.
 - [ ] Plan future-month dates, leave planning mode, and verify attendance-history cells still cannot create future actual records.
-- [ ] Verify eight planned days with 6.5 hours each meets the 52-hour minimum; eight days below 52 hours does not.
-- [ ] Verify seven days never qualifies, even with 52+ planned hours; nine days qualifies with the hour minimum waived.
+- [ ] Verify eight planned days with 6.5 hours each meets the 52-hour minimum; eight days below 52 office hours does not qualify even if office time plus commute exceeds 52.
+- [ ] Verify seven days never qualifies, even with 52+ planned office hours; nine days qualifies with the hour minimum waived.
+- [ ] Verify commute is shown as 1 h 15 min each way (2 h 30 min per day), with 20 h travel for eight days and 22 h 30 min for nine days.
+- [ ] Verify eight days with 52 office hours shows 72 h total commitment including travel.
 - [ ] Edit a planned day's hours, remove a planned date, switch months, and verify the plan persists independently for each month.
 
 ## Roadmap and documents

@@ -1531,6 +1531,23 @@ public class MainActivity extends Activity {
         metricsLp.topMargin = dp(12);
         card.addView(metrics, metricsLp);
 
+        LinearLayout travelSummary = vertical();
+        travelSummary.setPadding(dp(10), dp(9), dp(10), dp(9));
+        travelSummary.setBackground(bg("#F4F6F1", 12));
+        LinearLayout.LayoutParams travelSummaryLp = new LinearLayout.LayoutParams(-1, -2);
+        travelSummaryLp.topMargin = dp(10);
+        card.addView(travelSummary, travelSummaryLp);
+        travelSummary.addView(text("COMMUTE  ·  1 h 15 min each way  ·  "
+                + formatOfficePlanDuration(OfficeMonthPlanRules.dailyCommuteHours()) + " per office day",
+                10, color("#496257"), true));
+        double monthlyTravelHours = OfficeMonthPlanRules.totalCommuteHours(days);
+        double totalCommitmentHours = OfficeMonthPlanRules.totalCommitmentHours(hours, days);
+        LinearLayout.LayoutParams travelTotalLp = new LinearLayout.LayoutParams(-1, -2);
+        travelTotalLp.topMargin = dp(4);
+        travelSummary.addView(text("Monthly travel: " + formatOfficePlanDuration(monthlyTravelHours)
+                + "   ·   Total commitment: " + formatOfficePlanDuration(totalCommitmentHours),
+                11, color("#18372E"), true), travelTotalLp);
+
         String status;
         if (waived) {
             status = "9+ days planned — the 52-hour minimum is waived.";
@@ -1550,7 +1567,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
         statusLp.topMargin = dp(7);
         card.addView(statusView, statusLp);
-        TextView guidance = text("Tap a date in the calendar to add or remove it. New dates default to 6.5 planned hours; edit each date as needed.",
+        TextView guidance = text("Tap dates to add or remove them. New dates default to 6.5 office hours. The 52-hour threshold counts office time only; commute is additional.",
                 10, color("#687A70"), false);
         guidance.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams guidanceLp = new LinearLayout.LayoutParams(-1, -2);
@@ -1596,8 +1613,14 @@ public class MainActivity extends Activity {
             dateDetails.addView(text(formatOfficePlanDate(dateKey), 12, color("#18372E"), true));
             LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
             detailLp.topMargin = dp(2);
-            dateDetails.addView(text(formatOfficePlanHours(plannedHours) + " planned", 10,
-                    color("#687A70"), false), detailLp);
+            dateDetails.addView(text(formatOfficePlanHours(plannedHours) + " office + "
+                    + formatOfficePlanDuration(OfficeMonthPlanRules.dailyCommuteHours()) + " travel",
+                    10, color("#687A70"), false), detailLp);
+            LinearLayout.LayoutParams commitmentLp = new LinearLayout.LayoutParams(-1, -2);
+            commitmentLp.topMargin = dp(2);
+            dateDetails.addView(text(formatOfficePlanDuration(
+                    plannedHours + OfficeMonthPlanRules.dailyCommuteHours()) + " total commitment",
+                    10, color("#496257"), true), commitmentLp);
             row.addView(dateDetails, new LinearLayout.LayoutParams(0, -2, 1f));
 
             Button editHours = secondaryButton("Edit hours", () -> editOfficePlanHours(dateKey));
@@ -1753,6 +1776,15 @@ public class MainActivity extends Activity {
 
     private String formatOfficePlanHours(double hours) {
         return formatOfficePlanHoursNumber(hours) + " h";
+    }
+
+    private String formatOfficePlanDuration(double hours) {
+        long totalMinutes = Math.max(0L, Math.round(hours * 60d));
+        long wholeHours = totalMinutes / 60L;
+        long minutes = totalMinutes % 60L;
+        if (wholeHours == 0L) return minutes + " min";
+        if (minutes == 0L) return wholeHours + " h";
+        return wholeHours + " h " + minutes + " min";
     }
 
     private String formatOfficePlanHoursNumber(double hours) {

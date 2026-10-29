@@ -6,8 +6,23 @@ final class OfficeMonthPlanRules {
     static final int HOURS_WAIVER_DAYS = 9;
     static final double MINIMUM_HOURS = 52.0d;
     static final double DEFAULT_HOURS_PER_DAY = 6.5d;
+    static final int COMMUTE_MINUTES_EACH_WAY = 75;
+    static final int DAILY_COMMUTE_MINUTES = COMMUTE_MINUTES_EACH_WAY * 2;
 
     private OfficeMonthPlanRules() {}
+
+    /** Commute is planned separately and never counts toward required office hours. */
+    static double dailyCommuteHours() {
+        return DAILY_COMMUTE_MINUTES / 60.0d;
+    }
+
+    static double totalCommuteHours(int plannedDays) {
+        return Math.max(0, plannedDays) * (double) DAILY_COMMUTE_MINUTES / 60.0d;
+    }
+
+    static double totalCommitmentHours(double plannedOfficeHours, int plannedDays) {
+        return Math.max(0d, plannedOfficeHours) + totalCommuteHours(plannedDays);
+    }
 
     static boolean isHoursMinimumWaived(int plannedDays) {
         return plannedDays >= HOURS_WAIVER_DAYS;
