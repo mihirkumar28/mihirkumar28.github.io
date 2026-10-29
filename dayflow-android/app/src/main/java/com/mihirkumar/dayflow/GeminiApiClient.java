@@ -78,7 +78,7 @@ public final class GeminiApiClient {
             String fallbackAnswer = generateForModel(context, apiKey, prompt, FALLBACK_MODEL, 3);
             GeminiDiagnostics.record(context, "request_complete", FALLBACK_MODEL, 3,
                     200, 0, "", "Fallback model returned an answer");
-            return "[Gemini 3.5 Flash-Lite fallback used after high demand on Gemini 3.8 Flash.]\\n\\n"
+            return "[Gemini 3.5 Flash-Lite fallback used after high demand on Gemini 3.8 Flash.]\n\n"
                     + fallbackAnswer;
         } catch (GeminiApiException fallback) {
             GeminiDiagnostics.record(context, "fallback_failed", FALLBACK_MODEL, 3,
