@@ -20,6 +20,10 @@ final class OfficeMonthPlanRules {
         return Math.max(0, plannedDays) * (double) DAILY_COMMUTE_MINUTES / 60.0d;
     }
 
+    static double dailyCommitmentHours(double plannedOfficeHours) {
+        return Math.max(0d, plannedOfficeHours) + dailyCommuteHours();
+    }
+
     static double totalCommitmentHours(double plannedOfficeHours, int plannedDays) {
         return Math.max(0d, plannedOfficeHours) + totalCommuteHours(plannedDays);
     }
