@@ -422,9 +422,11 @@ public class GeminiAssistantActivity extends Activity {
             requestGeneration++; // Ignore a late response from this timed-out request.
             setControlsEnabled(true);
             connectionStatus.setText("Gemini request timed out.");
-            resultView.setText("No response from Gemini within 45 seconds. Check your mobile data/Wi-Fi and API key, then try Test connection again. If this repeats, open Google AI Studio and confirm the key's project still has Gemini API access.");
+            GeminiDiagnostics.record(getApplicationContext(), "ui_deadline_exceeded", "gemini-3.8-flash",
+                    0, 0, 60_000L, "", "UI deadline reached before the bounded retries completed");
+            resultView.setText("No response from Gemini within 60 seconds. DayFlow retries transient timeouts and tries Flash-Lite automatically. Check your connection and retry; use View / export Gemini diagnostic logs to see the HTTP status and timing.");
         };
-        requestHandler.postDelayed(requestTimeout, 45_000L);
+        requestHandler.postDelayed(requestTimeout, 60_000L);
 
         new Thread(() -> {
             try {
