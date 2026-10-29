@@ -275,7 +275,9 @@ public class GeminiAssistantActivity extends Activity {
                 "Testing Gemini connection…", answer -> {
                     if (answer.contains("DAYFLOW_GEMINI_CONNECTED")) {
                         resultView.setText("Connection successful. Gemini is ready for DayFlow.");
-                        connectionStatus.setText("Connected successfully.");
+                        connectionStatus.setText(answer.startsWith("[Gemini 3.5 Flash-Lite fallback used")
+                                ? "Connected using Gemini 3.5 Flash-Lite fallback."
+                                : "Connected successfully using Gemini 3.8 Flash.");
                     } else {
                         resultView.setText("Gemini replied, but the test marker was missing. Response:\n\n" + answer);
                         connectionStatus.setText("Gemini responded; review the test result.");
