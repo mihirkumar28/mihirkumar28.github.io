@@ -13,7 +13,10 @@ Native Android implementation of DayFlow. The app stores its timetable in Androi
 - Recovery mode
 - Daily execution metrics
 - Body-composition planner tab with locally saved inputs, target-date selection, TDEE/deficit estimates and fat-loss-partition scenarios
-- Offline-first: no backend required
+- Optional Gemini AI assistant for testing a personal Google AI Studio API key and reviewing today's saved routine
+- Gemini API key encrypted locally with Android Keystore; the encrypted secret is excluded from device/cloud backup
+- Gemini analysis is opt-in and sends current-day task titles, times and statuses to Google; Google may use free-tier content to improve its products
+- Offline-first core timetable: no backend required
 
 ## Build
 Requires JDK 17 and Android Gradle Plugin 8.13.x. The project can be built by GitHub Actions.
