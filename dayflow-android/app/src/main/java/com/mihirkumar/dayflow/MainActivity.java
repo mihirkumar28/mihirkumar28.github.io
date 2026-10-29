@@ -1803,7 +1803,7 @@ public class MainActivity extends Activity {
                 String dateKey = item.optString("date", "");
                 double officeHours = Math.max(0d, Math.min(24d, item.optDouble("hours",
                         OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY)));
-                double dayTotal = officeHours + OfficeMonthPlanRules.dailyCommuteHours();
+                double dayTotal = OfficeMonthPlanRules.dailyCommitmentHours(officeHours);
 
                 View divider = new View(this);
                 divider.setBackgroundColor(color("#E3EAE3"));
