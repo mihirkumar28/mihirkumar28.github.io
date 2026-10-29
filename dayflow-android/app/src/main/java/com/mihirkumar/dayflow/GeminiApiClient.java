@@ -51,7 +51,7 @@ public final class GeminiApiClient {
 
         try {
             String fallbackAnswer = generateForModel(apiKey, prompt, FALLBACK_MODEL);
-            return "[Gemini 3.5 Flash-Lite fallback used after high demand on Gemini 3.8 Flash.]\\n\\n"
+            return "[Gemini 3.5 Flash-Lite fallback used after high demand on Gemini 3.8 Flash.]\n\n"
                     + fallbackAnswer;
         } catch (GeminiApiException fallback) {
             if (fallback.getStatusCode() == 503) {
@@ -134,7 +134,7 @@ public final class GeminiApiClient {
                     if (answerPart != null) {
                         String text = answerPart.optString("text", "");
                         if (!text.isEmpty()) {
-                            if (answer.length() > 0) answer.append("\\n");
+                            if (answer.length() > 0) answer.append("\n");
                             answer.append(text);
                         }
                     }
