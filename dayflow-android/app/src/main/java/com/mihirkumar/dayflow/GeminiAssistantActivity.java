@@ -275,7 +275,9 @@ public class GeminiAssistantActivity extends Activity {
                 "Testing Gemini connection…", answer -> {
                     if (answer.contains("DAYFLOW_GEMINI_CONNECTED")) {
                         resultView.setText("Connection successful. Gemini is ready for DayFlow.");
-                        connectionStatus.setText("Connected successfully.");
+                        connectionStatus.setText(answer.startsWith("[Gemini 3.5 Flash-Lite fallback used")
+                                ? "Connected using Gemini 3.5 Flash-Lite fallback."
+                                : "Connected successfully using Gemini 3.8 Flash.");
                     } else {
                         resultView.setText("Gemini replied, but the test marker was missing. Response:\n\n" + answer);
                         connectionStatus.setText("Gemini responded; review the test result.");
@@ -407,9 +409,9 @@ public class GeminiAssistantActivity extends Activity {
             requestGeneration++; // Ignore a late response from this timed-out request.
             setControlsEnabled(true);
             connectionStatus.setText("Gemini request timed out.");
-            resultView.setText("No response from Gemini within 30 seconds. Check your mobile data/Wi-Fi and API key, then try Test connection again. If this repeats, open Google AI Studio and confirm the key's project still has Gemini API access.");
+            resultView.setText("No response from Gemini within 45 seconds. Check your mobile data/Wi-Fi and API key, then try Test connection again. If this repeats, open Google AI Studio and confirm the key's project still has Gemini API access.");
         };
-        requestHandler.postDelayed(requestTimeout, 30_000L);
+        requestHandler.postDelayed(requestTimeout, 45_000L);
 
         new Thread(() -> {
             try {
