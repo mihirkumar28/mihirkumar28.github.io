@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -38,6 +40,9 @@ public class GeminiAssistantActivity extends Activity {
     private TextView connectionStatus;
     private TextView resultView;
     private boolean requestRunning;
+    private final Handler requestHandler = new Handler(Looper.getMainLooper());
+    private long requestGeneration;
+    private Runnable requestTimeout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,7 +97,25 @@ public class GeminiAssistantActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(20), dp(18), dp(20), dp(28));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+        // Android 15 enforces edge-to-edge for targetSdk 35. Reserve the system bars so
+        // the back link, heading, and final privacy note remain readable and scrollable.
+        scroll.setOnApplyWindowInsetsListener((view, insets) -> {
+            int topInset;
+            int bottomInset;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                android.graphics.Insets bars = insets.getInsets(
+                        android.view.WindowInsets.Type.systemBars());
+                topInset = bars.top;
+                bottomInset = bars.bottom;
+            } else {
+                topInset = insets.getSystemWindowInsetTop();
+                bottomInset = insets.getSystemWindowInsetBottom();
+            }
+            content.setPadding(dp(20), dp(18) + topInset, dp(20), dp(28) + bottomInset);
+            return insets;
+        });
         setContentView(scroll);
+        scroll.requestApplyInsets();
 
         TextView back = text("‹  Back to DayFlow", 14, Color.rgb(101, 197, 160), true);
         back.setPadding(0, 0, 0, dp(12));
@@ -247,6 +270,7 @@ public class GeminiAssistantActivity extends Activity {
             showError(safeMessage(e));
             return;
         }
+        connectionStatus.setText("Contacting Gemini API…");
         runGeminiRequest("Reply with exactly this text and nothing else: DAYFLOW_GEMINI_CONNECTED",
                 "Testing Gemini connection…", answer -> {
                     if (answer.contains("DAYFLOW_GEMINI_CONNECTED")) {
@@ -297,7 +321,11 @@ public class GeminiAssistantActivity extends Activity {
             showError("Couldn't read the saved key: " + safeMessage(e));
             return;
         }
-        runGeminiRequest(prompt, "Reviewing today's routine…", answer -> resultView.setText(answer), key);
+        connectionStatus.setText("Sending today's schedule for analysis…");
+        runGeminiRequest(prompt, "Reviewing today's routine…", answer -> {
+            resultView.setText(answer);
+            connectionStatus.setText("Analysis complete.");
+        }, key);
     }
 
     private String buildTodayPrompt() throws Exception {
@@ -368,27 +396,54 @@ public class GeminiAssistantActivity extends Activity {
     private void runGeminiRequest(String prompt, String loadingText, RequestSuccess success, String apiKey) {
         if (requestRunning) return;
         requestRunning = true;
+        final long requestId = ++requestGeneration;
         setControlsEnabled(false);
         resultView.setText(loadingText);
+
+        if (requestTimeout != null) requestHandler.removeCallbacks(requestTimeout);
+        requestTimeout = () -> {
+            if (!requestRunning || requestGeneration != requestId) return;
+            requestRunning = false;
+            requestGeneration++; // Ignore a late response from this timed-out request.
+            setControlsEnabled(true);
+            connectionStatus.setText("Gemini request timed out.");
+            resultView.setText("No response from Gemini within 30 seconds. Check your mobile data/Wi-Fi and API key, then try Test connection again. If this repeats, open Google AI Studio and confirm the key's project still has Gemini API access.");
+        };
+        requestHandler.postDelayed(requestTimeout, 30_000L);
+
         new Thread(() -> {
             try {
                 String answer = GeminiApiClient.generateContent(apiKey, prompt);
                 runOnUiThread(() -> {
+                    if (!requestRunning || requestGeneration != requestId) return;
                     requestRunning = false;
+                    if (requestTimeout != null) requestHandler.removeCallbacks(requestTimeout);
+                    requestTimeout = null;
                     setControlsEnabled(true);
                     success.onSuccess(answer);
                 });
             } catch (Exception e) {
                 String message = safeMessage(e);
                 runOnUiThread(() -> {
+                    if (!requestRunning || requestGeneration != requestId) return;
                     requestRunning = false;
+                    if (requestTimeout != null) requestHandler.removeCallbacks(requestTimeout);
+                    requestTimeout = null;
                     setControlsEnabled(true);
                     resultView.setText("Gemini request failed. " + message
                             + "\n\nCheck that the key is valid, this project has Gemini API access, and the free-tier quota has not been exceeded.");
-                    connectionStatus.setText("Connection not verified.");
+                    connectionStatus.setText("Gemini request failed; see the details below.");
                 });
             }
         }, "DayFlow-Gemini-request").start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (requestTimeout != null) requestHandler.removeCallbacks(requestTimeout);
+        requestGeneration++;
+        requestRunning = false;
+        super.onDestroy();
     }
 
     private void setControlsEnabled(boolean enabled) {
