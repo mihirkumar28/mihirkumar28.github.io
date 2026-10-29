@@ -35,6 +35,7 @@ Run this checklist on the installed APK after CI emulator tests pass. A successf
 - [ ] Verify seven days never qualifies, even with 52+ planned office hours; nine days qualifies with the hour minimum waived.
 - [ ] Verify commute is shown as 1 h 15 min each way (2 h 30 min per day), with 20 h travel for eight days and 22 h 30 min for nine days.
 - [ ] Verify eight days with 52 office hours shows 72 h total commitment including travel.
+- [ ] Verify commute totals, status guidance, and each planned-day detail stay on one line at standard and enlarged display text sizes.
 - [ ] Edit a planned day's hours, remove a planned date, switch months, and verify the plan persists independently for each month.
 
 ## Roadmap and documents
