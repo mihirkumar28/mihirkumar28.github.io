@@ -24,11 +24,16 @@ Run this checklist on the installed APK after CI emulator tests pass. A successf
 - [ ] Change a template/date in the app and verify the widget refreshes without a reinstall.
 - [ ] Verify widget actions do not apply a reusable template to the wrong date.
 
-## Office attendance
+## Office attendance and monthly planning
 - [ ] Start and end an office session; verify elapsed time and open/closed state.
 - [ ] Record multiple sessions on one date and verify the total is their sum.
 - [ ] Edit a historical session and verify today's total does not change incorrectly.
 - [ ] Verify Weekend/WFH states cannot create an unintended office attendance session.
+- [ ] In Office → Office-day plan, mark dates and verify planned dates are distinct from recorded attendance.
+- [ ] Plan future-month dates, leave planning mode, and verify attendance-history cells still cannot create future actual records.
+- [ ] Verify eight planned days with 6.5 hours each meets the 52-hour minimum; eight days below 52 hours does not.
+- [ ] Verify seven days never qualifies, even with 52+ planned hours; nine days qualifies with the hour minimum waived.
+- [ ] Edit a planned day's hours, remove a planned date, switch months, and verify the plan persists independently for each month.
 
 ## Roadmap and documents
 - [ ] Move a goal between months, expand/collapse months, and verify the source month remains visible and parent-child identity is preserved.
