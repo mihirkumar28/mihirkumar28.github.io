@@ -48,6 +48,7 @@ public class MainActivity extends Activity {
     private static final String COMMUTE_OUT_START = "commuteOutStart";
     private static final String COMMUTE_OUT_END = "commuteOutEnd";
     private static final String OFFICE_LOG_KEY = "officeLog";
+    private static final String OFFICE_MONTH_PLAN_KEY_PREFIX = "officeMonthPlan_";
     private static final String DEBUG_LOG_KEY = "debugLog";
     private static final String DEBUG_TAG = "DayFlow";
     private static final String UPDATE_METADATA_URL = "https://github.com/mihirkumar28/mihirkumar28.github.io/releases/download/latest/update.json";
@@ -164,6 +165,7 @@ public class MainActivity extends Activity {
     private String selectedDateKey;
     private String officeSummaryPeriod = "all";
     private Calendar attendanceCalendarMonth = Calendar.getInstance();
+    private boolean officePlanMode = false;
     private boolean updateCheckRunning;
     private DayFlowUpdateInfo.ReleaseInfo updatePendingAfterNotificationPermission;
     private androidx.lifecycle.LiveData<WorkInfo> updateDownloadLiveData;
@@ -1332,6 +1334,9 @@ public class MainActivity extends Activity {
         metrics.addView(commuteMetric, new LinearLayout.LayoutParams(0, -2, 1f));
         summary.addView(metrics);
 
+        // Planned office days are separate from actual attendance records.
+        addOfficePlanSection();
+
         // Calendar becomes a quiet section, with saved days marked subtly and today unmistakable.
         LinearLayout calendarSection = vertical();
         LinearLayout.LayoutParams calendarSectionLp = new LinearLayout.LayoutParams(-1, -2);
@@ -1341,8 +1346,10 @@ public class MainActivity extends Activity {
         LinearLayout calendarHeader = horizontal();
         calendarHeader.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout calendarHeading = vertical();
-        calendarHeading.addView(text("Attendance history", 17, color("#18372E"), true));
-        calendarHeading.addView(text("Tap a date to view or edit its record", 11, color("#687A70"), false));
+        calendarHeading.addView(text(officePlanMode ? "Plan office days" : "Attendance history", 17, color("#18372E"), true));
+        calendarHeading.addView(text(officePlanMode
+                ? "Tap dates to add or remove planned office days"
+                : "Tap a date to view or edit its record", 11, color("#687A70"), false));
         calendarHeader.addView(calendarHeading, new LinearLayout.LayoutParams(0, -2, 1f));
 
         Calendar monthStart = (Calendar) attendanceCalendarMonth.clone();
@@ -1375,8 +1382,9 @@ public class MainActivity extends Activity {
         Button nextMonth = secondaryButton("›", () -> changeAttendanceCalendarMonth(1));
         nextMonth.setTextSize(20);
         nextMonth.setContentDescription("Next month");
-        nextMonth.setEnabled(!isCurrentMonth);
-        if (isCurrentMonth) nextMonth.setAlpha(0.3f);
+        nextMonth.setEnabled(officePlanMode || !isCurrentMonth);
+        if (!officePlanMode && isCurrentMonth) nextMonth.setAlpha(0.3f);
+        else nextMonth.setAlpha(1f);
         monthNav.addView(nextMonth, new LinearLayout.LayoutParams(dp(40), dp(40)));
         LinearLayout.LayoutParams monthNavLp = new LinearLayout.LayoutParams(-1, dp(40));
         monthNavLp.topMargin = dp(10);
@@ -1412,6 +1420,7 @@ public class MainActivity extends Activity {
                 String dayKey = keyForDate(dayCalendar.getTime());
                 JSONObject record = getOfficeDay(dayKey, false);
                 boolean recorded = OfficeAttendanceTime.hasRecordedData(record);
+                boolean planned = isOfficeDatePlanned(dayKey);
                 boolean isToday = dayKey.equals(today);
                 boolean futureDate = dayKey.compareTo(today) > 0;
                 boolean live = isToday && (hasOpenOfficeSession(record) || hasOpenCommute(record));
@@ -1423,7 +1432,7 @@ public class MainActivity extends Activity {
                 weekRow.addView(cell, cellLp);
 
                 TextView number = text(String.valueOf(dayNumber), 12,
-                        futureDate ? color("#A8BAAE") : color("#50635A"), false);
+                        planned ? color("#286B55") : futureDate ? color("#A8BAAE") : color("#50635A"), planned);
                 number.setGravity(Gravity.CENTER);
                 if (isToday) {
                     GradientDrawable circle = new GradientDrawable();
@@ -1432,6 +1441,10 @@ public class MainActivity extends Activity {
                     number.setTextColor(Color.WHITE);
                     number.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
                     number.setBackground(circle);
+                } else if (planned) {
+                    number.setTextColor(color("#286B55"));
+                    number.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                    number.setBackground(bg("#DCEBE2", 20));
                 }
                 LinearLayout numberWrap = horizontal();
                 numberWrap.setGravity(Gravity.CENTER);
@@ -1440,30 +1453,313 @@ public class MainActivity extends Activity {
 
                 TextView marker = new TextView(this);
                 marker.setGravity(Gravity.CENTER);
-                marker.setText(recorded ? "•" : " ");
+                marker.setText(planned ? "✓" : recorded ? "•" : " ");
                 marker.setTextSize(11);
                 marker.setIncludeFontPadding(false);
-                marker.setTextColor(color(live ? "#B44248" : "#2E8060"));
+                marker.setTextColor(color(planned ? "#286B55" : live ? "#B44248" : "#2E8060"));
                 cell.addView(marker, new LinearLayout.LayoutParams(-1, dp(9)));
                 cell.setContentDescription(new SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault())
                         .format(dayCalendar.getTime())
                         + (live ? ", today's live attendance or commute session"
                             : isToday ? ", today" : recorded ? ", record saved" : ", no record")
-                        + (futureDate ? "" : ", tap to view or edit"));
-                cell.setEnabled(!futureDate);
-                if (futureDate) cell.setAlpha(0.38f);
-                else cell.setOnClickListener(v -> editAttendanceDay(dayKey));
+                        + (planned ? ", planned office day" : "")
+                        + (officePlanMode ? ", tap to add or remove from office plan"
+                            : futureDate ? "" : ", tap to view or edit"));
+                cell.setEnabled(officePlanMode || !futureDate);
+                if (futureDate && !officePlanMode) cell.setAlpha(0.38f);
+                else {
+                    cell.setAlpha(1f);
+                    cell.setOnClickListener(v -> {
+                        if (officePlanMode) toggleOfficePlanDate(dayKey);
+                        else if (!futureDate) editAttendanceDay(dayKey);
+                    });
+                }
             }
             grid.addView(weekRow);
         }
         calendarSection.addView(grid);
 
         LinearLayout legend = horizontal();
-        TextView recordedLegend = text("•  Record saved", 10, color("#2E8060"), false);
+        TextView recordedLegend = text(officePlanMode ? "✓  Planned office day" : "•  Record saved",
+                10, color("#2E8060"), false);
         legend.addView(recordedLegend, new LinearLayout.LayoutParams(0, dp(23), 1f));
         TextView todayLegend = text("●  Today", 10, color("#286B55"), true);
         legend.addView(todayLegend, new LinearLayout.LayoutParams(0, dp(23), 1f));
         calendarSection.addView(legend);
+    }
+
+    private void addOfficePlanSection() {
+        String monthKey = officePlanMonthKey();
+        JSONArray plan = getOfficeMonthPlan(monthKey);
+        int days = plan.length();
+        double hours = officePlanTotalHours(plan);
+        boolean waived = OfficeMonthPlanRules.isHoursMinimumWaived(days);
+
+        LinearLayout card = vertical();
+        card.setPadding(dp(15), dp(14), dp(15), dp(13));
+        card.setBackground(bg("#FFFFFF", 18));
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+        cardLp.bottomMargin = dp(17);
+        officePageContent.addView(card, cardLp);
+
+        LinearLayout titleRow = horizontal();
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout titleStack = vertical();
+        titleStack.addView(text("Office-day plan", 17, color("#18372E"), true));
+        String monthLabel = new SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+                .format(attendanceCalendarMonth.getTime());
+        titleStack.addView(text(monthLabel, 11, color("#687A70"), false));
+        titleRow.addView(titleStack, new LinearLayout.LayoutParams(0, -2, 1f));
+        card.addView(titleRow);
+
+        LinearLayout metrics = horizontal();
+        metrics.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout dayMetric = vertical();
+        dayMetric.addView(text("PLANNED DAYS", 9, color("#687A70"), true));
+        LinearLayout.LayoutParams metricValueLp = new LinearLayout.LayoutParams(-1, -2);
+        metricValueLp.topMargin = dp(3);
+        dayMetric.addView(text(days + (days == 1 ? " day" : " days"), 19,
+                color("#18372E"), true), metricValueLp);
+        metrics.addView(dayMetric, new LinearLayout.LayoutParams(0, -2, 1f));
+        LinearLayout hoursMetric = vertical();
+        hoursMetric.addView(text("PLANNED HOURS", 9, color("#687A70"), true));
+        LinearLayout.LayoutParams hoursValueLp = new LinearLayout.LayoutParams(-1, -2);
+        hoursValueLp.topMargin = dp(3);
+        hoursMetric.addView(text(formatOfficePlanHours(hours), 19, color("#18372E"), true), hoursValueLp);
+        metrics.addView(hoursMetric, new LinearLayout.LayoutParams(0, -2, 1f));
+        LinearLayout.LayoutParams metricsLp = new LinearLayout.LayoutParams(-1, -2);
+        metricsLp.topMargin = dp(12);
+        card.addView(metrics, metricsLp);
+
+        String status;
+        if (waived) {
+            status = "9+ days planned — the 52-hour minimum is waived.";
+        } else if (days < OfficeMonthPlanRules.MINIMUM_DAYS) {
+            int needed = OfficeMonthPlanRules.MINIMUM_DAYS - days;
+            status = "Plan " + needed + (needed == 1 ? " more office day. " : " more office days. ")
+                    + "At 8 days, plan 52 hours; 9+ days waives the hour minimum.";
+        } else if (OfficeMonthPlanRules.isCompliant(days, hours)) {
+            status = "Requirement met: at least 8 days and 52 hours planned.";
+        } else {
+            status = "Plan " + formatOfficePlanHours(OfficeMonthPlanRules.MINIMUM_HOURS - hours)
+                    + " more to reach 52 hours, or add a 9th office day to waive the hour minimum.";
+        }
+        TextView statusView = text(status, 11, color(waived || OfficeMonthPlanRules.isCompliant(days, hours)
+                ? "#286B55" : "#785C25"), true);
+        statusView.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
+        statusLp.topMargin = dp(7);
+        card.addView(statusView, statusLp);
+        TextView guidance = text("Tap a date in the calendar to add or remove it. New dates default to 6.5 planned hours; edit each date as needed.",
+                10, color("#687A70"), false);
+        guidance.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams guidanceLp = new LinearLayout.LayoutParams(-1, -2);
+        guidanceLp.topMargin = dp(5);
+        card.addView(guidance, guidanceLp);
+
+        Button plannerToggle = secondaryButton(officePlanMode ? "Finish planning" : "Select dates on calendar", () -> {
+            officePlanMode = !officePlanMode;
+            renderOfficePage();
+        });
+        plannerToggle.setTextSize(12);
+        LinearLayout.LayoutParams toggleLp = new LinearLayout.LayoutParams(-1, dp(42));
+        toggleLp.topMargin = dp(10);
+        card.addView(plannerToggle, toggleLp);
+
+        if (days == 0) {
+            TextView empty = text("No office days planned for this month yet.", 11, color("#82948A"), false);
+            LinearLayout.LayoutParams emptyLp = new LinearLayout.LayoutParams(-1, -2);
+            emptyLp.topMargin = dp(10);
+            card.addView(empty, emptyLp);
+            return;
+        }
+
+        ArrayList<JSONObject> entries = new ArrayList<>();
+        for (int i = 0; i < plan.length(); i++) {
+            JSONObject item = plan.optJSONObject(i);
+            if (item != null) entries.add(item);
+        }
+        Collections.sort(entries, (a, b) -> a.optString("date", "")
+                .compareTo(b.optString("date", "")));
+        for (JSONObject item : entries) {
+            String dateKey = item.optString("date", "");
+            if (dateKey.length() != 10) continue;
+            double plannedHours = Math.max(0d, Math.min(24d, item.optDouble("hours",
+                    OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY)));
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.topMargin = dp(7);
+            card.addView(row, rowLp);
+
+            LinearLayout dateDetails = vertical();
+            dateDetails.addView(text(formatOfficePlanDate(dateKey), 12, color("#18372E"), true));
+            LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, -2);
+            detailLp.topMargin = dp(2);
+            dateDetails.addView(text(formatOfficePlanHours(plannedHours) + " planned", 10,
+                    color("#687A70"), false), detailLp);
+            row.addView(dateDetails, new LinearLayout.LayoutParams(0, -2, 1f));
+
+            Button editHours = secondaryButton("Edit hours", () -> editOfficePlanHours(dateKey));
+            editHours.setTextSize(10);
+            row.addView(editHours, new LinearLayout.LayoutParams(-2, dp(34)));
+            Button removeDay = secondaryButton("×", () -> removeOfficePlanDate(dateKey));
+            removeDay.setTextSize(16);
+            removeDay.setContentDescription("Remove planned office day " + formatOfficePlanDate(dateKey));
+            LinearLayout.LayoutParams removeLp = new LinearLayout.LayoutParams(dp(38), dp(34));
+            removeLp.leftMargin = dp(5);
+            row.addView(removeDay, removeLp);
+        }
+    }
+
+    private String officePlanMonthKey() {
+        return new SimpleDateFormat("yyyy-MM", Locale.US).format(attendanceCalendarMonth.getTime());
+    }
+
+    private String officePlanPreferenceKey(String monthKey) {
+        return OFFICE_MONTH_PLAN_KEY_PREFIX + monthKey;
+    }
+
+    private JSONArray getOfficeMonthPlan(String monthKey) {
+        try {
+            return new JSONArray(getPrefs().getString(officePlanPreferenceKey(monthKey), "[]"));
+        } catch (Exception e) {
+            debugLog("Office month plan could not be read: " + e.getMessage());
+            return new JSONArray();
+        }
+    }
+
+    private void saveOfficeMonthPlan(String monthKey, JSONArray plan) {
+        getPrefs().edit().putString(officePlanPreferenceKey(monthKey), plan.toString()).apply();
+    }
+
+    private int officePlanIndex(JSONArray plan, String dateKey) {
+        if (plan == null) return -1;
+        for (int i = 0; i < plan.length(); i++) {
+            JSONObject item = plan.optJSONObject(i);
+            if (item != null && dateKey.equals(item.optString("date", ""))) return i;
+        }
+        return -1;
+    }
+
+    private boolean isOfficeDatePlanned(String dateKey) {
+        if (dateKey == null || dateKey.length() < 7) return false;
+        return officePlanIndex(getOfficeMonthPlan(dateKey.substring(0, 7)), dateKey) >= 0;
+    }
+
+    private double officePlanTotalHours(JSONArray plan) {
+        double total = 0d;
+        if (plan == null) return total;
+        for (int i = 0; i < plan.length(); i++) {
+            JSONObject item = plan.optJSONObject(i);
+            if (item != null) {
+                total += Math.max(0d, Math.min(24d, item.optDouble("hours",
+                        OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY)));
+            }
+        }
+        return total;
+    }
+
+    private void toggleOfficePlanDate(String dateKey) {
+        String monthKey = dateKey.substring(0, 7);
+        JSONArray plan = getOfficeMonthPlan(monthKey);
+        int existing = officePlanIndex(plan, dateKey);
+        if (existing >= 0) {
+            plan.remove(existing);
+        } else {
+            try {
+                plan.put(new JSONObject().put("date", dateKey)
+                        .put("hours", OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY));
+            } catch (Exception e) {
+                Toast.makeText(this, "Couldn't add that office day.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+        saveOfficeMonthPlan(monthKey, plan);
+        renderOfficePage();
+    }
+
+    private void removeOfficePlanDate(String dateKey) {
+        String monthKey = dateKey.substring(0, 7);
+        JSONArray plan = getOfficeMonthPlan(monthKey);
+        int existing = officePlanIndex(plan, dateKey);
+        if (existing >= 0) {
+            plan.remove(existing);
+            saveOfficeMonthPlan(monthKey, plan);
+        }
+        renderOfficePage();
+    }
+
+    private void editOfficePlanHours(String dateKey) {
+        JSONArray plan = getOfficeMonthPlan(dateKey.substring(0, 7));
+        int index = officePlanIndex(plan, dateKey);
+        if (index < 0) return;
+        JSONObject existing = plan.optJSONObject(index);
+        double currentHours = existing == null ? OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY
+                : existing.optDouble("hours", OfficeMonthPlanRules.DEFAULT_HOURS_PER_DAY);
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setText(formatOfficePlanHoursNumber(currentHours));
+        input.setSelectAllOnFocus(true);
+        input.setHint("Hours (0–24)");
+        input.setPadding(dp(12), dp(10), dp(12), dp(10));
+        input.setBackground(bg("#FFFFFF", 12));
+        LinearLayout form = vertical();
+        form.setPadding(dp(4), dp(5), dp(4), dp(2));
+        form.addView(text(formatOfficePlanDate(dateKey) + " · planned office hours", 12,
+                color("#18372E"), true));
+        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(-1, dp(48));
+        inputLp.topMargin = dp(9);
+        form.addView(input, inputLp);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Edit planned hours")
+                .setView(form)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String raw = input.getText().toString().trim();
+            double hours;
+            try {
+                hours = Double.parseDouble(raw);
+            } catch (NumberFormatException e) {
+                input.setError("Enter a number from 0 to 24");
+                return;
+            }
+            if (Double.isNaN(hours) || Double.isInfinite(hours) || hours < 0d || hours > 24d) {
+                input.setError("Enter a number from 0 to 24");
+                return;
+            }
+            try {
+                JSONObject item = plan.optJSONObject(index);
+                if (item == null) return;
+                item.put("hours", hours);
+                saveOfficeMonthPlan(dateKey.substring(0, 7), plan);
+                dialog.dismiss();
+                renderOfficePage();
+            } catch (Exception e) {
+                input.setError("Couldn't save this value");
+            }
+        }));
+        dialog.show();
+    }
+
+    private String formatOfficePlanDate(String dateKey) {
+        long timestamp = OfficeAttendanceTime.timestampForDayAndTime(dateKey, 12, 0);
+        return new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(new Date(timestamp));
+    }
+
+    private String formatOfficePlanHours(double hours) {
+        return formatOfficePlanHoursNumber(hours) + " h";
+    }
+
+    private String formatOfficePlanHoursNumber(double hours) {
+        if (Math.abs(hours - Math.rint(hours)) < 0.0001d) {
+            return String.valueOf((long) Math.rint(hours));
+        }
+        return String.format(Locale.US, "%.1f", hours);
     }
 
     private void changeAttendanceCalendarMonth(int offset) {
@@ -1472,7 +1768,7 @@ public class MainActivity extends Activity {
         candidate.set(Calendar.DAY_OF_MONTH, 1);
         Calendar current = Calendar.getInstance();
         current.set(Calendar.DAY_OF_MONTH, 1);
-        if (candidate.after(current)) return;
+        if (!officePlanMode && candidate.after(current)) return;
         attendanceCalendarMonth = candidate;
         renderOfficePage();
     }
