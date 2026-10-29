@@ -36,18 +36,21 @@ public final class GeminiApiClient {
                 "Routine analysis request started; payload omitted from diagnostics.");
         try {
             return generateForModel(context, apiKey, prompt, PRIMARY_MODEL, 1);
-        } catch (GeminiApiException first) {
-            if (first.getStatusCode() != 503) {
-                GeminiDiagnostics.record(context, "request_failed", PRIMARY_MODEL, 1,
-                        first.getStatusCode(), 0, first.getRequestId(), "API request failed");
+        } catch (Exception first) {
+            if (!isRetryable(first)) {
+                logRequestFailure(context, PRIMARY_MODEL, 1, first, "Primary request failed");
                 throw first;
             }
-            GeminiDiagnostics.record(context, "overload_retry_scheduled", PRIMARY_MODEL, 1,
-                    503, 0, first.getRequestId(), "HTTP 503; one retry scheduled");
+            int status = httpStatus(first);
+            String event = status == 503 ? "overload_retry_scheduled" : "transport_timeout_retry_scheduled";
+            String detail = status == 503 ? "HTTP 503; one retry scheduled"
+                    : "Transient network timeout; one retry scheduled";
+            GeminiDiagnostics.record(context, event, PRIMARY_MODEL, 1, status, 0,
+                    requestId(first), detail);
         }
 
-        long backoffMs = 800L + java.util.concurrent.ThreadLocalRandom.current().nextLong(401L);
-        GeminiDiagnostics.record(context, "retry_backoff", PRIMARY_MODEL, 2, 503,
+        long backoffMs = 900L + java.util.concurrent.ThreadLocalRandom.current().nextLong(501L);
+        GeminiDiagnostics.record(context, "retry_backoff", PRIMARY_MODEL, 2, 0,
                 backoffMs, "", "Waiting briefly before retry");
         try {
             Thread.sleep(backoffMs);
@@ -60,38 +63,72 @@ public final class GeminiApiClient {
 
         try {
             GeminiDiagnostics.record(context, "request_begin", PRIMARY_MODEL, 2, 0, 0, "",
-                    "Retry after HTTP 503; payload omitted from diagnostics.");
+                    "Retry after transient error; payload omitted from diagnostics.");
             return generateForModel(context, apiKey, prompt, PRIMARY_MODEL, 2);
-        } catch (GeminiApiException second) {
-            if (second.getStatusCode() != 503) {
-                GeminiDiagnostics.record(context, "request_failed", PRIMARY_MODEL, 2,
-                        second.getStatusCode(), 0, second.getRequestId(), "API retry failed");
+        } catch (Exception second) {
+            if (!isRetryable(second)) {
+                logRequestFailure(context, PRIMARY_MODEL, 2, second, "Primary retry failed");
                 throw second;
             }
+            int status = httpStatus(second);
+            String detail = status == 503 ? "Primary model still overloaded; fallback scheduled"
+                    : "Primary request timed out again; fallback scheduled";
             GeminiDiagnostics.record(context, "fallback_scheduled", FALLBACK_MODEL, 3,
-                    503, 0, second.getRequestId(), "Primary model still overloaded; fallback scheduled");
+                    status, 0, requestId(second), detail);
         }
 
         try {
             GeminiDiagnostics.record(context, "request_begin", FALLBACK_MODEL, 3, 0, 0, "",
-                    "Fallback after repeated HTTP 503; payload omitted from diagnostics.");
+                    "Fallback after repeated transient error; payload omitted from diagnostics.");
             String fallbackAnswer = generateForModel(context, apiKey, prompt, FALLBACK_MODEL, 3);
             GeminiDiagnostics.record(context, "request_complete", FALLBACK_MODEL, 3,
                     200, 0, "", "Fallback model returned an answer");
-            return "[Gemini 3.5 Flash-Lite fallback used after high demand on Gemini 3.8 Flash.]\n\n"
+            return "[Gemini 3.5 Flash-Lite fallback used after high latency or overload on Gemini 3.8 Flash.]\n\n"
                     + fallbackAnswer;
-        } catch (GeminiApiException fallback) {
-            GeminiDiagnostics.record(context, "fallback_failed", FALLBACK_MODEL, 3,
-                    fallback.getStatusCode(), 0, fallback.getRequestId(), "Fallback API request failed");
-            if (fallback.getStatusCode() == 503) {
-                throw new IOException("Both Gemini 3.8 Flash and the fallback Gemini 3.5 Flash-Lite are temporarily overloaded (HTTP 503). This is a Gemini service-capacity issue, not a quota error. Wait a little and try again.");
+        } catch (Exception fallback) {
+            logRequestFailure(context, FALLBACK_MODEL, 3, fallback, "Fallback request failed");
+            if (isRetryable(fallback)) {
+                if (httpStatus(fallback) == 503) {
+                    throw new IOException("Both Gemini models are temporarily overloaded (HTTP 503). Wait a little and try again.");
+                }
+                throw new IOException("Gemini did not respond before the network timeout on the primary model and the fallback. Check your connection and retry; the log includes the elapsed time and Google request ID if one was returned.");
             }
             throw fallback;
-        } catch (Exception error) {
-            GeminiDiagnostics.record(context, "fallback_client_error", FALLBACK_MODEL, 3,
-                    0, 0, "", error.getClass().getSimpleName() + ": " + safeExceptionDetail(error));
-            throw error;
         }
+    }
+
+    private static boolean isRetryable(Exception error) {
+        if (error instanceof GeminiApiException) {
+            int status = ((GeminiApiException) error).getStatusCode();
+            return status == 408 || status == 503 || status == 504;
+        }
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof java.net.SocketTimeoutException
+                    || current instanceof java.net.ConnectException
+                    || current instanceof java.net.UnknownHostException
+                    || current instanceof java.net.NoRouteToHostException
+                    || current instanceof java.net.SocketException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private static int httpStatus(Exception error) {
+        return error instanceof GeminiApiException ? ((GeminiApiException) error).getStatusCode() : 0;
+    }
+
+    private static String requestId(Exception error) {
+        return error instanceof GeminiApiException ? ((GeminiApiException) error).getRequestId() : "";
+    }
+
+    private static void logRequestFailure(Context context, String model, int attempt,
+            Exception error, String label) {
+        GeminiDiagnostics.record(context, "request_failed", model, attempt, httpStatus(error),
+                0, requestId(error), label + ": " + error.getClass().getSimpleName()
+                        + ": " + safeExceptionDetail(error));
     }
 
     private static String generateForModel(Context context, String apiKey, String prompt,
@@ -100,8 +137,11 @@ public final class GeminiApiClient {
         JSONObject content = new JSONObject()
                 .put("role", "user")
                 .put("parts", new JSONArray().put(part));
+        // Gemini 3.8 Flash defaults to medium thinking; low reduces latency for
+        // this bounded schedule review without needing deep multi-step reasoning.
+        JSONObject thinkingConfig = new JSONObject().put("thinkingLevel", "LOW");
         JSONObject generationConfig = new JSONObject()
-                .put("temperature", 0.2)
+                .put("thinkingConfig", thinkingConfig)
                 .put("maxOutputTokens", 1200);
         JSONObject request = new JSONObject()
                 .put("contents", new JSONArray().put(content))
@@ -117,7 +157,7 @@ public final class GeminiApiClient {
             connection = (HttpURLConnection) new URL(endpoint).openConnection();
             connection.setRequestMethod("POST");
             connection.setConnectTimeout(5_000);
-            connection.setReadTimeout(8_000);
+            connection.setReadTimeout(12_000);
             connection.setDoOutput(true);
             connection.setUseCaches(false);
             connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
