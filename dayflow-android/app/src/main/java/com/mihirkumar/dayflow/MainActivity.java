@@ -1726,18 +1726,18 @@ public class MainActivity extends Activity {
         monthViewLp.topMargin = dp(3);
         timeCard.addView(monthView, monthViewLp);
 
-        addRoutineImpactMetric(timeCard, "Office days in your plan",
+        addRoutineImpactMetric(timeCard, "Office days",
                 plannedDays + (plannedDays == 1 ? " day" : " days"), false);
-        addRoutineImpactMetric(timeCard, "Your planned office hours",
+        addRoutineImpactMetric(timeCard, "Time in office",
                 formatOfficePlanDuration(plannedOfficeHours), false);
-        addRoutineImpactMetric(timeCard, "Travel (75 min each way)",
+        addRoutineImpactMetric(timeCard, "Travel time",
                 formatOfficePlanDuration(commuteHours), false);
-        addRoutineImpactMetric(timeCard, "Office + travel total",
+        addRoutineImpactMetric(timeCard, "Office + travel",
                 formatOfficePlanDuration(totalCommitmentHours), true);
         if (plannedDays > 0) {
-            addRoutineImpactMetric(timeCard, "Average per office day",
+            addRoutineImpactMetric(timeCard, "Average commitment/day",
                     formatOfficePlanDuration(averageCommitmentHours), false);
-            addRoutineImpactMetric(timeCard, "Average time in office per day",
+            addRoutineImpactMetric(timeCard, "Average office time/day",
                     formatOfficePlanDuration(averageOfficeHours), false);
         }
 
@@ -1749,8 +1749,14 @@ public class MainActivity extends Activity {
         content.addView(baselineCard, baselineLp);
         baselineCard.addView(text("TIME FREED VS THE 8-DAY REFERENCE", 9,
                 color("#286B55"), true));
-        addRoutineImpactMetric(baselineCard,
-                "Reference: 52 office h + 20 travel h", formatOfficePlanDuration(baselineCommitmentHours), false);
+        TextView referenceNote = text("Reference = 8 days: 52 h office + 20 h travel.",
+                11, color("#315447"), false);
+        referenceNote.setSingleLine(true);
+        LinearLayout.LayoutParams referenceNoteLp = new LinearLayout.LayoutParams(-1, -2);
+        referenceNoteLp.topMargin = dp(3);
+        baselineCard.addView(referenceNote, referenceNoteLp);
+        addRoutineImpactMetric(baselineCard, "Reference total",
+                formatOfficePlanDuration(baselineCommitmentHours), false);
         addRoutineImpactMetric(baselineCard, "Your actual plan",
                 formatOfficePlanDuration(totalCommitmentHours), false);
 
@@ -1760,14 +1766,14 @@ public class MainActivity extends Activity {
         } else if (Math.abs(timeFreedHours) < 0.0001d) {
             deltaLabel = "Same total time";
         } else if (timeFreedHours > 0d) {
-            deltaLabel = formatOfficePlanDuration(timeFreedHours) + " less committed";
+            deltaLabel = formatOfficePlanDuration(timeFreedHours) + " freed";
         } else {
             deltaLabel = formatOfficePlanDuration(-timeFreedHours) + " more committed";
         }
-        addRoutineImpactMetric(baselineCard, "Difference in office + travel time",
+        addRoutineImpactMetric(baselineCard, "Net time freed",
                 deltaLabel, true);
         TextView baselineNote = text(
-                "This uses the hours you entered for each date. A shorter office visit still counts as that date's actual planned hours; travel remains 2 h 30 min.",
+                "This is time not spent on office + travel versus the reference, available to reallocate elsewhere in your routine. Each date uses its own planned office hours; travel remains 2 h 30 min.",
                 11, color("#315447"), false);
         baselineNote.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams baselineNoteLp = new LinearLayout.LayoutParams(-1, -2);
