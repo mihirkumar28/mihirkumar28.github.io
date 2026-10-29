@@ -45,6 +45,6 @@ public class OfficeMonthPlanRulesTest {
         assertEquals(72.0d, OfficeMonthPlanRules.totalCommitmentHours(officeHours, 8), 0.0001d);
 
         assertFalse(OfficeMonthPlanRules.isCompliant(8, 32.0d));
-        assertEquals(52.0d, OfficeMonthPlanRules.totalCommitmentHours(32.0d, 8) - 20.0d, 0.0001d);
+        assertEquals(52.0d, OfficeMonthPlanRules.totalCommitmentHours(32.0d, 8), 0.0001d);
     }
 }
