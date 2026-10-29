@@ -39,8 +39,8 @@ public final class GeminiApiClient {
         try {
             connection = (HttpURLConnection) new URL(ENDPOINT).openConnection();
             connection.setRequestMethod("POST");
-            connection.setConnectTimeout(15_000);
-            connection.setReadTimeout(45_000);
+            connection.setConnectTimeout(10_000);
+            connection.setReadTimeout(20_000);
             connection.setDoOutput(true);
             connection.setUseCaches(false);
             connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
