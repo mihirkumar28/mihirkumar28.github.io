@@ -2,7 +2,6 @@ package com.mihirkumar.dayflow;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Base64;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
