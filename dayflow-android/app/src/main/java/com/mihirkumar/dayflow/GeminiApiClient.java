@@ -1,6 +1,6 @@
 package com.mihirkumar.dayflow;
 
-import org.json.JSONArray;
+import android.content.Context;\n\nimport org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -23,41 +23,72 @@ public final class GeminiApiClient {
      * Tries the primary model, retries a temporary 503 once with backoff, then
      * switches to a documented lower-cost model if the primary remains overloaded.
      */
-    public static String generateContent(String apiKey, String prompt) throws Exception {
+    public static String generateContent(Context context, String apiKey, String prompt) throws Exception {
         if (apiKey == null || apiKey.trim().isEmpty()) {
+            GeminiDiagnostics.record(context, "client_rejected", PRIMARY_MODEL, 0, 0, 0, "",
+                    "API key missing");
             throw new IllegalArgumentException("Gemini API key is missing.");
         }
 
+        GeminiDiagnostics.record(context, "request_begin", PRIMARY_MODEL, 1, 0, 0, "",
+                "Routine analysis request started; payload omitted from diagnostics.");
         try {
-            return generateForModel(apiKey, prompt, PRIMARY_MODEL);
+            return generateForModel(context, apiKey, prompt, PRIMARY_MODEL, 1);
         } catch (GeminiApiException first) {
-            if (first.getStatusCode() != 503) throw first;
+            if (first.getStatusCode() != 503) {
+                GeminiDiagnostics.record(context, "request_failed", PRIMARY_MODEL, 1,
+                        first.getStatusCode(), 0, first.getRequestId(), "API request failed");
+                throw first;
+            }
+            GeminiDiagnostics.record(context, "overload_retry_scheduled", PRIMARY_MODEL, 1,
+                    503, 0, first.getRequestId(), "HTTP 503; one retry scheduled");
         }
 
-        // Google's REST troubleshooting guide recommends exponential backoff for 503.
         long backoffMs = 800L + java.util.concurrent.ThreadLocalRandom.current().nextLong(401L);
+        GeminiDiagnostics.record(context, "retry_backoff", PRIMARY_MODEL, 2, 503,
+                backoffMs, "", "Waiting briefly before retry");
         try {
             Thread.sleep(backoffMs);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
+            GeminiDiagnostics.record(context, "request_interrupted", PRIMARY_MODEL, 2,
+                    0, backoffMs, "", "Retry interrupted");
             throw new IOException("Gemini retry was interrupted.", interrupted);
         }
 
         try {
-            return generateForModel(apiKey, prompt, PRIMARY_MODEL);
+            GeminiDiagnostics.record(context, "request_begin", PRIMARY_MODEL, 2, 0, 0, "",
+                    "Retry after HTTP 503; payload omitted from diagnostics.");
+            return generateForModel(context, apiKey, prompt, PRIMARY_MODEL, 2);
         } catch (GeminiApiException second) {
-            if (second.getStatusCode() != 503) throw second;
+            if (second.getStatusCode() != 503) {
+                GeminiDiagnostics.record(context, "request_failed", PRIMARY_MODEL, 2,
+                        second.getStatusCode(), 0, second.getRequestId(), "API retry failed");
+                throw second;
+            }
+            GeminiDiagnostics.record(context, "fallback_scheduled", FALLBACK_MODEL, 3,
+                    503, 0, second.getRequestId(), "Primary model still overloaded; fallback scheduled");
         }
 
         try {
-            String fallbackAnswer = generateForModel(apiKey, prompt, FALLBACK_MODEL);
-            return "[Gemini 3.5 Flash-Lite fallback used after high demand on Gemini 3.8 Flash.]\n\n"
+            GeminiDiagnostics.record(context, "request_begin", FALLBACK_MODEL, 3, 0, 0, "",
+                    "Fallback after repeated HTTP 503; payload omitted from diagnostics.");
+            String fallbackAnswer = generateForModel(context, apiKey, prompt, FALLBACK_MODEL, 3);
+            GeminiDiagnostics.record(context, "request_complete", FALLBACK_MODEL, 3,
+                    200, 0, "", "Fallback model returned an answer");
+            return "[Gemini 3.5 Flash-Lite fallback used after high demand on Gemini 3.8 Flash.]\\n\\n"
                     + fallbackAnswer;
         } catch (GeminiApiException fallback) {
+            GeminiDiagnostics.record(context, "fallback_failed", FALLBACK_MODEL, 3,
+                    fallback.getStatusCode(), 0, fallback.getRequestId(), "Fallback API request failed");
             if (fallback.getStatusCode() == 503) {
                 throw new IOException("Both Gemini 3.8 Flash and the fallback Gemini 3.5 Flash-Lite are temporarily overloaded (HTTP 503). This is a Gemini service-capacity issue, not a quota error. Wait a little and try again.");
             }
             throw fallback;
+        } catch (Exception error) {
+            GeminiDiagnostics.record(context, "fallback_client_error", FALLBACK_MODEL, 3,
+                    0, 0, "", error.getClass().getSimpleName() + ": " + safeExceptionDetail(error));
+            throw error;
         }
     }
 
