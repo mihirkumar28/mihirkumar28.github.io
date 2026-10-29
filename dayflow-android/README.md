@@ -16,6 +16,8 @@ Native Android implementation of DayFlow. The app stores its timetable in Androi
 - Optional Gemini AI assistant for testing a personal Google AI Studio API key and reviewing today's saved routine
 - Gemini API key encrypted locally with Android Keystore; the encrypted secret is excluded from device/cloud backup
 - Gemini analysis is opt-in and sends current-day task titles, times and statuses to Google; Google may use free-tier content to improve its products
+- Local Gemini diagnostics record request timestamps, model/attempt, HTTP status, response latency, limited request IDs and sanitized error details; they never record API keys, prompts, task titles, or response text
+- Gemini diagnostics can be viewed, copied, or exported from the Gemini assistant screen and attached to a support conversation; logs are not automatically uploaded
 - Offline-first core timetable: no backend required
 
 ## Build

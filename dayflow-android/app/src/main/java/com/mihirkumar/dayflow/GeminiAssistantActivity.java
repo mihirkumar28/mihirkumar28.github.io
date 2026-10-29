@@ -2,7 +2,10 @@ package com.mihirkumar.dayflow;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -10,6 +13,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.net.Uri;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -23,6 +27,8 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -32,6 +38,7 @@ public class GeminiAssistantActivity extends Activity {
     private static final String DAYFLOW_PREFS = "dayflow";
     private static final String CONSENT_PREFS = "dayflow_gemini_preferences";
     private static final String CONSENT_KEY = "schedule_analysis_consent_v1";
+    private static final int REQUEST_EXPORT_GEMINI_LOGS = 7908;
 
     private EditText apiKeyInput;
     private Button saveKeyButton;
@@ -184,6 +191,12 @@ public class GeminiAssistantActivity extends Activity {
         LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
         statusLp.topMargin = dp(10);
         keyCard.addView(connectionStatus, statusLp);
+
+        Button diagnosticsButton = button("View / export Gemini diagnostic logs", false);
+        LinearLayout.LayoutParams diagnosticsLp = new LinearLayout.LayoutParams(-1, dp(44));
+        diagnosticsLp.topMargin = dp(10);
+        keyCard.addView(diagnosticsButton, diagnosticsLp);
+        diagnosticsButton.setOnClickListener(v -> showGeminiDiagnostics());
 
         LinearLayout analysisCard = new LinearLayout(this);
         analysisCard.setOrientation(LinearLayout.VERTICAL);
@@ -415,7 +428,7 @@ public class GeminiAssistantActivity extends Activity {
 
         new Thread(() -> {
             try {
-                String answer = GeminiApiClient.generateContent(apiKey, prompt);
+                String answer = GeminiApiClient.generateContent(getApplicationContext(), apiKey, prompt);
                 runOnUiThread(() -> {
                     if (!requestRunning || requestGeneration != requestId) return;
                     requestRunning = false;
@@ -446,6 +459,53 @@ public class GeminiAssistantActivity extends Activity {
         requestGeneration++;
         requestRunning = false;
         super.onDestroy();
+    }
+
+    private void showGeminiDiagnostics() {
+        String report = GeminiDiagnostics.exportText(this);
+        new AlertDialog.Builder(this)
+                .setTitle("Gemini diagnostic logs")
+                .setMessage(report)
+                .setPositiveButton("Export .txt", (dialog, which) -> exportGeminiDiagnostics())
+                .setNeutralButton("Copy logs", (dialog, which) -> {
+                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (clipboard != null) {
+                        clipboard.setPrimaryClip(ClipData.newPlainText("DayFlow Gemini diagnostics", report));
+                        Toast.makeText(this, "Diagnostic log copied. Paste it into your ChatGPT conversation.", Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(this, "Clipboard is unavailable. Export the log instead.", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void exportGeminiDiagnostics() {
+        String timestamp = new SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(new Date());
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TITLE, "dayflow-gemini-diagnostics-" + timestamp + ".txt");
+        try {
+            startActivityForResult(intent, REQUEST_EXPORT_GEMINI_LOGS);
+        } catch (Exception e) {
+            Toast.makeText(this, "Couldn't open the file picker. Use Copy logs instead.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_EXPORT_GEMINI_LOGS || resultCode != RESULT_OK
+                || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        try (OutputStream output = getContentResolver().openOutputStream(uri)) {
+            if (output == null) throw new java.io.IOException("Could not open the selected file.");
+            output.write(GeminiDiagnostics.exportText(this).getBytes(StandardCharsets.UTF_8));
+            Toast.makeText(this, "Gemini diagnostics exported. Attach the .txt file in ChatGPT so I can inspect it.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Couldn't export diagnostics: " + safeMessage(e), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void setControlsEnabled(boolean enabled) {
