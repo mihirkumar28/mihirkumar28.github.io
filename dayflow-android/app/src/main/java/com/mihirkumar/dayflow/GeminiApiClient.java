@@ -13,9 +13,8 @@ import java.nio.charset.StandardCharsets;
 
 /** Minimal REST client for Gemini. Call from a worker thread; never logs prompts or API keys. */
 public final class GeminiApiClient {
-    private static final String MODEL = "gemini-3.8-flash";
-    private static final String ENDPOINT =
-            "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent";
+    private static final String PRIMARY_MODEL = "gemini-3.8-flash";
+    private static final String FALLBACK_MODEL = "gemini-3.5-flash-lite";
     private static final int MAX_RESPONSE_BYTES = 1_000_000;
 
     private GeminiApiClient() { }
