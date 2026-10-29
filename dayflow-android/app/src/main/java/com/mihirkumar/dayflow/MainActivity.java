@@ -214,13 +214,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static class RoutineImpactStats {
-        int studyMinutes;
-        int workMinutes;
-        int exerciseMinutes;
-        int unallocatedMinutes;
-    }
-
     private static class SyllabusTopic {
         long id;
         String subject, title;
@@ -1838,67 +1831,6 @@ public class MainActivity extends Activity {
                 content, "Edit office plan", () -> switchPage("office"));
     }
 
-    private RoutineImpactStats routineImpactStats(ArrayList<Block> routine) {
-        RoutineImpactStats stats = new RoutineImpactStats();
-        ArrayList<int[]> intervals = new ArrayList<>();
-        int firstStart = 24 * 60;
-        int lastEnd = 0;
-        if (routine == null) return stats;
-
-        for (Block block : routine) {
-            if (block == null) continue;
-            int start;
-            int end;
-            try {
-                start = Math.max(0, Math.min(24 * 60, mins(block.start)));
-                end = Math.max(0, Math.min(24 * 60, mins(block.end)));
-            } catch (Exception ignored) {
-                continue;
-            }
-            if (end <= start) continue;
-            int duration = end - start;
-            if (isStudyBlock(block.title)) stats.studyMinutes += duration;
-            else if (isWorkBlock(block.title)) stats.workMinutes += duration;
-            else if (isExerciseBlock(block.title)) stats.exerciseMinutes += duration;
-            intervals.add(new int[]{start, end});
-            firstStart = Math.min(firstStart, start);
-            lastEnd = Math.max(lastEnd, end);
-        }
-
-        Collections.sort(intervals, Comparator.comparingInt(interval -> interval[0]));
-        int covered = 0;
-        int coveredStart = -1;
-        int coveredEnd = -1;
-        for (int[] interval : intervals) {
-            if (coveredStart < 0) {
-                coveredStart = interval[0];
-                coveredEnd = interval[1];
-            } else if (interval[0] <= coveredEnd) {
-                coveredEnd = Math.max(coveredEnd, interval[1]);
-            } else {
-                covered += coveredEnd - coveredStart;
-                coveredStart = interval[0];
-                coveredEnd = interval[1];
-            }
-        }
-        if (coveredStart >= 0) covered += coveredEnd - coveredStart;
-        int routineWindow = lastEnd > firstStart && firstStart < 24 * 60
-                ? lastEnd - firstStart : 0;
-        stats.unallocatedMinutes = Math.max(0, routineWindow - covered);
-        return stats;
-    }
-
-    private boolean isWorkBlock(String title) {
-        String value = title == null ? "" : title.toLowerCase(Locale.US);
-        return value.contains("work") || value.contains("office hours") || value.equals("job");
-    }
-
-    private boolean isExerciseBlock(String title) {
-        String value = title == null ? "" : title.toLowerCase(Locale.US);
-        return value.contains("exercise") || value.contains("gym") || value.contains("swim")
-                || value.contains("cardio") || value.contains("workout") || value.contains("stairs");
-    }
-
     private void addRoutineImpactMetric(LinearLayout parent, String label, String value, boolean emphasize) {
         LinearLayout row = horizontal();
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -1912,50 +1844,6 @@ public class MainActivity extends Activity {
         valueView.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         valueView.setSingleLine(true);
         row.addView(valueView, new LinearLayout.LayoutParams(-2, -2));
-    }
-
-    private void addRoutineImpactComparison(LinearLayout parent, String label,
-                                            int wfhMinutes, int officeMinutes, int plannedDays) {
-        int dailyDelta = officeMinutes - wfhMinutes;
-        int monthlyDelta = dailyDelta * plannedDays;
-        LinearLayout card = vertical();
-        card.setPadding(dp(14), dp(11), dp(14), dp(11));
-        card.setBackground(surfaceBackground(16));
-        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
-        cardLp.bottomMargin = dp(8);
-        parent.addView(card, cardLp);
-
-        LinearLayout heading = horizontal();
-        heading.setGravity(Gravity.CENTER_VERTICAL);
-        heading.addView(text(label, 13, color("#18372E"), true),
-                new LinearLayout.LayoutParams(0, -2, 1f));
-        String deltaLabel = dailyDelta == 0 ? "No change" : formatSignedImpact(dailyDelta) + "/day";
-        // A positive value can mean more study, but also more work; present deltas neutrally.
-        int deltaColor = color("#496257");
-        TextView delta = text(deltaLabel, 11, deltaColor, true);
-        delta.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        heading.addView(delta);
-        card.addView(heading);
-
-        LinearLayout values = horizontal();
-        values.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout wfhColumn = vertical();
-        wfhColumn.addView(text("WFH", 9, color("#82948A"), true));
-        wfhColumn.addView(text(fmtShort(wfhMinutes), 14, color("#18372E"), true));
-        values.addView(wfhColumn, new LinearLayout.LayoutParams(0, -2, 1f));
-        LinearLayout officeColumn = vertical();
-        officeColumn.addView(text("OFFICE", 9, color("#82948A"), true));
-        officeColumn.addView(text(fmtShort(officeMinutes), 14, color("#18372E"), true));
-        values.addView(officeColumn, new LinearLayout.LayoutParams(0, -2, 1f));
-        LinearLayout monthlyColumn = vertical();
-        monthlyColumn.addView(text("MONTH CHANGE", 9, color("#82948A"), true));
-        monthlyColumn.addView(text(plannedDays == 0 ? "—"
-                : monthlyDelta == 0 ? "No change" : formatSignedImpact(monthlyDelta),
-                12, deltaColor, true));
-        values.addView(monthlyColumn, new LinearLayout.LayoutParams(0, -2, 1f));
-        LinearLayout.LayoutParams valuesLp = new LinearLayout.LayoutParams(-1, -2);
-        valuesLp.topMargin = dp(9);
-        card.addView(values, valuesLp);
     }
 
     private String formatSignedImpact(int minutes) {
