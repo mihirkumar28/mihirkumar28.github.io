@@ -1755,7 +1755,7 @@ public class MainActivity extends Activity {
                 officeStats.workMinutes, plannedDays);
         addRoutineImpactComparison(content, "Exercise scheduled", wfhStats.exerciseMinutes,
                 officeStats.exerciseMinutes, plannedDays);
-        addRoutineImpactComparison(content, "Open time inside the routine window",
+        addRoutineImpactComparison(content, "Unallocated routine time",
                 wfhStats.unallocatedMinutes, officeStats.unallocatedMinutes, plannedDays);
 
         LinearLayout interpretation = vertical();
@@ -1873,8 +1873,8 @@ public class MainActivity extends Activity {
         heading.addView(text(label, 13, color("#18372E"), true),
                 new LinearLayout.LayoutParams(0, -2, 1f));
         String deltaLabel = dailyDelta == 0 ? "No change" : formatSignedImpact(dailyDelta) + "/day";
-        int deltaColor = dailyDelta > 0 ? color("#286B55")
-                : dailyDelta < 0 ? color("#A14942") : color("#687A70");
+        // A positive value can mean more study, but also more work; present deltas neutrally.
+        int deltaColor = color("#496257");
         TextView delta = text(deltaLabel, 11, deltaColor, true);
         delta.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         heading.addView(delta);
