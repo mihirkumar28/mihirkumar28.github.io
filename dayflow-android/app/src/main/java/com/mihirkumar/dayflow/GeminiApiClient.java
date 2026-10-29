@@ -142,9 +142,6 @@ public final class GeminiApiClient {
             if (retryAfter != null && !retryAfter.trim().isEmpty()) {
                 statusDetail += "; Retry-After=" + retryAfter.trim();
             }
-            GeminiDiagnostics.record(context, "http_response", model, attempt, status,
-                    System.currentTimeMillis() - startedAt, requestId, statusDetail);
-
             InputStream stream = status >= 200 && status < 300
                     ? connection.getInputStream() : connection.getErrorStream();
             String responseText = stream == null ? "" : readBounded(stream);
@@ -160,10 +157,17 @@ public final class GeminiApiClient {
             if (status < 200 || status >= 300) {
                 JSONObject error = response == null ? null : response.optJSONObject("error");
                 String detail = error == null ? "" : error.optString("message", "");
+                String apiStatus = error == null ? "" : error.optString("status", "");
+                if (!apiStatus.isEmpty()) statusDetail += "; apiStatus=" + apiStatus;
+                if (!detail.trim().isEmpty()) statusDetail += "; message=" + detail.trim();
+                GeminiDiagnostics.record(context, "http_response", model, attempt, status,
+                        System.currentTimeMillis() - startedAt, requestId, statusDetail);
                 String message = "Gemini API returned HTTP " + status;
                 if (!detail.trim().isEmpty()) message += ": " + detail.trim();
                 throw new GeminiApiException(status, message, requestId);
             }
+            GeminiDiagnostics.record(context, "http_response", model, attempt, status,
+                    System.currentTimeMillis() - startedAt, requestId, statusDetail);
             if (response == null) throw new IOException("Gemini returned an empty or invalid response.");
 
             JSONArray candidates = response.optJSONArray("candidates");
