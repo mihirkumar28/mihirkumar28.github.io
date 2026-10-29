@@ -20,10 +20,49 @@ public final class GeminiApiClient {
 
     private GeminiApiClient() { }
 
+    /**
+     * Tries the primary model, retries a temporary 503 once with backoff, then
+     * switches to a documented lower-cost model if the primary remains overloaded.
+     */
     public static String generateContent(String apiKey, String prompt) throws Exception {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalArgumentException("Gemini API key is missing.");
         }
+
+        try {
+            return generateForModel(apiKey, prompt, PRIMARY_MODEL);
+        } catch (GeminiApiException first) {
+            if (first.getStatusCode() != 503) throw first;
+        }
+
+        // Google's REST troubleshooting guide recommends exponential backoff for 503.
+        long backoffMs = 800L + java.util.concurrent.ThreadLocalRandom.current().nextLong(401L);
+        try {
+            Thread.sleep(backoffMs);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Gemini retry was interrupted.", interrupted);
+        }
+
+        try {
+            return generateForModel(apiKey, prompt, PRIMARY_MODEL);
+        } catch (GeminiApiException second) {
+            if (second.getStatusCode() != 503) throw second;
+        }
+
+        try {
+            String fallbackAnswer = generateForModel(apiKey, prompt, FALLBACK_MODEL);
+            return "[Gemini 3.5 Flash-Lite fallback used after high demand on Gemini 3.8 Flash.]\\n\\n"
+                    + fallbackAnswer;
+        } catch (GeminiApiException fallback) {
+            if (fallback.getStatusCode() == 503) {
+                throw new IOException("Both Gemini 3.8 Flash and the fallback Gemini 3.5 Flash-Lite are temporarily overloaded (HTTP 503). This is a Gemini service-capacity issue, not a quota error. Wait a little and try again.");
+            }
+            throw fallback;
+        }
+    }
+
+    private static String generateForModel(String apiKey, String prompt, String model) throws Exception {
         JSONObject part = new JSONObject().put("text", prompt);
         JSONObject content = new JSONObject()
                 .put("role", "user")
@@ -37,10 +76,12 @@ public final class GeminiApiClient {
 
         HttpURLConnection connection = null;
         try {
-            connection = (HttpURLConnection) new URL(ENDPOINT).openConnection();
+            String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/"
+                    + model + ":generateContent";
+            connection = (HttpURLConnection) new URL(endpoint).openConnection();
             connection.setRequestMethod("POST");
-            connection.setConnectTimeout(10_000);
-            connection.setReadTimeout(20_000);
+            connection.setConnectTimeout(5_000);
+            connection.setReadTimeout(8_000);
             connection.setDoOutput(true);
             connection.setUseCaches(false);
             connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
@@ -57,16 +98,24 @@ public final class GeminiApiClient {
             int status = connection.getResponseCode();
             InputStream stream = status >= 200 && status < 300
                     ? connection.getInputStream() : connection.getErrorStream();
-            String responseText = readBounded(stream);
-            JSONObject response = new JSONObject(responseText);
+            String responseText = stream == null ? "" : readBounded(stream);
+            JSONObject response = null;
+            if (!responseText.trim().isEmpty()) {
+                try {
+                    response = new JSONObject(responseText);
+                } catch (Exception ignored) {
+                    // Preserve HTTP status even if an intermediary returns a non-JSON error body.
+                }
+            }
 
             if (status < 200 || status >= 300) {
-                JSONObject error = response.optJSONObject("error");
+                JSONObject error = response == null ? null : response.optJSONObject("error");
                 String detail = error == null ? "" : error.optString("message", "");
                 String message = "Gemini API returned HTTP " + status;
                 if (!detail.trim().isEmpty()) message += ": " + detail.trim();
-                throw new IOException(message);
+                throw new GeminiApiException(status, message);
             }
+            if (response == null) throw new IOException("Gemini returned an empty or invalid response.");
 
             JSONArray candidates = response.optJSONArray("candidates");
             if (candidates == null || candidates.length() == 0) {
@@ -86,7 +135,7 @@ public final class GeminiApiClient {
                     if (answerPart != null) {
                         String text = answerPart.optString("text", "");
                         if (!text.isEmpty()) {
-                            if (answer.length() > 0) answer.append("\n");
+                            if (answer.length() > 0) answer.append("\\n");
                             answer.append(text);
                         }
                     }
@@ -96,6 +145,19 @@ public final class GeminiApiClient {
             return answer.toString().trim();
         } finally {
             if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static final class GeminiApiException extends IOException {
+        private final int statusCode;
+
+        GeminiApiException(int statusCode, String message) {
+            super(message);
+            this.statusCode = statusCode;
+        }
+
+        int getStatusCode() {
+            return statusCode;
         }
     }
 
