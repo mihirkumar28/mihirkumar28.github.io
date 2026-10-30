@@ -20,7 +20,7 @@ public class GeminiScheduleFactsTest {
 
         String prompt = GeminiScheduleFacts.routinePrompt("2026-10-30", "wfh", blocks);
 
-        assertTrue(prompt.contains("Sleep = 0h 15m"));
+        assertTrue(prompt.contains("Sleep 22:00–22:15 = 0h 15m"));
         assertTrue(prompt.contains("Do not infer actual time in bed, sleep duration, or wake-up time"));
         assertFalse(prompt.contains("6h 45m sleep"));
     }
