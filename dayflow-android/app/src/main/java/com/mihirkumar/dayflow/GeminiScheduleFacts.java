@@ -129,7 +129,8 @@ final class GeminiScheduleFacts {
         int gapsMinutes = Math.max(0, windowMinutes - occupiedMinutes);
 
         String arrangementLabel = "office".equals(arrangement) ? "Work from office"
-                : "weekend".equals(arrangement) ? "Weekend" : "Work from home";
+                : "weekend".equals(arrangement) ? "Weekend"
+                : "wfh".equals(arrangement) ? "Work from home" : "Not recorded for this date";
         StringBuilder prompt = new StringBuilder();
         prompt.append("DAYFLOW ROUTINE REVIEW\n");
         prompt.append("Date: ").append(dateKey).append("\n");
