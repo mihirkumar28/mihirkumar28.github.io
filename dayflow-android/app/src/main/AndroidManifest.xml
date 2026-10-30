@@ -29,6 +29,7 @@
                 android:resource="@xml/file_paths" />
         </provider>
         <activity android:name=".GeminiAssistantActivity" android:exported="false" />
+        <activity android:name=".GeminiCommuteAssistantActivity" android:exported="false" />
         <activity android:name=".PlanDocumentsActivity" android:exported="false" />
         <activity android:name=".OfflinePdfViewerActivity" android:exported="false" />
         <activity android:name=".NiddkBodyWeightPlannerActivity" android:exported="false" />
