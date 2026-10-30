@@ -47,14 +47,16 @@ final class GeminiCommuteFacts {
         final int count;
         final int median;
         final int p80;
+        final boolean weekdaySpecific;
 
-        Stats(List<Sample> samples) {
+        Stats(List<Sample> samples, boolean weekdaySpecific) {
             ArrayList<Integer> values = new ArrayList<>();
             for (Sample sample : samples) values.add(sample.minutes);
             Collections.sort(values);
             count = values.size();
             median = percentileMedian(values);
             p80 = percentile(values, 0.80d);
+            this.weekdaySpecific = weekdaySpecific;
         }
     }
 
@@ -106,9 +108,9 @@ final class GeminiCommuteFacts {
             long outEnd = day.optLong("commuteOutEnd", 0L);
 
             Sample inbound = createSample(date, parsed.getDayOfWeek(), "home to work",
-                    inStart, inEnd);
+                    inStart, inEnd, nowMillis);
             Sample outbound = createSample(date, parsed.getDayOfWeek(), "work to home",
-                    outStart, outEnd);
+                    outStart, outEnd, nowMillis);
 
             if (inStart > 0L && inEnd > 0L) {
                 if (inEnd <= inStart) invalidIntervals++;
@@ -142,6 +144,7 @@ final class GeminiCommuteFacts {
         int actualLegs = 0;
         int forecastLegs = 0;
         int unavailableForecastLegs = 0;
+        int missingPastLegs = 0;
         int futureOfficeDates = 0;
         StringBuilder projectionLines = new StringBuilder();
 
@@ -149,8 +152,8 @@ final class GeminiCommuteFacts {
             String date = entry.getKey();
             LocalDate parsed = parseDate(date);
             JSONObject actualDay = logByDate.get(date);
-            Long actualInbound = completedDuration(actualDay, "commuteInStart", "commuteInEnd");
-            Long actualOutbound = completedDuration(actualDay, "commuteOutStart", "commuteOutEnd");
+            Long actualInbound = completedDuration(actualDay, "commuteInStart", "commuteInEnd", nowMillis);
+            Long actualOutbound = completedDuration(actualDay, "commuteOutStart", "commuteOutEnd", nowMillis);
 
             projectionLines.append("- ").append(date).append(" (")
                     .append(parsed == null ? "unknown weekday" : parsed.getDayOfWeek())
@@ -168,6 +171,11 @@ final class GeminiCommuteFacts {
                 actualLegs++;
                 projectionLines.append("; work to home actual ")
                         .append(formatMinutes(actualOutbound.intValue()));
+            }
+
+            if (parsed != null && parsed.isBefore(today)) {
+                if (actualInbound == null) missingPastLegs++;
+                if (actualOutbound == null) missingPastLegs++;
             }
 
             if (parsed != null && !parsed.isBefore(today)) {
@@ -188,7 +196,8 @@ final class GeminiCommuteFacts {
                         projectionLines.append("; home to work forecast ")
                                 .append(formatMinutes(inStats.median)).append(" median / ")
                                 .append(formatMinutes(inStats.p80)).append(" 80th percentile (")
-                                .append(inStats.count).append(" samples)");
+                                .append(inStats.count).append(" ")
+                                .append(inStats.weekdaySpecific ? "weekday-specific samples)" : "overall fallback samples)");
                     }
                 }
                 if (actualOutbound == null) {
@@ -202,7 +211,8 @@ final class GeminiCommuteFacts {
                         projectionLines.append("; work to home forecast ")
                                 .append(formatMinutes(outStats.median)).append(" median / ")
                                 .append(formatMinutes(outStats.p80)).append(" 80th percentile (")
-                                .append(outStats.count).append(" samples)");
+                                .append(outStats.count).append(" ")
+                                .append(outStats.weekdaySpecific ? "weekday-specific samples)" : "overall fallback samples)");
                     }
                 }
             }
@@ -262,6 +272,8 @@ final class GeminiCommuteFacts {
         prompt.append("Forecast missing future legs: ").append(forecastLegs).append("\n");
         prompt.append("Future legs with insufficient history for a forecast: ")
                 .append(unavailableForecastLegs).append("\n");
+        prompt.append("Past planned commute legs without a completed record (not counted as zero): ")
+                .append(missingPastLegs).append("\n");
         prompt.append("Forecast is based on observed median and 80th-percentile duration, not live traffic.\n");
         if (forecastLegs > 0) {
             prompt.append("Forecast duration for missing future legs: ")
@@ -270,7 +282,7 @@ final class GeminiCommuteFacts {
         } else {
             prompt.append("No future commute leg currently has sufficient samples for a numerical forecast.\n");
         }
-        if (unavailableForecastLegs == 0) {
+        if (unavailableForecastLegs == 0 && missingPastLegs == 0) {
             prompt.append("Projected selected-month commute total (actual completed legs plus forecast missing future legs): ")
                     .append(formatMinutes(actualMinutes + forecastMedianMinutes)).append(" median / ")
                     .append(formatMinutes(actualMinutes + forecastP80Minutes))
@@ -280,7 +292,8 @@ final class GeminiCommuteFacts {
                     .append(formatMinutes(actualMinutes + forecastMedianMinutes))
                     .append(" median / ").append(formatMinutes(actualMinutes + forecastP80Minutes))
                     .append(" 80th-percentile scenario; this is not a complete month total because ")
-                    .append(unavailableForecastLegs).append(" future legs cannot be estimated.\n");
+                    .append(unavailableForecastLegs).append(" future legs cannot be estimated and ")
+                    .append(missingPastLegs).append(" past legs were not logged. Missing historical records are unknown, not zero.\n");
         }
 
         prompt.append("\nRECENT COMPLETED COMMUTE OBSERVATIONS (local departure time):\n");
@@ -308,8 +321,8 @@ final class GeminiCommuteFacts {
     }
 
     private static Sample createSample(String date, DayOfWeek weekday, String direction,
-            long startMillis, long endMillis) {
-        if (startMillis <= 0L || endMillis <= startMillis) return null;
+            long startMillis, long endMillis, long nowMillis) {
+        if (startMillis <= 0L || endMillis <= startMillis || endMillis > nowMillis) return null;
         long roundedMinutes = Math.round((endMillis - startMillis) / 60000d);
         if (roundedMinutes <= 0L || roundedMinutes > MAX_REASONABLE_LEG_MINUTES) return null;
         Calendar calendar = Calendar.getInstance();
@@ -319,11 +332,11 @@ final class GeminiCommuteFacts {
         return new Sample(date, weekday, direction, departure, (int) roundedMinutes);
     }
 
-    private static Long completedDuration(JSONObject day, String startKey, String endKey) {
+    private static Long completedDuration(JSONObject day, String startKey, String endKey, long nowMillis) {
         if (day == null) return null;
         long start = day.optLong(startKey, 0L);
         long end = day.optLong(endKey, 0L);
-        if (start <= 0L || end <= start) return null;
+        if (start <= 0L || end <= start || end > nowMillis) return null;
         long minutes = Math.round((end - start) / 60000d);
         if (minutes <= 0L || minutes > MAX_REASONABLE_LEG_MINUTES) return null;
         return minutes;
@@ -334,9 +347,9 @@ final class GeminiCommuteFacts {
         for (Sample sample : samples) {
             if (sample.weekday == day) sameDay.add(sample);
         }
-        if (sameDay.size() >= MIN_WEEKDAY_SAMPLES) return new Stats(sameDay);
+        if (sameDay.size() >= MIN_WEEKDAY_SAMPLES) return new Stats(sameDay, true);
         if (samples.isEmpty()) return null;
-        return new Stats(samples);
+        return new Stats(samples, false);
     }
 
     private static int percentileMedian(List<Integer> sorted) {
