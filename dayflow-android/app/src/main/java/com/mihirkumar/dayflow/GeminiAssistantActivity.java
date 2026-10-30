@@ -468,10 +468,6 @@ public class GeminiAssistantActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(DAYFLOW_PREFS, Context.MODE_PRIVATE);
         JSONArray plan = new JSONArray(prefs.getString("officeMonthPlan_" + monthKey, "[]"));
         JSONArray officeLog = new JSONArray(prefs.getString("officeLog", "[]"));
-        if (plan.length() == 0) {
-            throw new IllegalStateException("No saved office dates exist for " + monthKey
-                    + ". Open Office & commute, add planned dates and per-date hours, then analyse the month.");
-        }
         return GeminiScheduleFacts.officeMonthPrompt(monthKey, plan, officeLog);
     }
 
