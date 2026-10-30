@@ -56,7 +56,7 @@ public class GeminiCommuteFactsTest {
         assertTrue(prompt.contains("Projected selected-month commute total"));
         assertTrue(prompt.contains("Home"));
         assertTrue(prompt.contains("Office"));
-        assertTrue(prompt.contains("do not alter, add, delete, move, reschedule"));
+        assertTrue(prompt.contains("Do not alter, add, delete, move, reschedule"));
     }
 
     @Test
