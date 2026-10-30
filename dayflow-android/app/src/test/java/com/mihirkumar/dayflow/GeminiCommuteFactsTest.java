@@ -68,7 +68,7 @@ public class GeminiCommuteFactsTest {
                 "Home", 18.5204, 73.8567, "Office", 18.5314, 73.8446);
         assertTrue(prompt.contains("No valid completed commute observations in the history window."));
         assertTrue(prompt.contains("No future commute leg currently has sufficient samples for a numerical forecast."));
-        assertTrue(prompt.contains("full-month projection unavailable"));
+        assertTrue(prompt.contains("Full-month projection unavailable"));
     }
 
     @Test
