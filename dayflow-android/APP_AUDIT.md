@@ -217,4 +217,5 @@ Source changes on `fix/today-tab-usability`:
 - [x] Project missing commute legs only for today/future planned office dates. Distinguish missing historical records and insufficient future samples from zero-duration commutes.
 - [x] Include saved date-specific routine blocks as read-only context. The commute analysis screen has no timetable mutation or apply pathway.
 - [x] Add JVM tests for directional projection, missing-data handling, read-only prompt constraints and straight-line distance.
-- [ ] Run GitHub Actions lint, JVM tests, emulator smoke checks and APK build; verify geocoding, map handoff, consent and screen layout on a physical Android device.
+- [x] GitHub Actions Android lint, JVM tests and signed release APK build passed on main; the public APK and matching update metadata were published.
+- [~] PR emulator smoke check was not completed in the observed run; geocoding, map handoff, consent flow and commute screen layout still need physical-device verification.
