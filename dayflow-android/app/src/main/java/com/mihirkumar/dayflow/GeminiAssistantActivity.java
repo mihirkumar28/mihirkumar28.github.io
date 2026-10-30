@@ -50,6 +50,12 @@ public class GeminiAssistantActivity extends Activity {
     private final Handler requestHandler = new Handler(Looper.getMainLooper());
     private long requestGeneration;
     private Runnable requestTimeout;
+    private String analysisMode = "routine";
+    private String selectedRoutineDate;
+    private String selectedOfficeMonth;
+    private Button routineModeButton;
+    private Button officeModeButton;
+    private Button analysisPeriodButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,8 +63,11 @@ public class GeminiAssistantActivity extends Activity {
         getWindow().setStatusBarColor(Color.rgb(13, 21, 18));
         getWindow().setNavigationBarColor(Color.rgb(13, 21, 18));
         getWindow().getDecorView().setSystemUiVisibility(0);
+        selectedRoutineDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        selectedOfficeMonth = new SimpleDateFormat("yyyy-MM", Locale.US).format(new Date());
         buildUi();
         refreshStatus();
+        refreshAnalysisControls();
     }
 
     private int dp(float value) {
@@ -206,13 +215,40 @@ public class GeminiAssistantActivity extends Activity {
         analysisCardLp.topMargin = dp(14);
         content.addView(analysisCard, analysisCardLp);
 
-        analysisCard.addView(text("2. Analyze today's routine", 16, Color.rgb(242, 247, 243), true));
-        TextView details = text("Gemini checks your actual saved task titles and times, flags potential overload or gaps, and suggests changes without editing the plan.", 12, Color.rgb(171, 189, 178), false);
+        analysisCard.addView(text("2. Choose what to analyse", 16, Color.rgb(242, 247, 243), true));
+        TextView details = text("Analyse a saved routine on any date, or review your saved monthly office-presence plan and attendance separately.", 12, Color.rgb(171, 189, 178), false);
         LinearLayout.LayoutParams detailsLp = new LinearLayout.LayoutParams(-1, -2);
         detailsLp.topMargin = dp(7);
         analysisCard.addView(details, detailsLp);
 
-        analyzeButton = button("Analyze today's routine", true);
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams modeRowLp = new LinearLayout.LayoutParams(-1, dp(46));
+        modeRowLp.topMargin = dp(12);
+        analysisCard.addView(modeRow, modeRowLp);
+        routineModeButton = button("Daily routine", false);
+        modeRow.addView(routineModeButton, new LinearLayout.LayoutParams(0, -1, 1f));
+        officeModeButton = button("Office month", false);
+        LinearLayout.LayoutParams officeModeLp = new LinearLayout.LayoutParams(0, -1, 1f);
+        officeModeLp.leftMargin = dp(8);
+        modeRow.addView(officeModeButton, officeModeLp);
+        routineModeButton.setOnClickListener(v -> {
+            analysisMode = "routine";
+            refreshAnalysisControls();
+        });
+        officeModeButton.setOnClickListener(v -> {
+            analysisMode = "office";
+            refreshAnalysisControls();
+        });
+
+        analysisPeriodButton = button("Select date", false);
+        analysisPeriodButton.setTextSize(12);
+        LinearLayout.LayoutParams periodLp = new LinearLayout.LayoutParams(-1, dp(46));
+        periodLp.topMargin = dp(9);
+        analysisCard.addView(analysisPeriodButton, periodLp);
+        analysisPeriodButton.setOnClickListener(v -> chooseAnalysisPeriod());
+
+        analyzeButton = button("Analyse selected routine", true);
         LinearLayout.LayoutParams analyzeLp = new LinearLayout.LayoutParams(-1, dp(48));
         analyzeLp.topMargin = dp(12);
         analysisCard.addView(analyzeButton, analyzeLp);
@@ -226,10 +262,54 @@ public class GeminiAssistantActivity extends Activity {
         resultLp.topMargin = dp(12);
         analysisCard.addView(resultView, resultLp);
 
-        TextView dataNote = text("Privacy note: using the free tier means prompts and responses may be used by Google to improve its products. Schedule analysis sends today's task names, time ranges, and statuses to Google. Avoid storing sensitive information in task titles.", 11, Color.rgb(154, 171, 160), false);
+        TextView dataNote = text("Privacy note: free-tier prompts and responses may be used by Google to improve its products. A daily review sends the selected date's task names, times and statuses. A monthly review sends planned office dates, per-date hours and available attendance records. Avoid storing sensitive information in task titles.", 11, Color.rgb(154, 171, 160), false);
         LinearLayout.LayoutParams noteLp = new LinearLayout.LayoutParams(-1, -2);
         noteLp.topMargin = dp(16);
         content.addView(dataNote, noteLp);
+    }
+
+    private void refreshAnalysisControls() {
+        if (analysisPeriodButton == null) return;
+        boolean routine = "routine".equals(analysisMode);
+        routineModeButton.setBackground(background(
+                routine ? Color.rgb(35, 132, 95) : Color.rgb(35, 53, 44), 12, Color.TRANSPARENT));
+        routineModeButton.setTextColor(Color.WHITE);
+        officeModeButton.setBackground(background(
+                routine ? Color.rgb(35, 53, 44) : Color.rgb(35, 132, 95), 12, Color.TRANSPARENT));
+        officeModeButton.setTextColor(Color.WHITE);
+        if (routine) {
+            analysisPeriodButton.setText("Date  ·  " + GeminiScheduleFacts.formatDateLabel(selectedRoutineDate));
+            analyzeButton.setText("Review selected day");
+        } else {
+            analysisPeriodButton.setText("Month  ·  " + GeminiScheduleFacts.formatMonthLabel(selectedOfficeMonth));
+            analyzeButton.setText("Review office month");
+        }
+    }
+
+    private void chooseAnalysisPeriod() {
+        if ("routine".equals(analysisMode)) {
+            java.util.Calendar calendar = java.util.Calendar.getInstance();
+            try {
+                Date date = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedRoutineDate);
+                if (date != null) calendar.setTime(date);
+            } catch (Exception ignored) { }
+            new android.app.DatePickerDialog(this, (view, year, month, day) -> {
+                selectedRoutineDate = String.format(Locale.US, "%04d-%02d-%02d",
+                        year, month + 1, day);
+                refreshAnalysisControls();
+            }, calendar.get(java.util.Calendar.YEAR), calendar.get(java.util.Calendar.MONTH),
+                    calendar.get(java.util.Calendar.DAY_OF_MONTH)).show();
+        } else {
+            java.util.Calendar calendar = java.util.Calendar.getInstance();
+            try {
+                Date date = new SimpleDateFormat("yyyy-MM", Locale.US).parse(selectedOfficeMonth);
+                if (date != null) calendar.setTime(date);
+            } catch (Exception ignored) { }
+            new android.app.DatePickerDialog(this, (view, year, month, day) -> {
+                selectedOfficeMonth = String.format(Locale.US, "%04d-%02d", year, month + 1);
+                refreshAnalysisControls();
+            }, calendar.get(java.util.Calendar.YEAR), calendar.get(java.util.Calendar.MONTH), 1).show();
+        }
     }
 
     private void refreshStatus() {
@@ -303,11 +383,29 @@ public class GeminiAssistantActivity extends Activity {
             showError("Save your Gemini API key first.");
             return;
         }
-        String prompt;
+        final String prompt;
+        final String consentTitle;
+        final String consentMessage;
         try {
-            prompt = buildTodayPrompt();
+            if ("routine".equals(analysisMode)) {
+                prompt = buildRoutinePrompt(selectedRoutineDate);
+                consentTitle = "Send this day's routine to Google?";
+                consentMessage = "DayFlow will send the saved blocks for "
+                        + GeminiScheduleFacts.formatDateLabel(selectedRoutineDate)
+                        + " to Gemini (task names, times, statuses and priorities). "
+                        + "Google may use free-tier prompts and responses to improve its products. "
+                        + "The routine will not be edited.";
+            } else {
+                prompt = buildOfficeMonthPrompt(selectedOfficeMonth);
+                consentTitle = "Send this monthly office plan to Google?";
+                consentMessage = "DayFlow will send the saved planned office dates and per-date hours for "
+                        + GeminiScheduleFacts.formatMonthLabel(selectedOfficeMonth)
+                        + ", plus any recorded attendance sessions for that month. "
+                        + "Google may use free-tier prompts and responses to improve its products. "
+                        + "Your office plan and attendance records will not be edited.";
+            }
         } catch (Exception e) {
-            showError("Couldn't read today's schedule: " + safeMessage(e));
+            showError("Couldn't prepare the selected analysis: " + safeMessage(e));
             return;
         }
 
@@ -317,9 +415,9 @@ public class GeminiAssistantActivity extends Activity {
             return;
         }
         new AlertDialog.Builder(this)
-                .setTitle("Send today's schedule to Google?")
-                .setMessage("To analyze the routine, DayFlow will send today's task titles, time ranges, and statuses to Gemini. Google may use free-tier prompts and responses to improve its products. Your plan will not be edited. Continue?")
-                .setPositiveButton("Continue & analyze", (dialog, which) -> {
+                .setTitle(consentTitle)
+                .setMessage(consentMessage + " Continue?")
+                .setPositiveButton("Continue & analyse", (dialog, which) -> {
                     consentPrefs.edit().putBoolean(CONSENT_KEY, true).apply();
                     runAnalysis(prompt);
                 })
@@ -336,56 +434,41 @@ public class GeminiAssistantActivity extends Activity {
             showError("Couldn't read the saved key: " + safeMessage(e));
             return;
         }
-        connectionStatus.setText("Sending today's schedule for analysis…");
-        runGeminiRequest(prompt, "Reviewing today's routine…", answer -> {
+        String targetLabel = "routine".equals(analysisMode)
+                ? GeminiScheduleFacts.formatDateLabel(selectedRoutineDate)
+                : GeminiScheduleFacts.formatMonthLabel(selectedOfficeMonth) + " office plan";
+        connectionStatus.setText("Sending " + targetLabel + " to Gemini…");
+        runGeminiRequest(prompt, "Reviewing " + targetLabel + "…", answer -> {
             resultView.setText(answer);
             connectionStatus.setText("Analysis complete.");
         }, key);
     }
 
-    private String buildTodayPrompt() throws Exception {
-        String date = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+    private String buildRoutinePrompt(String dateKey) throws Exception {
         SharedPreferences prefs = getSharedPreferences(DAYFLOW_PREFS, Context.MODE_PRIVATE);
-        String json = prefs.getString("blocks_" + date, null);
-        if ((json == null || json.trim().isEmpty()) && date.equals(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()))) {
+        String json = prefs.getString("blocks_" + dateKey, null);
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        if ((json == null || json.trim().isEmpty()) && dateKey.equals(today)) {
             json = prefs.getString("blocks", null);
         }
         if (json == null || json.trim().isEmpty()) {
-            throw new IllegalStateException("There is no saved schedule for today. Open Today in DayFlow and save a routine, then try again.");
+            throw new IllegalStateException("No saved routine exists for " + dateKey
+                    + ". Open that date in DayFlow, create or apply its routine, save it, then analyse it.");
         }
-        String arrangement = prefs.getString("mode_" + date, prefs.getString("mode", "wfh"));
-        String arrangementLabel = "office".equals(arrangement) ? "Work from office"
-                : "weekend".equals(arrangement) ? "Weekend" : "Work from home";
         JSONArray blocks = new JSONArray(json);
-        if (blocks.length() == 0) throw new IllegalStateException("Today's saved schedule has no blocks yet.");
-
-        StringBuilder schedule = new StringBuilder();
-        int totalMinutes = 0;
-        int completedMinutes = 0;
-        schedule.append("Date: ").append(date).append("\nWork arrangement: ").append(arrangementLabel).append("\n");
-        schedule.append("Saved task blocks (status is from the app; duration is calculated from start/end):\n");
-        for (int i = 0; i < blocks.length(); i++) {
-            JSONObject block = blocks.optJSONObject(i);
-            if (block == null) continue;
-            String start = block.optString("start", "");
-            String end = block.optString("end", "");
-            String title = block.optString("title", "Untitled block");
-            String status = block.optString("status", "pending");
-            int duration = durationMinutes(start, end);
-            totalMinutes += duration;
-            if ("done".equals(status)) completedMinutes += duration;
-            schedule.append("- ").append(start).append("–").append(end).append(" (")
-                    .append(formatDuration(duration)).append("): ").append(title)
-                    .append(" | status=").append(status)
-                    .append(" | rigidity=").append(block.optString("rigidity", "flexible"))
-                    .append(" | priority=").append(block.optString("priority", "normal")).append("\n");
+        if (blocks.length() == 0) {
+            throw new IllegalStateException("The saved routine for " + dateKey + " has no time blocks.");
         }
-        schedule.append("Total scheduled: ").append(formatDuration(totalMinutes)).append("\n");
-        schedule.append("Marked done: ").append(formatDuration(completedMinutes)).append("\n\n");
-        schedule.append("You are DayFlow's schedule reviewer. Analyze only this provided data. Do not invent tasks, obligations, durations, or facts.\n");
-        schedule.append("Return: (1) brief verdict on feasibility, (2) time conflicts or unrealistic transitions that are evident from the given times, (3) likely overload or underused time, (4) at most three concrete schedule changes.\n");
-        schedule.append("Preserve fixed blocks and critical priorities unless the data clearly implies otherwise. Distinguish an observed fact from an assumption. Do not claim to edit or save anything; suggestions only. Keep the answer concise and practical.");
-        return schedule.toString();
+        String arrangement = prefs.getString("mode_" + dateKey,
+                dateKey.equals(today) ? prefs.getString("mode", "unknown") : "unknown");
+        return GeminiScheduleFacts.routinePrompt(dateKey, arrangement, blocks);
+    }
+
+    private String buildOfficeMonthPrompt(String monthKey) throws Exception {
+        SharedPreferences prefs = getSharedPreferences(DAYFLOW_PREFS, Context.MODE_PRIVATE);
+        JSONArray plan = new JSONArray(prefs.getString("officeMonthPlan_" + monthKey, "[]"));
+        JSONArray officeLog = new JSONArray(prefs.getString("officeLog", "[]"));
+        return GeminiScheduleFacts.officeMonthPrompt(monthKey, plan, officeLog);
     }
 
     private int durationMinutes(String start, String end) {
