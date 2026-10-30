@@ -28,9 +28,9 @@ public class GeminiCommuteFactsTest {
             log.put(new JSONObject()
                     .put("date", dates[i])
                     .put("commuteInStart", timestamp(dates[i] + " 08:00"))
-                    .put("commuteInEnd", timestamp(dates[i] + " 08:" + String.format(Locale.US, "%02d", inbound[i])))
+                    .put("commuteInEnd", timestamp(dates[i] + " 08:00") + inbound[i] * 60_000L)
                     .put("commuteOutStart", timestamp(dates[i] + " 17:00"))
-                    .put("commuteOutEnd", timestamp(dates[i] + " 17:" + String.format(Locale.US, "%02d", outbound[i]))));
+                    .put("commuteOutEnd", timestamp(dates[i] + " 17:00") + outbound[i] * 60_000L));
         }
         JSONArray plan = new JSONArray()
                 .put(new JSONObject().put("date", "2026-11-02").put("hours", 8))
