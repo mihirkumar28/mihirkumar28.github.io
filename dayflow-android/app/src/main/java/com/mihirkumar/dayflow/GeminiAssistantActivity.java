@@ -228,7 +228,7 @@ public class GeminiAssistantActivity extends Activity {
         analysisCard.addView(modeRow, modeRowLp);
         routineModeButton = button("Daily routine", false);
         modeRow.addView(routineModeButton, new LinearLayout.LayoutParams(0, -1, 1f));
-        officeModeButton = button("Monthly office plan", false);
+        officeModeButton = button("Office month", false);
         LinearLayout.LayoutParams officeModeLp = new LinearLayout.LayoutParams(0, -1, 1f);
         officeModeLp.leftMargin = dp(8);
         modeRow.addView(officeModeButton, officeModeLp);
@@ -242,6 +242,7 @@ public class GeminiAssistantActivity extends Activity {
         });
 
         analysisPeriodButton = button("Select date", false);
+        analysisPeriodButton.setTextSize(12);
         LinearLayout.LayoutParams periodLp = new LinearLayout.LayoutParams(-1, dp(46));
         periodLp.topMargin = dp(9);
         analysisCard.addView(analysisPeriodButton, periodLp);
@@ -261,7 +262,7 @@ public class GeminiAssistantActivity extends Activity {
         resultLp.topMargin = dp(12);
         analysisCard.addView(resultView, resultLp);
 
-        TextView dataNote = text("Privacy note: using the free tier means prompts and responses may be used by Google to improve its products. Schedule analysis sends today's task names, time ranges, and statuses to Google. Avoid storing sensitive information in task titles.", 11, Color.rgb(154, 171, 160), false);
+        TextView dataNote = text("Privacy note: free-tier prompts and responses may be used by Google to improve its products. A daily review sends the selected date's task names, times and statuses. A monthly review sends planned office dates, per-date hours and available attendance records. Avoid storing sensitive information in task titles.", 11, Color.rgb(154, 171, 160), false);
         LinearLayout.LayoutParams noteLp = new LinearLayout.LayoutParams(-1, -2);
         noteLp.topMargin = dp(16);
         content.addView(dataNote, noteLp);
@@ -277,11 +278,11 @@ public class GeminiAssistantActivity extends Activity {
                 routine ? Color.rgb(35, 53, 44) : Color.rgb(35, 132, 95), 12, Color.TRANSPARENT));
         officeModeButton.setTextColor(Color.WHITE);
         if (routine) {
-            analysisPeriodButton.setText("Routine date  ·  " + GeminiScheduleFacts.formatDateLabel(selectedRoutineDate));
-            analyzeButton.setText("Analyse selected day's routine");
+            analysisPeriodButton.setText("Date  ·  " + GeminiScheduleFacts.formatDateLabel(selectedRoutineDate));
+            analyzeButton.setText("Review selected day");
         } else {
-            analysisPeriodButton.setText("Office plan month  ·  " + GeminiScheduleFacts.formatMonthLabel(selectedOfficeMonth));
-            analyzeButton.setText("Analyse monthly office presence");
+            analysisPeriodButton.setText("Month  ·  " + GeminiScheduleFacts.formatMonthLabel(selectedOfficeMonth));
+            analyzeButton.setText("Review office month");
         }
     }
 
@@ -433,8 +434,11 @@ public class GeminiAssistantActivity extends Activity {
             showError("Couldn't read the saved key: " + safeMessage(e));
             return;
         }
-        connectionStatus.setText("Sending today's schedule for analysis…");
-        runGeminiRequest(prompt, "Reviewing today's routine…", answer -> {
+        String targetLabel = "routine".equals(analysisMode)
+                ? GeminiScheduleFacts.formatDateLabel(selectedRoutineDate)
+                : GeminiScheduleFacts.formatMonthLabel(selectedOfficeMonth) + " office plan";
+        connectionStatus.setText("Sending " + targetLabel + " to Gemini…");
+        runGeminiRequest(prompt, "Reviewing " + targetLabel + "…", answer -> {
             resultView.setText(answer);
             connectionStatus.setText("Analysis complete.");
         }, key);
