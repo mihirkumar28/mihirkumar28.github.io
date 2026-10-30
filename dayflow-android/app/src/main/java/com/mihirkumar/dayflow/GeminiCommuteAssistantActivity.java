@@ -168,7 +168,7 @@ public class GeminiCommuteAssistantActivity extends Activity {
         pointsCard.setBackground(background(Color.rgb(24, 35, 30), 18, Color.rgb(47, 67, 57)));
         content.addView(pointsCard);
         pointsCard.addView(text("1. Home and work points", 16, Color.rgb(242, 247, 243), true));
-        TextView pointHelp = text("Enter a place/address for each point. DayFlow will resolve coordinates on this device when possible. You can instead paste latitude and longitude from Google Maps. Points remain local until you explicitly analyse with Gemini.", 12, Color.rgb(171, 189, 178), false);
+        TextView pointHelp = text("Enter a place/address for each point. Android's geocoding service may receive the address to resolve coordinates; you can instead paste latitude and longitude manually. Resolved points are stored on this device. Opening the route preview shares the coordinates with your map app.", 12, Color.rgb(171, 189, 178), false);
         LinearLayout.LayoutParams pointHelpParams = new LinearLayout.LayoutParams(-1, -2);
         pointHelpParams.topMargin = dp(7);
         pointsCard.addView(pointHelp, pointHelpParams);
@@ -205,6 +205,12 @@ public class GeminiCommuteAssistantActivity extends Activity {
         mapParams.topMargin = dp(8);
         pointsCard.addView(mapButton, mapParams);
         mapButton.setOnClickListener(v -> openRouteInMaps());
+
+        Button clearPointsButton = button("Clear saved home/work points", false);
+        LinearLayout.LayoutParams clearPointsParams = new LinearLayout.LayoutParams(-1, dp(42));
+        clearPointsParams.topMargin = dp(6);
+        pointsCard.addView(clearPointsButton, clearPointsParams);
+        clearPointsButton.setOnClickListener(v -> confirmClearPoints());
 
         LinearLayout analysisCard = new LinearLayout(this);
         analysisCard.setOrientation(LinearLayout.VERTICAL);
@@ -244,7 +250,7 @@ public class GeminiCommuteAssistantActivity extends Activity {
         resultParams.topMargin = dp(12);
         analysisCard.addView(resultView, resultParams);
 
-        TextView privacyNote = text("Privacy: home/work labels and coordinates, selected office dates, available routine blocks, and recorded commute timestamps are sent to Google only when you press Analyse and confirm the separate commute-data consent. The app does not track your live location. Google's handling of Gemini prompts is subject to your account and plan; free-tier content may be used to improve Google's products.", 11, Color.rgb(154, 171, 160), false);
+        TextView privacyNote = text("Privacy: address geocoding may contact the Android geocoding provider, and route preview opens an external map app with your two points. Home/work labels and coordinates, selected office dates, available routine blocks, and recorded commute timestamps are sent to Google Gemini only when you press Analyse and confirm the separate commute-data consent. The app does not track your live location. Home/work points are excluded from Android backup. Google's handling of Gemini prompts is subject to your account and plan; free-tier content may be used to improve Google's products.", 11, Color.rgb(154, 171, 160), false);
         LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(-1, -2);
         privacyParams.topMargin = dp(16);
         content.addView(privacyNote, privacyParams);
@@ -441,6 +447,27 @@ public class GeminiCommuteAssistantActivity extends Activity {
 
     private boolean validCoordinate(double value, double min, double max) {
         return !Double.isNaN(value) && !Double.isInfinite(value) && value >= min && value <= max;
+    }
+
+    private void confirmClearPoints() {
+        new AlertDialog.Builder(this)
+                .setTitle("Clear saved home/work points?")
+                .setMessage("This removes both saved locations and coordinates from this device. Commute history and your timetable will not be affected.")
+                .setPositiveButton("Clear points", (dialog, which) -> {
+                    getSharedPreferences(POINTS_PREFS, Context.MODE_PRIVATE)
+                            .edit().clear().apply();
+                    homeLabelInput.setText("");
+                    homeLatInput.setText("");
+                    homeLngInput.setText("");
+                    workLabelInput.setText("");
+                    workLatInput.setText("");
+                    workLngInput.setText("");
+                    pointsStatus.setText("Saved home/work points cleared.");
+                    requestStatus.setText("Save both points again before the next commute analysis.");
+                    refreshPointStatus();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void openRouteInMaps() {
