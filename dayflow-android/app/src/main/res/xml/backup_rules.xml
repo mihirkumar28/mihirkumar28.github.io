@@ -2,4 +2,6 @@
 <full-backup-content>
     <!-- The AES key belongs to Android Keystore and is intentionally device-bound. -->
     <exclude domain="sharedpref" path="dayflow_gemini_secrets.xml" />
+    <!-- Home/work coordinates are private location data and remain device-local. -->
+    <exclude domain="sharedpref" path="dayflow_commute_points.xml" />
 </full-backup-content>

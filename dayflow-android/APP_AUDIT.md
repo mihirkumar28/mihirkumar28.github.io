@@ -205,3 +205,16 @@ Source changes on `fix/today-tab-usability`:
 - [x] Deploy the matching APK and update.json to GitHub Pages, then publish the same update.json to GitHub Releases.
 - [x] Preserve compatibility with already-installed app versions that still download updates through the Pages mirror; the manifest does not announce a new version until that mirror is live.
 - [ ] Verify the end-to-end main-branch build, Pages deployment, Release manifest update, and in-app update install.
+
+
+## Gemini commute intelligence — 2026-10-30
+
+- [x] Add a separate commute-analysis screen reachable from the existing Gemini assistant; keep existing daily-routine and office-month review flows intact.
+- [x] Save home/work labels and coordinates locally, with manual coordinate entry or address geocoding, route preview in the user's map app, and a clear-points action.
+- [x] Exclude the exact home/work points from Android cloud backup and device transfer; ask for separate explicit consent before sending points, routine blocks, office dates and commute timestamps to Gemini.
+- [x] Build directional commute samples from completed records over the preceding 120 days; ignore malformed intervals and implausible legs longer than six hours.
+- [x] Calculate per-weekday medians and 80th percentiles when at least three weekday-specific samples exist; otherwise use the direction's overall history and label the fallback.
+- [x] Project missing commute legs only for today/future planned office dates. Distinguish missing historical records and insufficient future samples from zero-duration commutes.
+- [x] Include saved date-specific routine blocks as read-only context. The commute analysis screen has no timetable mutation or apply pathway.
+- [x] Add JVM tests for directional projection, missing-data handling, read-only prompt constraints and straight-line distance.
+- [ ] Run GitHub Actions lint, JVM tests, emulator smoke checks and APK build; verify geocoding, map handoff, consent and screen layout on a physical Android device.
