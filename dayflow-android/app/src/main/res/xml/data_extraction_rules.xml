@@ -3,6 +3,8 @@
     <cloud-backup>
         <!-- Never transfer encrypted Gemini credentials without their device-bound Keystore key. -->
         <exclude domain="sharedpref" path="dayflow_gemini_secrets.xml" />
+        <!-- Keep exact home/work coordinates on this device only. -->
+        <exclude domain="sharedpref" path="dayflow_commute_points.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="dayflow_gemini_secrets.xml" />
