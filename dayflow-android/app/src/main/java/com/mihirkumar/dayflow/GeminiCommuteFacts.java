@@ -291,7 +291,7 @@ final class GeminiCommuteFacts {
             prompt.append("Known subtotal only (actual completed legs plus forecastable future legs): ")
                     .append(formatMinutes(actualMinutes + forecastMedianMinutes))
                     .append(" median / ").append(formatMinutes(actualMinutes + forecastP80Minutes))
-                    .append(" 80th-percentile scenario; this is not a complete month total because ")
+                    .append(" 80th-percentile scenario; Full-month projection unavailable as a complete value because ")
                     .append(unavailableForecastLegs).append(" future legs cannot be estimated and ")
                     .append(missingPastLegs).append(" past legs were not logged. Missing historical records are unknown, not zero.\n");
         }
