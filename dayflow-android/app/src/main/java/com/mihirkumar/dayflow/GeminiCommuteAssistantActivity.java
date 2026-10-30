@@ -479,8 +479,7 @@ public class GeminiCommuteAssistantActivity extends Activity {
         String origin = prefs.getString("home_lat", "") + "," + prefs.getString("home_lng", "");
         String destination = prefs.getString("work_lat", "") + "," + prefs.getString("work_lng", "");
         String url = "https://www.google.com/maps/dir/?api=1&origin="
-                + Uri.encode(origin) + "&destination=" + Uri.encode(destination)
-                + "&travelmode=driving";
+                + Uri.encode(origin) + "&destination=" + Uri.encode(destination);
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Exception error) {
