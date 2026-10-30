@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Locale;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Builds deterministic facts for Gemini. Calculations are performed by DayFlow, not guessed by the model. */
 final class GeminiScheduleFacts {
@@ -169,6 +171,7 @@ final class GeminiScheduleFacts {
 
     static String officeMonthPrompt(String monthKey, JSONArray plan, JSONArray officeLog) throws Exception {
         ArrayList<JSONObject> plannedEntries = new ArrayList<>();
+        Map<String, Double> plannedHoursByDate = new HashMap<>();
         int invalidEntries = 0;
         double plannedHours = 0d;
         for (int i = 0; i < plan.length(); i++) {
@@ -189,6 +192,7 @@ final class GeminiScheduleFacts {
                     .put("date", date)
                     .put("hours", hours);
             plannedEntries.add(normalized);
+            plannedHoursByDate.put(date, hours);
             plannedHours += hours;
         }
         Collections.sort(plannedEntries, (a, b) -> a.optString("date", "")
@@ -252,8 +256,15 @@ final class GeminiScheduleFacts {
             if (millis > 0L) {
                 actualDays++;
                 actualHours += millis / 3600000d;
-                actualLines.add("- " + date + " | recorded time in office="
-                        + formatDecimalHours(millis / 3600000d));
+                Double plannedForDate = plannedHoursByDate.get(date);
+                String line = "- " + date + " | recorded time in office="
+                        + formatDecimalHours(millis / 3600000d);
+                if (plannedForDate != null) {
+                    line += " | planned office time=" + formatDecimalHours(plannedForDate);
+                } else {
+                    line += " | no planned office entry for this date";
+                }
+                actualLines.add(line);
             }
         }
         prompt.append("\nRECORDED ACTUAL ATTENDANCE (separate from the plan):\n");
