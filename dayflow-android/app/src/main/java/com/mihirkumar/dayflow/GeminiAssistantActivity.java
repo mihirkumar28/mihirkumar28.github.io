@@ -254,6 +254,13 @@ public class GeminiAssistantActivity extends Activity {
         analysisCard.addView(analyzeButton, analyzeLp);
         analyzeButton.setOnClickListener(v -> analyzeRoutine());
 
+        Button commuteAnalysisButton = button("Commute analysis & forecast", false);
+        LinearLayout.LayoutParams commuteAnalysisLp = new LinearLayout.LayoutParams(-1, dp(46));
+        commuteAnalysisLp.topMargin = dp(8);
+        analysisCard.addView(commuteAnalysisButton, commuteAnalysisLp);
+        commuteAnalysisButton.setOnClickListener(v ->
+                startActivity(new Intent(this, GeminiCommuteAssistantActivity.class)));
+
         resultView = text("Your analysis will appear here.", 13, Color.rgb(215, 231, 220), false);
         resultView.setTextIsSelectable(true);
         resultView.setPadding(dp(13), dp(13), dp(13), dp(13));
