@@ -21,6 +21,7 @@ import java.util.Locale;
 /** Delivers slot-end alerts and restores today's schedule alarms after system events. */
 public class ScheduleAlertReceiver extends BroadcastReceiver {
     static final String ACTION_SLOT_END_REMINDER = "com.mihirkumar.dayflow.SLOT_END_REMINDER";
+    static final String ACTION_DAILY_RESCHEDULE = "com.mihirkumar.dayflow.DAILY_RESCHEDULE";
     static final String EXTRA_TITLE = "slotTitle";
     static final String EXTRA_END_TIME = "slotEndTime";
     static final String EXTRA_REQUEST_CODE = "requestCode";
@@ -34,7 +35,8 @@ public class ScheduleAlertReceiver extends BroadcastReceiver {
             showReminder(context, intent);
             return;
         }
-        if (Intent.ACTION_BOOT_COMPLETED.equals(action)
+        if (ACTION_DAILY_RESCHEDULE.equals(action)
+                || Intent.ACTION_BOOT_COMPLETED.equals(action)
                 || Intent.ACTION_TIME_CHANGED.equals(action)
                 || Intent.ACTION_TIMEZONE_CHANGED.equals(action)
                 || "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED".equals(action)) {
@@ -104,9 +106,10 @@ public class ScheduleAlertReceiver extends BroadcastReceiver {
     private String formatTime(String value) {
         try {
             String[] parts = value.split(":");
+            if (parts.length != 2) return value;
             int hour = Integer.parseInt(parts[0]);
             int minute = Integer.parseInt(parts[1]);
-            if (parts.length != 2 || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+            if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
                 return value;
             }
             return String.format(Locale.getDefault(), "%d:%02d %s",
