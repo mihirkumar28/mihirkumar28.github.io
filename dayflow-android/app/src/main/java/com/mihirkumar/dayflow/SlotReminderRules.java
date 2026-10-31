@@ -10,7 +10,7 @@ final class SlotReminderRules {
     static boolean shouldAlert(String title, String status, int startMinute, int endMinute) {
         if (status == null || !"pending".equalsIgnoreCase(status.trim())) return false;
         if (startMinute < 0 || endMinute > 1440 || endMinute <= startMinute) return false;
-        if (endMinute - startMinute < 10) return false;
+        if (endMinute - startMinute <= 10) return false;
         return !isMorningAlarmTitle(title);
     }
 
