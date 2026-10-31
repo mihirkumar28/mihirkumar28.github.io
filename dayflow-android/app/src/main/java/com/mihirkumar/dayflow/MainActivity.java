@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
     private static final String UPDATE_DOWNLOAD_ERROR_KEY = "appUpdateDownloadError";
     private static final String UPDATE_INSTALL_PERMISSION_PROMPTED_KEY = "appUpdateInstallPermissionPrompted";
     private static final int UPDATE_NOTIFICATION_PERMISSION_REQUEST = 4203;
+    private static final int REMINDER_NOTIFICATION_PERMISSION_REQUEST = 4204;
     // Check often enough to discover a newly published APK during normal use.
     private static final long UPDATE_CHECK_INTERVAL_MS = 2L * 60L * 60L * 1000L;
     private static final long UPDATE_REPROMPT_INTERVAL_MS = 12L * 60L * 60L * 1000L;
@@ -158,6 +159,8 @@ public class MainActivity extends Activity {
     private ProgressBar todayPlanProgress;
     private TextView currentTitle, currentTime, currentCountdown, plannedView, doneView, studyActualView;
     private TextView officeStatus, officeTimes, commuteView;
+    private TextView sunriseTimeView, sunriseMetaView, reminderStatusView;
+    private Button sunriseActionButton, reminderActionButton;
     private Button officeAction, commuteAction, focusAction;
     private String mode = "wfh";
     // Plan preview selection is deliberately separate from the template applied to the live date.
@@ -324,6 +327,7 @@ public class MainActivity extends Activity {
         ensureRoadmapData();
         refreshRoadmapTabContent();
         render();
+        ScheduleAlertScheduler.scheduleToday(this);
         ensureScreenTimeWorker();
         if (ScreenTimeTracker.hasUsageAccess(this)) ScreenTimeTracker.refreshRecentDays(this, 7);
 
@@ -334,6 +338,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         loadSelectedDate();
+        ScheduleAlertScheduler.scheduleToday(this);
         ensureScreenTimeWorker();
         if (ScreenTimeTracker.refreshRecentDays(this, 7)) DayFlowWidgetProvider.refreshAll(this);
         render();
@@ -354,6 +359,19 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REMINDER_NOTIFICATION_PERMISSION_REQUEST) {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            if (granted) {
+                ScheduleAlertScheduler.scheduleToday(this);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                        && !ScheduleAlertScheduler.hasExactAlarmAccess(this)) {
+                    handler.post(this::openExactAlarmSettings);
+                }
+            }
+            refreshSunriseAndAlerts();
+            return;
+        }
         if (requestCode != UPDATE_NOTIFICATION_PERMISSION_REQUEST) return;
         DayFlowUpdateInfo.ReleaseInfo release = updatePendingAfterNotificationPermission;
         updatePendingAfterNotificationPermission = null;
@@ -593,6 +611,7 @@ public class MainActivity extends Activity {
         scroll.requestApplyInsets();
 
         buildHeader();
+        buildSunriseAndAlertsCard();
         buildModeRow();
 
         // Keep office actions close to the date/routine controls, but let the task
@@ -7621,6 +7640,165 @@ public class MainActivity extends Activity {
         dateNav.addView(next, new LinearLayout.LayoutParams(dp(48), dp(48)));
     }
 
+
+    private void buildSunriseAndAlertsCard() {
+        LinearLayout card = vertical();
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setBackground(bg("#17231D", 16));
+
+        LinearLayout sunriseRow = horizontal();
+        LinearLayout sunriseDetails = vertical();
+        sunriseDetails.addView(text("SUNRISE", 9, color("#6BD0A6"), true));
+        sunriseTimeView = text("—", 23, color("#F2F7F3"), true);
+        LinearLayout.LayoutParams timeLp = new LinearLayout.LayoutParams(-1, -2);
+        timeLp.topMargin = dp(2);
+        sunriseDetails.addView(sunriseTimeView, timeLp);
+        sunriseMetaView = text("Save a home location to see local sunrise times.", 10,
+                color("#A5B5AA"), false);
+        LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
+        metaLp.topMargin = dp(2);
+        sunriseDetails.addView(sunriseMetaView, metaLp);
+        sunriseRow.addView(sunriseDetails, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        sunriseActionButton = actionButton("Set home", color("#D6E1D8"), "#1B2621");
+        sunriseActionButton.setMinHeight(dp(40));
+        sunriseActionButton.setOnClickListener(v -> openHomeLocationSettings());
+        sunriseRow.addView(sunriseActionButton, new LinearLayout.LayoutParams(dp(112), dp(40)));
+        card.addView(sunriseRow);
+
+        LinearLayout alertHeader = horizontal();
+        LinearLayout.LayoutParams alertHeaderLp = new LinearLayout.LayoutParams(-1, -2);
+        alertHeaderLp.topMargin = dp(12);
+        alertHeader.setLayoutParams(alertHeaderLp);
+        TextView alertLabel = text("SLOT-END ALERTS", 9, color("#6BD0A6"), true);
+        alertHeader.addView(alertLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        reminderActionButton = actionButton("Enable alerts", color("#D6E1D8"), "#1B2621");
+        reminderActionButton.setMinHeight(dp(38));
+        reminderActionButton.setOnClickListener(v -> handleReminderAction());
+        alertHeader.addView(reminderActionButton, new LinearLayout.LayoutParams(dp(132), dp(38)));
+        card.addView(alertHeader);
+
+        reminderStatusView = text("", 10, color("#A5B5AA"), false);
+        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
+        statusLp.topMargin = dp(5);
+        card.addView(reminderStatusView, statusLp);
+
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+        cardLp.bottomMargin = dp(10);
+        root.addView(card, cardLp);
+        refreshSunriseAndAlerts();
+    }
+
+    private void refreshSunriseAndAlerts() {
+        if (sunriseTimeView != null && sunriseMetaView != null && sunriseActionButton != null) {
+            SharedPreferences points = getSharedPreferences("dayflow_commute_points", Context.MODE_PRIVATE);
+            String label = points.getString("home_label", "").trim();
+            String latitude = points.getString("home_lat", "").trim();
+            String longitude = points.getString("home_lng", "").trim();
+            boolean configured = !latitude.isEmpty() && !longitude.isEmpty();
+            if (configured) {
+                try {
+                    double lat = Double.parseDouble(latitude);
+                    double lon = Double.parseDouble(longitude);
+                    String dateKey = selectedDateKey == null ? todayKey() : selectedDateKey;
+                    Date sunrise = SunriseCalculator.calculateSunrise(lat, lon, dateKey);
+                    if (sunrise != null) {
+                        sunriseTimeView.setText(clock(sunrise.getTime()));
+                        Date selected = parseDateKey(dateKey);
+                        String dateLabel = selected == null ? dateKey
+                                : new SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(selected);
+                        sunriseMetaView.setText((label.isEmpty() ? "Home" : label) + "  ·  " + dateLabel);
+                    } else {
+                        sunriseTimeView.setText("No sunrise");
+                        sunriseMetaView.setText("The sun does not rise at this location on this date.");
+                    }
+                    sunriseActionButton.setText("Change home");
+                } catch (Exception e) {
+                    sunriseTimeView.setText("—");
+                    sunriseMetaView.setText("Home coordinates are invalid. Update your saved location.");
+                    sunriseActionButton.setText("Fix location");
+                }
+            } else {
+                sunriseTimeView.setText("—");
+                sunriseMetaView.setText("Save a home location in Commute settings to see sunrise times.");
+                sunriseActionButton.setText("Set home");
+            }
+        }
+
+        if (reminderStatusView != null && reminderActionButton != null) {
+            boolean notificationsAllowed = Build.VERSION.SDK_INT < 33
+                    || checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            boolean exactAllowed = ScheduleAlertScheduler.hasExactAlarmAccess(this);
+            if (!notificationsAllowed) {
+                reminderStatusView.setText("Allow notifications to hear 10-minute slot-end reminders.");
+                reminderActionButton.setText("Enable notifications");
+            } else if (!exactAllowed) {
+                reminderStatusView.setText("Reminders are queued, but Android may deliver them late until exact alarms are allowed.");
+                reminderActionButton.setText("Allow exact timing");
+            } else {
+                reminderStatusView.setText("Rings 10 minutes before each pending slot ends. Morning alarm / wake-up is excluded.");
+                reminderActionButton.setText("Manage alerts");
+            }
+        }
+    }
+
+    private void openHomeLocationSettings() {
+        try {
+            startActivity(new Intent(this, GeminiCommuteAssistantActivity.class));
+        } catch (Exception e) {
+            Toast.makeText(this, "Open More → Gemini commute analysis to set your home location.",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void handleReminderAction() {
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                    REMINDER_NOTIFICATION_PERMISSION_REQUEST);
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                && !ScheduleAlertScheduler.hasExactAlarmAccess(this)) {
+            openExactAlarmSettings();
+            return;
+        }
+        openNotificationSettings();
+    }
+
+    private void openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+        try {
+            Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        } catch (Exception e) {
+            openAppDetailsSettings();
+        }
+    }
+
+    private void openNotificationSettings() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            startActivity(intent);
+        } catch (Exception e) {
+            openAppDetailsSettings();
+        }
+    }
+
+    private void openAppDetailsSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignored) {
+            Toast.makeText(this, "Open Android Settings → Apps → DayFlow → Notifications.",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void buildModeRow() {
         LinearLayout wrapper = vertical();
         LinearLayout.LayoutParams wrapperLp = new LinearLayout.LayoutParams(-1, -2);
@@ -7902,6 +8080,7 @@ public class MainActivity extends Activity {
         else if (selectedDateKey.compareTo(todayKey()) < 0) date += "  •  Past";
         else date += "  •  Planned";
         dateView.setText(date);
+        refreshSunriseAndAlerts();
         View scheduleHeading = root.findViewWithTag("scheduleHeading");
         if (scheduleHeading instanceof TextView) {
             String heading = selectedDateKey.equals(todayKey()) ? "TODAY'S TIMELINE"
@@ -11761,6 +11940,7 @@ public class MainActivity extends Activity {
                     .putString(MODE_KEY, mode)
                     .apply();
             debugLog("Day saved: date=" + selectedDateKey + " mode=" + mode + " blocks=" + blocks.size());
+            ScheduleAlertScheduler.scheduleToday(this);
             DayFlowWidgetProvider.refreshAll(this);
         } catch (Exception e) {
             debugLog("Day save failed for " + selectedDateKey + ": " + e.getMessage());
