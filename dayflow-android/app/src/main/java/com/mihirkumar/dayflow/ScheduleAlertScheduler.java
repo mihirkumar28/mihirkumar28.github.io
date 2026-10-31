@@ -40,11 +40,33 @@ final class ScheduleAlertScheduler {
     }
 
     static void scheduleToday(Context context) {
+        scheduleDailyRearm(context);
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
         SharedPreferences dayPrefs = context.getSharedPreferences(DAYFLOW_PREFS, Context.MODE_PRIVATE);
         String raw = dayPrefs.getString("blocks_" + today, null);
         if (raw == null || raw.trim().isEmpty()) raw = dayPrefs.getString("blocks", "[]");
         scheduleForDate(context, today, raw);
+    }
+
+    private static void scheduleDailyRearm(Context context) {
+        try {
+            AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (alarms == null) return;
+            Intent intent = new Intent(context, ScheduleAlertReceiver.class)
+                    .setAction(ScheduleAlertReceiver.ACTION_DAILY_RESCHEDULE);
+            PendingIntent pending = PendingIntent.getBroadcast(context, 1005, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            Calendar nextDay = Calendar.getInstance();
+            nextDay.add(Calendar.DAY_OF_YEAR, 1);
+            nextDay.set(Calendar.HOUR_OF_DAY, 0);
+            nextDay.set(Calendar.MINUTE, 5);
+            nextDay.set(Calendar.SECOND, 0);
+            nextDay.set(Calendar.MILLISECOND, 0);
+            // This is only a daily re-arm signal, so it does not require exact-alarm access.
+            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextDay.getTimeInMillis(), pending);
+        } catch (Exception e) {
+            Log.e(DEBUG_TAG, "Could not schedule next-day reminder refresh", e);
+        }
     }
 
     private static void scheduleForDate(Context context, String dateKey, String rawBlocks) {
