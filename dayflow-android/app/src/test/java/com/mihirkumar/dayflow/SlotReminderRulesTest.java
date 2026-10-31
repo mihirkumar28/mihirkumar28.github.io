@@ -11,6 +11,7 @@ public class SlotReminderRulesTest {
         assertTrue(SlotReminderRules.shouldAlert("GS study", "pending", 360, 480));
         assertTrue(SlotReminderRules.shouldAlert("Work", "PENDING", 540, 600));
         assertFalse(SlotReminderRules.shouldAlert("Quick break", "pending", 600, 605));
+        assertFalse(SlotReminderRules.shouldAlert("Ten-minute slot", "pending", 600, 610));
     }
 
     @Test
