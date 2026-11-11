@@ -20,7 +20,7 @@
 
 ## Phase 2 — scheduling and data integrity
 
-- [ ] Add explicit invariant tests for non-overlapping blocks, valid start/end times, fixed anchors, and behavior when work will not fit in the remaining day.
+- [~] Added pure tests for valid intervals, overlaps and recurrence-day selection; new/edited blocks reject overlaps, and recurring additions skip dates that conflict. Fixed-anchor rescheduling and behavior when work will not fit in the remaining day remain open.
 - [ ] Test recurrence scope (single occurrence vs future occurrences vs template) and ensure generated blocks are idempotent.
 - [x] Validate every imported backup completely before mutating preferences; reject malformed/oversized files before clearing saved data. (Automatic rollback snapshot remains open.)
 - [ ] Test attendance edits across multiple sessions, open sessions, invalid historical intervals, and date boundaries.
