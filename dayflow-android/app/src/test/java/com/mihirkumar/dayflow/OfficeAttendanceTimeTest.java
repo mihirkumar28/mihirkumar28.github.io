@@ -143,6 +143,51 @@ public class OfficeAttendanceTimeTest {
         assertEquals(2L, updatedWeek[2]);
     }
 
+    @Test public void durationSumsMultipleSessionsWithoutDoubleCountingGaps() throws Exception {
+        JSONArray sessions = new JSONArray()
+                .put(new JSONObject().put("in", 9 * HOUR).put("out", 12 * HOUR))
+                .put(new JSONObject().put("in", 13 * HOUR).put("out", 17 * HOUR));
+        assertEquals(7 * HOUR, OfficeAttendanceTime.officeDuration(sessions, 20 * HOUR));
+    }
+
+    @Test public void historicalOpenSessionDoesNotAccumulateIntoTodayOrRangeTotals() throws Exception {
+        JSONObject historical = new JSONObject().put("date", "2026-10-12")
+                .put("sessions", new JSONArray().put(new JSONObject()
+                        .put("in", OfficeAttendanceTime.timestampForDayAndTime("2026-10-12", 9, 0))
+                        .put("out", 0L)));
+        JSONObject today = new JSONObject().put("date", "2026-10-14")
+                .put("sessions", new JSONArray().put(new JSONObject()
+                        .put("in", OfficeAttendanceTime.timestampForDayAndTime("2026-10-14", 9, 0))
+                        .put("out", 0L)));
+        JSONArray records = new JSONArray().put(historical).put(today);
+        long todayNow = OfficeAttendanceTime.timestampForDayAndTime("2026-10-14", 12, 0);
+
+        long[] totals = OfficeAttendanceTime.totalsForDateRange(
+                records, "2026-10-12", "2026-10-14", "2026-10-14", todayNow);
+
+        assertEquals(3 * HOUR, totals[0]);
+        assertEquals(0L, totals[1]);
+        assertEquals(1L, totals[2]);
+    }
+
+    @Test public void timestampRejectsImpossibleAndNonCanonicalDateKeys() {
+        assertInvalidDate("2026-02-30");
+        assertInvalidDate("2026-13-01");
+        assertInvalidDate("2026-10-08-extra");
+        assertInvalidDate("2026-1-08");
+        assertInvalidDate("");
+        assertInvalidDate(null);
+    }
+
+    private void assertInvalidDate(String date) {
+        try {
+            OfficeAttendanceTime.timestampForDayAndTime(date, 8, 30);
+            fail("Invalid date key should be rejected: " + date);
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("Invalid date"));
+        }
+    }
+
     @Test public void sessionUpdaterRejectsWrongFieldNames() throws Exception {
         try {
             OfficeAttendanceTime.setSessionTimestamp(new JSONObject(), "officeIn", 123L);

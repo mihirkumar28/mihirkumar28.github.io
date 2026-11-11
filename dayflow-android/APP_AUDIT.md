@@ -23,7 +23,7 @@
 - [ ] Add explicit invariant tests for non-overlapping blocks, valid start/end times, fixed anchors, and behavior when work will not fit in the remaining day.
 - [ ] Test recurrence scope (single occurrence vs future occurrences vs template) and ensure generated blocks are idempotent.
 - [x] Validate every imported backup completely before mutating preferences; reject malformed/oversized files before clearing saved data. (Automatic rollback snapshot remains open.)
-- [ ] Test attendance edits across multiple sessions, open sessions, invalid historical intervals, and date boundaries.
+- [~] Add tests for multiple sessions, historical open sessions, invalid recorded intervals and exact date-key boundaries; malformed/non-canonical date keys are now rejected. Device-level editing of old/open sessions remains to be verified.
 - [ ] Add migration tests for older saved preference formats.
 
 ## Phase 3 — design consistency and everyday usability
