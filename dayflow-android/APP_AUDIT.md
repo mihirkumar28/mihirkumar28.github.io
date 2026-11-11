@@ -22,7 +22,8 @@
 
 - [ ] Add explicit invariant tests for non-overlapping blocks, valid start/end times, fixed anchors, and behavior when work will not fit in the remaining day.
 - [ ] Test recurrence scope (single occurrence vs future occurrences vs template) and ensure generated blocks are idempotent.
-- [x] Validate every imported backup completely before mutating preferences; reject malformed/oversized files before clearing saved data. (Automatic rollback snapshot remains open.)
+- [x] Validate every imported backup completely before mutating preferences; reject malformed/oversized files before clearing saved data.
+- [~] Attempt to reinstate the previous preference snapshot if a restore commit fails; if rollback also fails, report that durable recovery could not be confirmed.
 - [ ] Test attendance edits across multiple sessions, open sessions, invalid historical intervals, and date boundaries.
 - [ ] Add migration tests for older saved preference formats.
 
