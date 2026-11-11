@@ -82,6 +82,32 @@ public class RoadmapTreeRulesTest {
                 "General Studies", "bad-month"));
     }
 
+    @Test public void monthDropRejectsMalformedMonthKeysEvenWhenSevenCharactersLong() {
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 0L, "2026-13", false,
+                "General Studies", "2026-10"));
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 0L, "2026-1x", false,
+                "General Studies", "2026-10"));
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 0L, "2026-10", false,
+                "General Studies", "abcd-01"));
+        assertFalse(RoadmapTreeRules.canDropGoalOnMonth(
+                "General Studies", 0L, "2026-10", false,
+                "General Studies", "2026-00"));
+    }
+
+    @Test public void monthSlotListDeduplicatesGoalsAndPlannedMonthsAndIgnoresMalformedKeys() {
+        assertEquals(java.util.Arrays.asList("2026-11", "2026-12", "2027-01"),
+                RoadmapTreeRules.monthKeysForPeriod("2026-10", true,
+                        java.util.Arrays.asList("2026-11", "2026-12", "2026-99", "junk!!"),
+                        java.util.Arrays.asList("2026-10", "2026-11", "2026-12", "2027-01", "2027-1x")));
+        assertEquals(java.util.Arrays.asList("2026-09", "2026-08", "2026-07"),
+                RoadmapTreeRules.monthKeysForPeriod("2026-10", false,
+                        java.util.Arrays.asList("2026-09", "2026-08"),
+                        java.util.Arrays.asList("2026-10", "2026-08", "2026-07", "2026-13")));
+    }
+
     @Test public void sameMonthRootGoalCanTargetItsMonthWithoutBreakingSequence() {
         assertTrue(RoadmapTreeRules.canDropGoalOnMonth(
                 "Maths Optional", 0L, "2026-10", false,
