@@ -52,21 +52,21 @@ public class IndiaSalaryCalculatorTest {
     @Test public void surchargeMarginalReliefLimitsTaxAtTheThreshold() {
         double atThreshold = IndiaSalaryCalculator.taxAfterRebate(5000000.0, true);
         double justAbove = IndiaSalaryCalculator.taxAfterRebate(5010000.0, true);
-        // The amount collected just above the threshold cannot be more than
-        // tax at the threshold plus the extra income (before cess).
-        double actualTaxWithSurcharge = surchargeTax(5010000.0);
-        assertTrue(actualTaxWithSurcharge <= atThreshold + 10000.01);
+        IndiaSalaryCalculator.Result result = surchargeResult(5010000.0);
+        // Standard deduction leaves taxable income ₹50,025 above the threshold.
+        // Surcharge marginal relief caps tax at threshold tax plus that excess.
+        assertTrue(result.taxBeforeSurcharge + result.surcharge
+                <= atThreshold + (result.taxableIncome - 5000000.0) + 0.01);
         assertTrue(justAbove > atThreshold);
     }
 
-    private double surchargeTax(double income) {
+    private IndiaSalaryCalculator.Result surchargeResult(double income) {
         IndiaSalaryCalculator.Inputs inputs = new IndiaSalaryCalculator.Inputs();
         inputs.annualBase = income;
         inputs.eligibleReimbursementAnnual = 0;
         inputs.carLeaseMonthly = 0;
         inputs.professionalTaxAnnual = 0;
         inputs.basicSharePct = 0;
-        return IndiaSalaryCalculator.calculate(inputs).taxBeforeSurcharge
-                + IndiaSalaryCalculator.calculate(inputs).surcharge;
+        return IndiaSalaryCalculator.calculate(inputs);
     }
 }
