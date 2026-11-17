@@ -24,10 +24,11 @@ final class IndiaSalaryCalculator {
         double employerPfPctOfBasic = 12.0;
         double gratuityPctOfBasic = 4.81;
         double carLeaseMonthly = 20000.0;
+        // Taxable car-use perquisite from payroll / Rule 15 Table II, per month.
+        double carPerquisiteMonthly = 0.0;
         double eligibleReimbursementAnnual = 360000.0;
         double professionalTaxAnnual = 2500.0;
         double otherPostTaxDeductionsAnnual = 0.0;
-        boolean carLeasePreTax = true;
         boolean residentIndividual = true;
     }
 
@@ -41,6 +42,7 @@ final class IndiaSalaryCalculator {
         double gratuity;
         double eligibleReimbursement;
         double carLeaseAnnual;
+        double carPerquisiteAnnual;
         double standardDeduction;
         double taxableIncome;
         double taxBeforeSurcharge;
@@ -69,11 +71,16 @@ final class IndiaSalaryCalculator {
         out.gratuity = out.basic * in.gratuityPctOfBasic / 100.0;
         out.eligibleReimbursement = Math.min(in.eligibleReimbursementAnnual, in.annualBase);
         out.carLeaseAnnual = in.carLeaseMonthly * 12.0;
+        out.carPerquisiteAnnual = in.carPerquisiteMonthly * 12.0;
         out.standardDeduction = Math.min(STANDARD_DEDUCTION, in.annualBase);
 
+        // Per the user's payroll structure, the lease recovery reduces salary cash
+        // and the salary amount subject to tax. The lease EMI itself is not the
+        // taxable perquisite: only the separately valued motor-car use perquisite
+        // is added to taxable income.
         double taxable = in.annualBase - out.employerNpsDeduction
-                - out.eligibleReimbursement - out.standardDeduction;
-        if (in.carLeasePreTax) taxable -= out.carLeaseAnnual;
+                - out.eligibleReimbursement - out.standardDeduction
+                - out.carLeaseAnnual + out.carPerquisiteAnnual;
         out.taxableIncome = Math.max(0.0, taxable);
 
         out.taxBeforeSurcharge = taxAfterRebate(out.taxableIncome, in.residentIndividual);
@@ -181,10 +188,10 @@ final class IndiaSalaryCalculator {
         c.employerPfPctOfBasic = in.employerPfPctOfBasic;
         c.gratuityPctOfBasic = in.gratuityPctOfBasic;
         c.carLeaseMonthly = in.carLeaseMonthly;
+        c.carPerquisiteMonthly = in.carPerquisiteMonthly;
         c.eligibleReimbursementAnnual = in.eligibleReimbursementAnnual;
         c.professionalTaxAnnual = in.professionalTaxAnnual;
         c.otherPostTaxDeductionsAnnual = in.otherPostTaxDeductionsAnnual;
-        c.carLeasePreTax = in.carLeasePreTax;
         c.residentIndividual = in.residentIndividual;
         return c;
     }
@@ -199,6 +206,7 @@ final class IndiaSalaryCalculator {
         requirePercent(in.employerPfPctOfBasic, "Employer PF rate");
         requirePercent(in.gratuityPctOfBasic, "Gratuity rate");
         requireNonNegative(in.carLeaseMonthly, "Monthly car lease");
+        requireNonNegative(in.carPerquisiteMonthly, "Monthly car perquisite");
         requireNonNegative(in.eligibleReimbursementAnnual, "Eligible reimbursement");
         requireNonNegative(in.professionalTaxAnnual, "Professional tax");
         requireNonNegative(in.otherPostTaxDeductionsAnnual, "Other deductions");
