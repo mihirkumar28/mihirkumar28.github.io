@@ -33,37 +33,68 @@ public class IndiaSalaryCalculatorTest {
         assertTrue(with.monthlyTakeHome - without.monthlyTakeHome < 360000.0 / 12.0);
     }
 
-    @Test public void carLeaseEmiIsNotItselfTheTaxablePerquisite() {
+    @Test public void defaultEvMixedUsePerquisiteIsCalculatedAsTwoThousandPerMonth() {
+        IndiaSalaryCalculator.Inputs inputs = new IndiaSalaryCalculator.Inputs();
+        IndiaSalaryCalculator.Result result = IndiaSalaryCalculator.calculate(inputs);
+        assertEquals(2000.0, result.carPerquisiteMonthly, 0.01);
+        assertEquals(24000.0, result.carPerquisiteAnnual, 0.01);
+    }
+
+    @Test public void employerPaidRunningCostsAndChauffeurChangePerquisiteAutomatically() {
+        IndiaSalaryCalculator.Inputs inputs = new IndiaSalaryCalculator.Inputs();
+        inputs.carOperatingCostsPaidByEmployer = true;
+        inputs.carChauffeurProvided = true;
+        IndiaSalaryCalculator.Result result = IndiaSalaryCalculator.calculate(inputs);
+        assertEquals(8000.0, result.carPerquisiteMonthly, 0.01);
+        assertEquals(96000.0, result.carPerquisiteAnnual, 0.01);
+    }
+
+    @Test public void largerEngineUsesHigherRule15TableIIValue() {
+        IndiaSalaryCalculator.Inputs inputs = new IndiaSalaryCalculator.Inputs();
+        inputs.carEngineAbove16L = true;
+        IndiaSalaryCalculator.Result result = IndiaSalaryCalculator.calculate(inputs);
+        assertEquals(3000.0, result.carPerquisiteMonthly, 0.01);
+    }
+
+    @Test public void exclusivelyOfficialUseIsNilOnlyWhenClaimedWithRecords() {
+        IndiaSalaryCalculator.Inputs inputs = new IndiaSalaryCalculator.Inputs();
+        inputs.carUsedWhollyOfficial = true;
+        IndiaSalaryCalculator.Result result = IndiaSalaryCalculator.calculate(inputs);
+        assertEquals(0.0, result.carPerquisiteMonthly, 0.01);
+        assertEquals(0.0, result.carPerquisiteAnnual, 0.01);
+    }
+
+    @Test public void leaseEmiIsNotThePerquisiteAndCalculatedPerquisiteIsAddedToTaxableIncome() {
         IndiaSalaryCalculator.Inputs inputs = new IndiaSalaryCalculator.Inputs();
         inputs.eligibleReimbursementAnnual = 0.0;
         inputs.carLeaseMonthly = 20000.0;
-        inputs.carPerquisiteMonthly = 5000.0;
-
         IndiaSalaryCalculator.Result result = IndiaSalaryCalculator.calculate(inputs);
         double expectedTaxable = inputs.annualBase - result.employerNpsDeduction
-                - result.standardDeduction - (20000.0 * 12.0) + (5000.0 * 12.0);
+                - result.standardDeduction - (20000.0 * 12.0) + (2000.0 * 12.0);
         assertEquals(expectedTaxable, result.taxableIncome, 0.01);
-        assertEquals(60000.0, result.carPerquisiteAnnual, 0.01);
+        assertEquals(24000.0, result.carPerquisiteAnnual, 0.01);
         assertEquals(240000.0, result.carLeaseAnnual, 0.01);
-        assertTrue(result.taxableIncome < inputs.annualBase);
     }
 
-    @Test public void carPerquisiteChangesTaxableIncomeButIsNotBankCash() {
-        IndiaSalaryCalculator.Inputs noPerquisite = new IndiaSalaryCalculator.Inputs();
-        noPerquisite.eligibleReimbursementAnnual = 0.0;
-        noPerquisite.carLeaseMonthly = 20000.0;
-        noPerquisite.carPerquisiteMonthly = 0.0;
+    @Test public void carPerquisiteAffectsTaxOnlyNotCashAsASeparatePayout() {
+        IndiaSalaryCalculator.Inputs mixedUse = new IndiaSalaryCalculator.Inputs();
+        mixedUse.eligibleReimbursementAnnual = 0.0;
+        mixedUse.carLeaseMonthly = 20000.0;
 
-        IndiaSalaryCalculator.Inputs withPerquisite = new IndiaSalaryCalculator.Inputs();
-        withPerquisite.eligibleReimbursementAnnual = 0.0;
-        withPerquisite.carLeaseMonthly = 20000.0;
-        withPerquisite.carPerquisiteMonthly = 5000.0;
+        IndiaSalaryCalculator.Inputs officialUse = new IndiaSalaryCalculator.Inputs();
+        officialUse.eligibleReimbursementAnnual = 0.0;
+        officialUse.carLeaseMonthly = 20000.0;
+        officialUse.carUsedWhollyOfficial = true;
 
-        IndiaSalaryCalculator.Result without = IndiaSalaryCalculator.calculate(noPerquisite);
-        IndiaSalaryCalculator.Result with = IndiaSalaryCalculator.calculate(withPerquisite);
-        assertEquals(60000.0, with.taxableIncome - without.taxableIncome, 0.01);
-        assertTrue(with.annualTakeHome < without.annualTakeHome);
-        assertTrue(without.annualTakeHome - with.annualTakeHome < 60000.0);
+        IndiaSalaryCalculator.Result mixed = IndiaSalaryCalculator.calculate(mixedUse);
+        IndiaSalaryCalculator.Result official = IndiaSalaryCalculator.calculate(officialUse);
+        assertEquals(24000.0, mixed.taxableIncome - official.taxableIncome, 0.01);
+        assertEquals(240000.0, mixed.carLeaseAnnual, 0.01);
+        assertEquals(240000.0, official.carLeaseAnnual, 0.01);
+        // The take-home difference is only the additional income tax attributable
+        // to the perquisite, not the perquisite amount itself.
+        assertTrue(mixed.annualTakeHome < official.annualTakeHome);
+        assertTrue(official.annualTakeHome - mixed.annualTakeHome < 24000.0);
     }
 
     @Test public void newRegimeResidentRebateAndMarginalReliefAreApplied() {
