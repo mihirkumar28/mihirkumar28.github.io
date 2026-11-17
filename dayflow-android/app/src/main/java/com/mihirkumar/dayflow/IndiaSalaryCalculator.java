@@ -140,7 +140,7 @@ final class IndiaSalaryCalculator {
         double income = Math.max(0.0, taxableIncome);
         double tax = slabTax(income);
         if (!residentIndividual) return tax;
-        // Section 87A rebate and marginal relief: tax cannot exceed the income
+        // New-regime resident rebate and marginal relief: tax cannot exceed the income
         // above ₹12 lakh for a resident individual under the new regime.
         if (income <= 1200000.0) return 0.0;
         return Math.min(tax, income - 1200000.0);
