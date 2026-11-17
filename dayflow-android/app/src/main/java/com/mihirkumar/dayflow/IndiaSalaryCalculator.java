@@ -5,8 +5,8 @@ package com.mihirkumar.dayflow;
  * for FY 2026-27. This is a planning model, not a tax-return engine.
  *
  * Base includes employer NPS. Employer PF and gratuity are added to base only
- * when presenting fixed CTC. Reimbursement and car-lease treatment are
- * explicitly configurable because payroll eligibility depends on the employer.
+ * when presenting fixed CTC. The car-lease salary recovery and taxable motor-car
+ * use perquisite are modelled as separate amounts.
  */
 final class IndiaSalaryCalculator {
     static final double STANDARD_DEDUCTION = 75000.0;
