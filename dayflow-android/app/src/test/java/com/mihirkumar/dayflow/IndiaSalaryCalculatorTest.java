@@ -33,6 +33,39 @@ public class IndiaSalaryCalculatorTest {
         assertTrue(with.monthlyTakeHome - without.monthlyTakeHome < 360000.0 / 12.0);
     }
 
+    @Test public void carLeaseEmiIsNotItselfTheTaxablePerquisite() {
+        IndiaSalaryCalculator.Inputs inputs = new IndiaSalaryCalculator.Inputs();
+        inputs.eligibleReimbursementAnnual = 0.0;
+        inputs.carLeaseMonthly = 20000.0;
+        inputs.carPerquisiteMonthly = 5000.0;
+
+        IndiaSalaryCalculator.Result result = IndiaSalaryCalculator.calculate(inputs);
+        double expectedTaxable = inputs.annualBase - result.employerNpsDeduction
+                - result.standardDeduction - (20000.0 * 12.0) + (5000.0 * 12.0);
+        assertEquals(expectedTaxable, result.taxableIncome, 0.01);
+        assertEquals(60000.0, result.carPerquisiteAnnual, 0.01);
+        assertEquals(240000.0, result.carLeaseAnnual, 0.01);
+        assertTrue(result.taxableIncome < inputs.annualBase);
+    }
+
+    @Test public void carPerquisiteChangesTaxableIncomeButIsNotBankCash() {
+        IndiaSalaryCalculator.Inputs noPerquisite = new IndiaSalaryCalculator.Inputs();
+        noPerquisite.eligibleReimbursementAnnual = 0.0;
+        noPerquisite.carLeaseMonthly = 20000.0;
+        noPerquisite.carPerquisiteMonthly = 0.0;
+
+        IndiaSalaryCalculator.Inputs withPerquisite = new IndiaSalaryCalculator.Inputs();
+        withPerquisite.eligibleReimbursementAnnual = 0.0;
+        withPerquisite.carLeaseMonthly = 20000.0;
+        withPerquisite.carPerquisiteMonthly = 5000.0;
+
+        IndiaSalaryCalculator.Result without = IndiaSalaryCalculator.calculate(noPerquisite);
+        IndiaSalaryCalculator.Result with = IndiaSalaryCalculator.calculate(withPerquisite);
+        assertEquals(60000.0, with.taxableIncome - without.taxableIncome, 0.01);
+        assertTrue(with.annualTakeHome < without.annualTakeHome);
+        assertTrue(without.annualTakeHome - with.annualTakeHome < 60000.0);
+    }
+
     @Test public void newRegimeResidentRebateAndMarginalReliefAreApplied() {
         assertEquals(0.0, IndiaSalaryCalculator.taxAfterRebate(1200000.0, true), 0.01);
         assertEquals(10000.0, IndiaSalaryCalculator.taxAfterRebate(1210000.0, true), 0.01);
