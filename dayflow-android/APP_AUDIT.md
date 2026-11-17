@@ -219,3 +219,12 @@ Source changes on `fix/today-tab-usability`:
 - [x] Add JVM tests for directional projection, missing-data handling, read-only prompt constraints and straight-line distance.
 - [x] GitHub Actions Android lint, JVM tests and signed release APK build passed on main; the public APK and matching update metadata were published.
 - [~] PR emulator smoke check was not completed in the observed run; geocoding, map handoff, consent flow and commute screen layout still need physical-device verification.
+
+
+## Salary calculator under More — 2026-11-17
+
+- [x] Add a dedicated native Salary Calculator entry under More → Finance & Compensation, separate from the career-goal note.
+- [x] Persist salary assumptions in DayFlow's existing local preferences so the calculator works offline and is included in the normal DayFlow backup.
+- [x] Model new-regime FY 2026–27 slabs, standard deduction, resident rebate / marginal relief, surcharge / surcharge marginal relief and cess; expose payroll-dependent lease and reimbursement assumptions.
+- [x] Show current monthly bank take-home, annual tax, fixed CTC and the annual base / fixed CTC needed for a target monthly take-home.
+- [ ] Run CI tests, lint and APK build; visually verify the calculator on a physical Android device.
