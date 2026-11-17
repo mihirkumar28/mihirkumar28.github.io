@@ -61,3 +61,5 @@ Run this checklist on the installed APK after CI emulator tests pass. A successf
 - APK version and commit:
 - Date:
 - Failed checks / screenshots:
+
+- [ ] Open More → Finance & Compensation → Salary calculator; change the base, target and payroll assumptions, navigate away and return, and confirm values persist. Verify tax, take-home, target base and fixed CTC update consistently; export/import a backup and confirm calculator inputs are retained.
