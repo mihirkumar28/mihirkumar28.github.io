@@ -24,8 +24,12 @@ final class IndiaSalaryCalculator {
         double employerPfPctOfBasic = 12.0;
         double gratuityPctOfBasic = 4.81;
         double carLeaseMonthly = 20000.0;
-        // Taxable car-use perquisite from payroll / Rule 15 Table II, per month.
-        double carPerquisiteMonthly = 0.0;
+        // Rule 15 Table II inputs. Defaults reflect an employer-hired EV used
+        // for mixed official/personal trips, with employee-paid running costs.
+        boolean carEngineAbove16L = false;
+        boolean carOperatingCostsPaidByEmployer = false;
+        boolean carChauffeurProvided = false;
+        boolean carUsedWhollyOfficial = false;
         double eligibleReimbursementAnnual = 360000.0;
         double professionalTaxAnnual = 2500.0;
         double otherPostTaxDeductionsAnnual = 0.0;
@@ -42,6 +46,7 @@ final class IndiaSalaryCalculator {
         double gratuity;
         double eligibleReimbursement;
         double carLeaseAnnual;
+        double carPerquisiteMonthly;
         double carPerquisiteAnnual;
         double standardDeduction;
         double taxableIncome;
@@ -71,7 +76,8 @@ final class IndiaSalaryCalculator {
         out.gratuity = out.basic * in.gratuityPctOfBasic / 100.0;
         out.eligibleReimbursement = Math.min(in.eligibleReimbursementAnnual, in.annualBase);
         out.carLeaseAnnual = in.carLeaseMonthly * 12.0;
-        out.carPerquisiteAnnual = in.carPerquisiteMonthly * 12.0;
+        out.carPerquisiteMonthly = calculatedCarPerquisiteMonthly(in);
+        out.carPerquisiteAnnual = out.carPerquisiteMonthly * 12.0;
         out.standardDeduction = Math.min(STANDARD_DEDUCTION, in.annualBase);
 
         // Per the user's payroll structure, the lease recovery reduces salary cash
@@ -102,6 +108,30 @@ final class IndiaSalaryCalculator {
         out.monthlyTakeHome = out.annualTakeHome / 12.0;
         out.fixedCtc = in.annualBase + out.employerPf + out.gratuity;
         return out;
+    }
+
+    /**
+     * Rule 15(3), Table II, for one employer-owned/hired car used for both
+     * official and personal purposes. For EVs / cars up to 1.6 L, the monthly
+     * value is ₹5,000 when the employer bears running/maintenance costs or
+     * ₹2,000 when the employee fully bears private-use running/maintenance.
+     * For cars above 1.6 L, the corresponding values are ₹7,000 and ₹3,000.
+     * Add ₹3,000 where the employer provides a chauffeur. Wholly official use
+     * is nil only where the prescribed journey records/certificate are kept.
+     *
+     * The default inputs assume an EV, mixed use, employee-paid running costs,
+     * no chauffeur and no wholly-official-use claim.
+     */
+    static double calculatedCarPerquisiteMonthly(Inputs in) {
+        if (in.carUsedWhollyOfficial) return 0.0;
+        double amount;
+        if (in.carOperatingCostsPaidByEmployer) {
+            amount = in.carEngineAbove16L ? 7000.0 : 5000.0;
+        } else {
+            amount = in.carEngineAbove16L ? 3000.0 : 2000.0;
+        }
+        if (in.carChauffeurProvided) amount += 3000.0;
+        return amount;
     }
 
     static double solveAnnualBaseForMonthlyTarget(Inputs source) {
@@ -188,7 +218,10 @@ final class IndiaSalaryCalculator {
         c.employerPfPctOfBasic = in.employerPfPctOfBasic;
         c.gratuityPctOfBasic = in.gratuityPctOfBasic;
         c.carLeaseMonthly = in.carLeaseMonthly;
-        c.carPerquisiteMonthly = in.carPerquisiteMonthly;
+        c.carEngineAbove16L = in.carEngineAbove16L;
+        c.carOperatingCostsPaidByEmployer = in.carOperatingCostsPaidByEmployer;
+        c.carChauffeurProvided = in.carChauffeurProvided;
+        c.carUsedWhollyOfficial = in.carUsedWhollyOfficial;
         c.eligibleReimbursementAnnual = in.eligibleReimbursementAnnual;
         c.professionalTaxAnnual = in.professionalTaxAnnual;
         c.otherPostTaxDeductionsAnnual = in.otherPostTaxDeductionsAnnual;
@@ -206,7 +239,6 @@ final class IndiaSalaryCalculator {
         requirePercent(in.employerPfPctOfBasic, "Employer PF rate");
         requirePercent(in.gratuityPctOfBasic, "Gratuity rate");
         requireNonNegative(in.carLeaseMonthly, "Monthly car lease");
-        requireNonNegative(in.carPerquisiteMonthly, "Monthly car perquisite");
         requireNonNegative(in.eligibleReimbursementAnnual, "Eligible reimbursement");
         requireNonNegative(in.professionalTaxAnnual, "Professional tax");
         requireNonNegative(in.otherPostTaxDeductionsAnnual, "Other deductions");
