@@ -39,6 +39,11 @@ public final class SalaryCalculatorActivity extends Activity {
     private final java.util.ArrayList<TextWatcher> watchers = new java.util.ArrayList<>();
     private final java.util.LinkedHashMap<String, EditText> fields = new java.util.LinkedHashMap<>();
     private CheckBox residentIndividual;
+    private CheckBox carEngineAbove16L;
+    private CheckBox carOperatingCostsPaidByEmployer;
+    private CheckBox carChauffeurProvided;
+    private CheckBox carUsedWhollyOfficial;
+    private TextView carPerquisiteSummary;
     private boolean rendering;
 
     private int dp(float value) {
@@ -159,9 +164,27 @@ public final class SalaryCalculatorActivity extends Activity {
         addField(payroll, "eligibleReimbursementAnnual", "Payroll-confirmed tax-exempt reimbursements (₹ / year)", 360000.0,
                 "Enter only bill-backed amounts payroll confirms are non-taxable. This is assumed to be inside Base; it is not added twice.");
         addField(payroll, "carLeaseMonthly", "Car lease EMI / salary recovery (₹ / month)", 20000.0,
-                "Reduces bank cash and the salary base in this payroll model. The EMI itself is not added to taxable income as a perquisite.");
-        addField(payroll, "carPerquisiteMonthly", "Taxable car-use perquisite (₹ / month)", 0.0,
-                "Enter the monthly taxable perquisite from payroll. This is added to taxable income; it is not added to bank cash. Rule 15 Table II depends on vehicle use, running costs and chauffeur.");
+                "Reduces the taxable salary base and bank cash under your employer's lease structure. The EMI is not itself the taxable perquisite.");
+
+        LinearLayout carPerquisite = card(content, "CAR PERQUISITE · RULE 15 TABLE II");
+        TextView carAssumption = label(
+                "Automatically calculated using the EV from your Windsor lease analysis: employer-hired car, mixed official/personal use, employee-paid running and maintenance, no chauffeur. Default perquisite: ₹2,000/month.",
+                11, MUTED, false);
+        carAssumption.setLineSpacing(dp(2), 1f);
+        carPerquisite.addView(carAssumption);
+        carEngineAbove16L = addOption(carPerquisite, "carEngineAbove16L",
+                "Non-EV car with engine above 1.6 litres", false);
+        carOperatingCostsPaidByEmployer = addOption(carPerquisite, "carOperatingCostsPaidByEmployer",
+                "Employer pays/reimburses running and maintenance costs", false);
+        carChauffeurProvided = addOption(carPerquisite, "carChauffeurProvided",
+                "Employer provides a chauffeur (+₹3,000/month)", false);
+        carUsedWhollyOfficial = addOption(carPerquisite, "carUsedWhollyOfficial",
+                "Wholly official use, with employer journey records and certificate", false);
+        carPerquisiteSummary = label("Calculated car perquisite: —", 14, ACCENT, true);
+        carPerquisiteSummary.setPadding(0, dp(7), 0, 0);
+        carPerquisiteSummary.setLineSpacing(dp(2), 1f);
+        carPerquisite.addView(carPerquisiteSummary);
+
         addField(payroll, "professionalTaxAnnual", "Professional tax (₹ / year)", 2500.0, "Maharashtra estimate; edit to match your payslip.");
         addField(payroll, "otherPostTaxDeductionsAnnual", "Other post-tax payroll deductions (₹ / year)", 0.0, "Loans, insurance, employee NPS, or any other deductions not already entered.");
 
@@ -201,7 +224,7 @@ public final class SalaryCalculatorActivity extends Activity {
 
         LinearLayout notes = card(content, "ASSUMPTIONS & LIMITS");
         TextView caveat = label(
-                "Planning estimate for FY 2026–27. Uses the new-regime slabs, ₹75,000 standard deduction, 4% cess, resident-individual rebate / marginal relief, and surcharge marginal relief. Employer NPS is carved out of Base and not added again to CTC. Reimbursement is tax-exempt only when payroll confirms eligibility. Car lease recovery is deducted from cash and taxable salary; only the separate monthly car-use perquisite is added to taxable income. Enter the perquisite shown by payroll, since Rule 15 Table II depends on vehicle use, who pays running / maintenance costs, and chauffeur provision. Check against payroll / Form 16.",
+                "Planning estimate for FY 2026–27. Uses the new-regime slabs, ₹75,000 standard deduction, 4% cess, resident-individual rebate / marginal relief, and surcharge marginal relief. Employer NPS is carved out of Base and not added again to CTC. Reimbursement is tax-exempt only when payroll confirms eligibility. The lease EMI reduces taxable salary and bank cash; only the separately calculated Rule 15 car-use perquisite is added to taxable income. The automatic estimate assumes an employer-hired EV with mixed use, employee-paid running/maintenance and no chauffeur. The options above adjust the statutory value. Wholly official use is nil only when the prescribed records are maintained. Check employer lease terms and payroll/Form 16.",
                 11, MUTED, false);
         caveat.setLineSpacing(dp(3), 1f);
         notes.addView(caveat);
@@ -236,6 +259,23 @@ public final class SalaryCalculatorActivity extends Activity {
         else if (title.startsWith("ANNUAL")) annualTax = value;
         else fixedCtc = value;
         return value;
+    }
+
+    private CheckBox addOption(LinearLayout panel, String name, String caption, boolean defaultValue) {
+        CheckBox option = new CheckBox(this);
+        option.setText(caption);
+        option.setTextSize(12);
+        option.setTextColor(INK);
+        option.setButtonTintList(android.content.res.ColorStateList.valueOf(ACCENT));
+        option.setChecked(storedBoolean(name, defaultValue));
+        LinearLayout.LayoutParams optionLp = new LinearLayout.LayoutParams(-1, -2);
+        optionLp.topMargin = dp(3);
+        panel.addView(option, optionLp);
+        option.setOnCheckedChangeListener((button, checked) -> {
+            saveBoolean(name, checked);
+            calculateAndRender();
+        });
+        return option;
     }
 
     private LinearLayout card(LinearLayout parent, String title) {
@@ -333,7 +373,11 @@ public final class SalaryCalculatorActivity extends Activity {
         in.employerPfPctOfBasic = value("employerPfPctOfBasic", 12.0);
         in.gratuityPctOfBasic = value("gratuityPctOfBasic", 4.81);
         in.carLeaseMonthly = value("carLeaseMonthly", 20000.0);
-        in.carPerquisiteMonthly = value("carPerquisiteMonthly", 0.0);
+        in.carEngineAbove16L = carEngineAbove16L != null && carEngineAbove16L.isChecked();
+        in.carOperatingCostsPaidByEmployer = carOperatingCostsPaidByEmployer != null
+                && carOperatingCostsPaidByEmployer.isChecked();
+        in.carChauffeurProvided = carChauffeurProvided != null && carChauffeurProvided.isChecked();
+        in.carUsedWhollyOfficial = carUsedWhollyOfficial != null && carUsedWhollyOfficial.isChecked();
         in.eligibleReimbursementAnnual = value("eligibleReimbursementAnnual", 360000.0);
         in.professionalTaxAnnual = value("professionalTaxAnnual", 2500.0);
         in.otherPostTaxDeductionsAnnual = value("otherPostTaxDeductionsAnnual", 0.0);
@@ -354,6 +398,11 @@ public final class SalaryCalculatorActivity extends Activity {
             monthlyTakeHome.setText(fmt(result.monthlyTakeHome));
             annualTax.setText(fmt(result.annualTax));
             fixedCtc.setText(fmt(result.fixedCtc));
+            if (carPerquisiteSummary != null) {
+                carPerquisiteSummary.setText("Calculated taxable perquisite: "
+                        + fmt(result.carPerquisiteMonthly) + " / month · "
+                        + fmt(result.carPerquisiteAnnual) + " / year.");
+            }
             if (resultRows != null) renderBreakdown(in, result);
             status.setText(result.monthlyTakeHome >= in.targetMonthlyTakeHome
                     ? "Current base is " + fmt(result.monthlyTakeHome - in.targetMonthlyTakeHome)
@@ -394,7 +443,7 @@ public final class SalaryCalculatorActivity extends Activity {
         row("Eligible bill-backed reimbursement (taxable-income relief)", -r.eligibleReimbursement);
         row("Standard deduction", -r.standardDeduction);
         row("Taxable-salary adjustment — lease EMI", -r.carLeaseAnnual);
-        row("Taxable car-use perquisite", r.carPerquisiteAnnual);
+        row("Calculated car-use perquisite (Rule 15 Table II)", r.carPerquisiteAnnual);
         row("Taxable income", r.taxableIncome);
         row("Income tax after rebate / marginal relief", r.taxBeforeSurcharge);
         row("Surcharge", r.surcharge);
