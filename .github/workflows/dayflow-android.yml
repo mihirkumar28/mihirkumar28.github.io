@@ -150,7 +150,7 @@ jobs:
                 if node.attrib.get("package") == "com.mihirkumar.dayflow"
             ]
             assert nodes, "Salary calculator UI hierarchy was empty."
-            bounds_pattern = re.compile(r"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]")
+            bounds_pattern = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
             violations = []
             for node in nodes:
                 match = bounds_pattern.fullmatch(node.attrib.get("bounds", ""))
