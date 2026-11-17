@@ -136,10 +136,20 @@ public final class SalaryCalculatorActivity extends Activity {
         description.setLineSpacing(dp(2), 1f);
         content.addView(description);
 
-        LinearLayout metrics = horizontal();
-        monthlyTakeHome = metric(metrics, "MONTHLY BANK TAKE-HOME");
-        annualTax = metric(metrics, "ANNUAL TAX");
-        fixedCtc = metric(metrics, "FIXED CTC");
+        // Give the main take-home figure the full screen width. The two supporting
+        // metrics sit below it, so currency values never have to compete for a third
+        // of a phone screen.
+        LinearLayout metrics = new LinearLayout(this);
+        metrics.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout primaryMetric = horizontal();
+        monthlyTakeHome = metric(primaryMetric, "MONTHLY BANK TAKE-HOME", true);
+        metrics.addView(primaryMetric, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout secondaryMetrics = horizontal();
+        annualTax = metric(secondaryMetrics, "ANNUAL TAX", false);
+        fixedCtc = metric(secondaryMetrics, "FIXED CTC", false);
+        LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(-1, -2);
+        secondaryLp.topMargin = dp(7);
+        metrics.addView(secondaryMetrics, secondaryLp);
         content.addView(metrics, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout currentInputs = card(content, "CURRENT COMPENSATION");
@@ -225,22 +235,26 @@ public final class SalaryCalculatorActivity extends Activity {
         return layout;
     }
 
-    private TextView metric(LinearLayout parent, String title) {
+    private TextView metric(LinearLayout parent, String title, boolean prominent) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(9), dp(10), dp(9), dp(10));
+        box.setPadding(dp(prominent ? 14 : 10), dp(prominent ? 13 : 10),
+                dp(prominent ? 14 : 10), dp(prominent ? 13 : 10));
         box.setBackground(rounded(PANEL, LINE, 12));
-        TextView key = label(title, 9, MUTED, true);
+        TextView key = label(title, prominent ? 10 : 9, MUTED, true);
         box.addView(key);
-        TextView value = label("—", 16, INK, true);
+        TextView value = label("—", prominent ? 24 : 14, INK, true);
         value.setPadding(0, dp(5), 0, 0);
         box.addView(value);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+        LinearLayout.LayoutParams lp = prominent
+                ? new LinearLayout.LayoutParams(-1, -2)
+                : new LinearLayout.LayoutParams(0, -2, 1f);
         lp.rightMargin = dp(5);
         parent.addView(box, lp);
-        if (title.startsWith("MONTHLY")) return monthlyTakeHome = value;
-        if (title.startsWith("ANNUAL")) return annualTax = value;
-        return fixedCtc = value;
+        if (title.startsWith("MONTHLY")) monthlyTakeHome = value;
+        else if (title.startsWith("ANNUAL")) annualTax = value;
+        else fixedCtc = value;
+        return value;
     }
 
     private LinearLayout card(LinearLayout parent, String title) {
@@ -274,7 +288,11 @@ public final class SalaryCalculatorActivity extends Activity {
             hint.setLineSpacing(dp(1), 1f);
             details.addView(hint);
         }
-        row.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
+        boolean compact = getResources().getConfiguration().screenWidthDp < 380;
+        row.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        if (!compact) {
+            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
+        }
         EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setTextSize(14);
@@ -284,7 +302,14 @@ public final class SalaryCalculatorActivity extends Activity {
         input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         input.setBackground(rounded(Color.WHITE, LINE, 9));
         input.setText(number(stored(name, defaultValue)));
-        row.addView(input, new LinearLayout.LayoutParams(dp(132), dp(46)));
+        if (compact) {
+            row.addView(details, new LinearLayout.LayoutParams(-1, -2));
+            LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(-1, dp(46));
+            inputLp.topMargin = dp(5);
+            row.addView(input, inputLp);
+        } else {
+            row.addView(input, new LinearLayout.LayoutParams(dp(132), dp(46)));
+        }
         fields.put(name, input);
         TextWatcher watcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -401,21 +426,34 @@ public final class SalaryCalculatorActivity extends Activity {
         row("Car lease paid from salary", -r.carLeaseAnnual);
         row("Other post-tax deductions", -r.otherPostTaxDeductions);
         row("Annual bank take-home", r.annualTakeHome);
+        // Use the exact same model value and formatter as the headline metric.
+        // This avoids a separately derived monthly number drifting from the top.
+        row("Monthly bank take-home", r.monthlyTakeHome);
         row("Employer PF added to CTC", r.employerPf);
         row("Gratuity provision added to CTC", r.gratuity);
         row("Fixed CTC (excludes bonus / ESOPs)", r.fixedCtc);
     }
 
     private void row(String name, double amount) {
+        boolean compact = getResources().getConfiguration().screenWidthDp < 380;
         LinearLayout line = new LinearLayout(this);
-        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
         line.setGravity(Gravity.CENTER_VERTICAL);
         line.setPadding(0, dp(6), 0, dp(6));
         TextView left = label(name, 11, MUTED, false);
-        line.addView(left, new LinearLayout.LayoutParams(0, -2, 1f));
+        if (compact) {
+            line.addView(left, new LinearLayout.LayoutParams(-1, -2));
+        } else {
+            line.addView(left, new LinearLayout.LayoutParams(0, -2, 1f));
+        }
         TextView right = label(fmt(amount), 11, INK, true);
         right.setGravity(Gravity.END);
-        line.addView(right, new LinearLayout.LayoutParams(dp(120), -2));
+        if (compact) {
+            right.setPadding(0, dp(2), 0, 0);
+            line.addView(right, new LinearLayout.LayoutParams(-1, -2));
+        } else {
+            line.addView(right, new LinearLayout.LayoutParams(dp(120), -2));
+        }
         View divider = new View(this);
         divider.setBackgroundColor(LINE);
         resultRows.addView(line);
