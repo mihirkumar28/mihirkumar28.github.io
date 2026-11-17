@@ -89,8 +89,9 @@ public final class SalaryCalculatorActivity extends Activity {
         window.setStatusBarColor(Color.rgb(13, 21, 18));
         window.setNavigationBarColor(Color.WHITE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            window.getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            // Dark status-bar background requires light system icons; keep only the
+            // navigation-bar light mode because the navigation area itself is white.
+            window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         }
         buildScreen();
         calculateAndRender();
