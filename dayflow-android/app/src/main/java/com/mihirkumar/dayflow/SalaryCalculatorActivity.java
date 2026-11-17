@@ -123,7 +123,7 @@ public final class SalaryCalculatorActivity extends Activity {
         scroll.setFillViewport(true);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(16), dp(16), dp(16), dp(28));
+        content.setPadding(dp(12), dp(12), dp(12), dp(24));
         content.setBackgroundColor(Color.WHITE);
 
         TextView intro = label("INDIA · NEW TAX REGIME · FY 2026–27", 10, ACCENT, true);
@@ -136,20 +136,13 @@ public final class SalaryCalculatorActivity extends Activity {
         description.setLineSpacing(dp(2), 1f);
         content.addView(description);
 
-        // Give the main take-home figure the full screen width. The two supporting
-        // metrics sit below it, so currency values never have to compete for a third
-        // of a phone screen.
+        // Keep every summary figure full-width. Even secondary metrics must not
+        // share a narrow row on compact phones or at increased display scaling.
         LinearLayout metrics = new LinearLayout(this);
         metrics.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout primaryMetric = horizontal();
-        monthlyTakeHome = metric(primaryMetric, "MONTHLY BANK TAKE-HOME", true);
-        metrics.addView(primaryMetric, new LinearLayout.LayoutParams(-1, -2));
-        LinearLayout secondaryMetrics = horizontal();
-        annualTax = metric(secondaryMetrics, "ANNUAL TAX", false);
-        fixedCtc = metric(secondaryMetrics, "FIXED CTC", false);
-        LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(-1, -2);
-        secondaryLp.topMargin = dp(7);
-        metrics.addView(secondaryMetrics, secondaryLp);
+        monthlyTakeHome = metric(metrics, "MONTHLY BANK TAKE-HOME", true);
+        annualTax = metric(metrics, "ANNUAL TAX", false);
+        fixedCtc = metric(metrics, "FIXED CTC", false);
         content.addView(metrics, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout currentInputs = card(content, "CURRENT COMPENSATION");
@@ -238,18 +231,16 @@ public final class SalaryCalculatorActivity extends Activity {
     private TextView metric(LinearLayout parent, String title, boolean prominent) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(prominent ? 14 : 10), dp(prominent ? 13 : 10),
-                dp(prominent ? 14 : 10), dp(prominent ? 13 : 10));
+        box.setPadding(dp(prominent ? 14 : 12), dp(prominent ? 12 : 9),
+                dp(prominent ? 14 : 12), dp(prominent ? 12 : 9));
         box.setBackground(rounded(PANEL, LINE, 12));
         TextView key = label(title, prominent ? 10 : 9, MUTED, true);
         box.addView(key);
-        TextView value = label("—", prominent ? 24 : 14, INK, true);
-        value.setPadding(0, dp(5), 0, 0);
+        TextView value = label("—", prominent ? 24 : 16, INK, true);
+        value.setPadding(0, dp(4), 0, 0);
         box.addView(value);
-        LinearLayout.LayoutParams lp = prominent
-                ? new LinearLayout.LayoutParams(-1, -2)
-                : new LinearLayout.LayoutParams(0, -2, 1f);
-        lp.rightMargin = dp(5);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.topMargin = dp(5);
         parent.addView(box, lp);
         if (title.startsWith("MONTHLY")) monthlyTakeHome = value;
         else if (title.startsWith("ANNUAL")) annualTax = value;
@@ -288,11 +279,11 @@ public final class SalaryCalculatorActivity extends Activity {
             hint.setLineSpacing(dp(1), 1f);
             details.addView(hint);
         }
-        boolean compact = getResources().getConfiguration().screenWidthDp < 380;
-        row.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        if (!compact) {
-            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
-        }
+        // Label, helper text and entry control each get the full available width.
+        // Avoid a fixed-width side-by-side edit field: font/display scaling varies
+        // substantially between Android devices.
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.addView(details, new LinearLayout.LayoutParams(-1, -2));
         EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setTextSize(14);
@@ -302,14 +293,9 @@ public final class SalaryCalculatorActivity extends Activity {
         input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         input.setBackground(rounded(Color.WHITE, LINE, 9));
         input.setText(number(stored(name, defaultValue)));
-        if (compact) {
-            row.addView(details, new LinearLayout.LayoutParams(-1, -2));
-            LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(-1, dp(46));
-            inputLp.topMargin = dp(5);
-            row.addView(input, inputLp);
-        } else {
-            row.addView(input, new LinearLayout.LayoutParams(dp(132), dp(46)));
-        }
+        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(-1, dp(48));
+        inputLp.topMargin = dp(5);
+        row.addView(input, inputLp);
         fields.put(name, input);
         TextWatcher watcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -426,34 +412,31 @@ public final class SalaryCalculatorActivity extends Activity {
         row("Car lease paid from salary", -r.carLeaseAnnual);
         row("Other post-tax deductions", -r.otherPostTaxDeductions);
         row("Annual bank take-home", r.annualTakeHome);
-        // Use the exact same model value and formatter as the headline metric.
-        // This avoids a separately derived monthly number drifting from the top.
-        row("Monthly bank take-home", r.monthlyTakeHome);
+        // Calculate and format the monthly amount once, then reuse the very same
+        // string in the headline and breakdown. The label explains the annual split.
+        String monthlyDisplay = fmt(r.monthlyTakeHome);
+        monthlyTakeHome.setText(monthlyDisplay);
+        rowFormatted("Monthly bank take-home (annual ÷ 12, rounded)", monthlyDisplay);
         row("Employer PF added to CTC", r.employerPf);
         row("Gratuity provision added to CTC", r.gratuity);
         row("Fixed CTC (excludes bonus / ESOPs)", r.fixedCtc);
     }
 
     private void row(String name, double amount) {
-        boolean compact = getResources().getConfiguration().screenWidthDp < 380;
+        rowFormatted(name, fmt(amount));
+    }
+
+    private void rowFormatted(String name, String formattedAmount) {
         LinearLayout line = new LinearLayout(this);
-        line.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        line.setGravity(Gravity.CENTER_VERTICAL);
-        line.setPadding(0, dp(6), 0, dp(6));
-        TextView left = label(name, 11, MUTED, false);
-        if (compact) {
-            line.addView(left, new LinearLayout.LayoutParams(-1, -2));
-        } else {
-            line.addView(left, new LinearLayout.LayoutParams(0, -2, 1f));
-        }
-        TextView right = label(fmt(amount), 11, INK, true);
-        right.setGravity(Gravity.END);
-        if (compact) {
-            right.setPadding(0, dp(2), 0, 0);
-            line.addView(right, new LinearLayout.LayoutParams(-1, -2));
-        } else {
-            line.addView(right, new LinearLayout.LayoutParams(dp(120), -2));
-        }
+        line.setOrientation(LinearLayout.VERTICAL);
+        line.setPadding(0, dp(7), 0, dp(7));
+        TextView left = label(name, 12, MUTED, false);
+        left.setLineSpacing(dp(1), 1f);
+        line.addView(left, new LinearLayout.LayoutParams(-1, -2));
+        TextView right = label(formattedAmount, 14, INK, true);
+        right.setGravity(Gravity.START);
+        right.setPadding(0, dp(3), 0, 0);
+        line.addView(right, new LinearLayout.LayoutParams(-1, -2));
         View divider = new View(this);
         divider.setBackgroundColor(LINE);
         resultRows.addView(line);
