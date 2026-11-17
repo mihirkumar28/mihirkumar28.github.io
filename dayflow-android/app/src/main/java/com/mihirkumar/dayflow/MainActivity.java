@@ -2072,6 +2072,10 @@ public class MainActivity extends Activity {
         addMoreRow("Office & commute","Check-in, commute tracking and attendance history","↗",()->switchPage("office"));
         addMoreRow("Screen-time history","Review saved daily phone-use totals","↗",()->switchPage("screenTime"));
 
+        sectionLabel(moreContent,"FINANCE & COMPENSATION");
+        addMoreRow("Salary calculator","New-regime take-home, NPS, PF, car lease and target fixed CTC","↗",
+                ()->startActivity(new Intent(MainActivity.this, SalaryCalculatorActivity.class)));
+
         sectionLabel(moreContent,"ROUTINES & LIBRARY");
         addMoreRow("Edit routine templates","Manage shared, WFH, office and weekend routines","↗",()->showTemplateEditorPicker());
         addMoreRow("Plans & documents","Read your study and career plans offline","↗",()->startActivity(new Intent(MainActivity.this, PlanDocumentsActivity.class)));

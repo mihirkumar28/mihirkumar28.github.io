@@ -13,6 +13,7 @@ Native Android implementation of DayFlow. The app stores its timetable in Androi
 - Recovery mode
 - Daily execution metrics
 - Body-composition planner tab with locally saved inputs, target-date selection, TDEE/deficit estimates and fat-loss-partition scenarios
+- Standalone salary calculator under More → Finance & Compensation, with locally saved new-regime tax, NPS/PF, car-lease and target-base / fixed-CTC estimates
 - Optional Gemini AI assistant for testing a personal Google AI Studio API key, reviewing a saved daily routine or office month, and running a separate commute analysis
 - Read-only Gemini commute analysis using saved home/work points, office dates, routine blocks and completed commute logs
 - On-device commute projection for future planned office dates: directional median and 80th-percentile estimates, using weekday-specific samples when at least three exist and an overall fallback otherwise
