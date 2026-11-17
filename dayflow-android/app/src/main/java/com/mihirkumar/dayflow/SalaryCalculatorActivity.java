@@ -172,7 +172,7 @@ public final class SalaryCalculatorActivity extends Activity {
         addField(payroll, "otherPostTaxDeductionsAnnual", "Other post-tax payroll deductions (₹ / year)", 0.0, "Loans, insurance, employee NPS, or any other deductions not already entered.");
 
         residentIndividual = new CheckBox(this);
-        residentIndividual.setText("Resident individual (apply Section 87A rebate / marginal relief)");
+        residentIndividual.setText("Resident individual (apply the new-regime rebate / marginal relief)");
         residentIndividual.setTextSize(13);
         residentIndividual.setTextColor(INK);
         residentIndividual.setButtonTintList(android.content.res.ColorStateList.valueOf(ACCENT));
@@ -207,7 +207,7 @@ public final class SalaryCalculatorActivity extends Activity {
 
         LinearLayout notes = card(content, "ASSUMPTIONS & LIMITS");
         TextView caveat = label(
-                "Planning estimate for FY 2026–27. Uses the new-regime slabs, ₹75,000 standard deduction, 4% cess, resident-individual Section 87A rebate / marginal relief, and surcharge marginal relief. Employer NPS is carved out of Base and not added again to CTC. Reimbursement is tax-exempt only when your employer's payroll confirms eligibility; calling HRA a reimbursement does not itself make it exempt under the new regime. Car-lease tax treatment must also match your employer's policy. Check the final structure against payroll / Form 16 before relying on it.",
+                "Planning estimate for FY 2026–27. Uses the new-regime slabs, ₹75,000 standard deduction, 4% cess, resident-individual rebate / marginal relief, and surcharge marginal relief. Employer NPS is carved out of Base and not added again to CTC. Reimbursement is tax-exempt only when your employer's payroll confirms eligibility; calling HRA a reimbursement does not itself make it exempt under the new regime. Car-lease tax treatment must also match your employer's policy. Check the final structure against payroll / Form 16 before relying on it.",
                 11, MUTED, false);
         caveat.setLineSpacing(dp(3), 1f);
         notes.addView(caveat);
