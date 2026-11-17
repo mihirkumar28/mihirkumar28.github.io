@@ -393,14 +393,14 @@ public final class SalaryCalculatorActivity extends Activity {
         row("Employee PF", -r.employeePf);
         row("Eligible bill-backed reimbursement (taxable-income relief)", -r.eligibleReimbursement);
         row("Standard deduction", -r.standardDeduction);
-        row("Car lease EMI / salary recovery (not a perquisite)", -r.carLeaseAnnual);
+        row("Taxable-salary adjustment — lease EMI", -r.carLeaseAnnual);
         row("Taxable car-use perquisite", r.carPerquisiteAnnual);
         row("Taxable income", r.taxableIncome);
         row("Income tax after rebate / marginal relief", r.taxBeforeSurcharge);
         row("Surcharge", r.surcharge);
         row("Health & education cess (4%)", r.cess);
         row("Professional tax", -r.professionalTax);
-        row("Car lease EMI recovered from salary", -r.carLeaseAnnual);
+        row("Bank-cash deduction — lease EMI", -r.carLeaseAnnual);
         row("Other post-tax deductions", -r.otherPostTaxDeductions);
         row("Annual bank take-home", r.annualTakeHome);
         // Calculate and format the monthly amount once, then reuse the very same
