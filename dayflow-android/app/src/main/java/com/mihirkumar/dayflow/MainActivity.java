@@ -8797,12 +8797,17 @@ public class MainActivity extends Activity {
     }
 
     private void addRecurringBlocks(String name, int start, int end, String behavior, String repeat) {
+        if (!DayFlowScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "Choose a valid time range that ends before midnight.", Toast.LENGTH_LONG).show();
+            return;
+        }
         Date base = parseDateKey(selectedDateKey);
         if (base == null) {
             finishAddBlock(name, start, end - start, behavior);
             return;
         }
         int count = 0;
+        int skipped = 0;
         Calendar cursor = Calendar.getInstance();
         cursor.setTime(base);
         for (int i = 0; i < 30; i++) {
@@ -8811,15 +8816,24 @@ public class MainActivity extends Activity {
             if (include) {
                 String key = keyForDate(cursor.getTime());
                 ArrayList<Block> dayBlocks = readBlocksForDate(key);
-                dayBlocks.add(new Block(System.currentTimeMillis() + i + count,
-                        toTime(start), toTime(end), name, behavior, "pending"));
-                writeBlocksForDate(key, dayBlocks);
-                count++;
+                Block candidate = new Block(System.currentTimeMillis() + i + count + skipped,
+                        toTime(start), toTime(end), name, behavior, "pending");
+                String validationError = scheduleValidationErrorWithCandidate(dayBlocks, candidate, null);
+                if (validationError != null) {
+                    // Do not overwrite or duplicate existing work on dates with a conflict.
+                    skipped++;
+                } else {
+                    dayBlocks.add(candidate);
+                    writeBlocksForDate(key, dayBlocks);
+                    count++;
+                }
             }
             cursor.add(Calendar.DAY_OF_YEAR, 1);
         }
         loadSelectedDate();
-        Toast.makeText(this, "Added " + count + " occurrences.", Toast.LENGTH_SHORT).show();
+        String message = "Added " + count + " occurrence(s).";
+        if (skipped > 0) message += " Skipped " + skipped + " date(s) with overlapping blocks.";
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
         render();
     }
 
@@ -8868,22 +8882,89 @@ public class MainActivity extends Activity {
             return;
         }
         int end = start + duration;
-        if (end > 1439) {
-            Toast.makeText(this, "That block would run past midnight.", Toast.LENGTH_SHORT).show();
+        if (!DayFlowScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "That block would run past midnight or has an invalid time.", Toast.LENGTH_SHORT).show();
             return;
         }
-        blocks.add(new Block(System.currentTimeMillis(), toTime(start), toTime(end), name, behavior, "pending"));
+        Block candidate = new Block(System.currentTimeMillis(), toTime(start), toTime(end), name, behavior, "pending");
+        String validationError = scheduleValidationErrorWithCandidate(blocks, candidate, null);
+        if (validationError != null) {
+            Toast.makeText(this, validationError, Toast.LENGTH_LONG).show();
+            return;
+        }
+        blocks.add(candidate);
         save();
     }
 
     private void addCustomTimedBlock(String name, int start, int end, String behavior) {
-        if (end <= start) {
-            Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+        if (!DayFlowScheduleRules.isValidInterval(start, end)) {
+            Toast.makeText(this, "End time must be after start time and before midnight.", Toast.LENGTH_SHORT).show();
             return;
         }
-        blocks.add(new Block(System.currentTimeMillis(), toTime(start), toTime(end), name, behavior, "pending"));
+        Block candidate = new Block(System.currentTimeMillis(), toTime(start), toTime(end), name, behavior, "pending");
+        String validationError = scheduleValidationErrorWithCandidate(blocks, candidate, null);
+        if (validationError != null) {
+            Toast.makeText(this, validationError, Toast.LENGTH_LONG).show();
+            return;
+        }
+        blocks.add(candidate);
         save();
     }
+
+
+    /**
+     * Returns a user-readable error when a proposed schedule contains an invalid interval
+     * or any overlap. Adjacent half-open intervals (for example 09:00–10:00 and
+     * 10:00–11:00) are valid.
+     */
+    private String scheduleValidationError(List<Block> proposed) {
+        for (int i = 0; i < proposed.size(); i++) {
+            Block first = proposed.get(i);
+            int firstStart;
+            int firstEnd;
+            try {
+                firstStart = mins(first.start);
+                firstEnd = mins(first.end);
+            } catch (RuntimeException e) {
+                return "Every block must have a valid start and end time.";
+            }
+            if (!DayFlowScheduleRules.isValidInterval(firstStart, firstEnd)) {
+                return "Each block must start before it ends and finish before midnight.";
+            }
+            for (int j = 0; j < i; j++) {
+                Block second = proposed.get(j);
+                int secondStart;
+                int secondEnd;
+                try {
+                    secondStart = mins(second.start);
+                    secondEnd = mins(second.end);
+                } catch (RuntimeException e) {
+                    return "Every block must have a valid start and end time.";
+                }
+                if (DayFlowScheduleRules.overlaps(firstStart, firstEnd, secondStart, secondEnd)) {
+                    String firstTitle = first.title == null || first.title.trim().isEmpty()
+                            ? "Untitled block" : first.title.trim();
+                    String secondTitle = second.title == null || second.title.trim().isEmpty()
+                            ? "Untitled block" : second.title.trim();
+                    return "\"" + firstTitle + "\" overlaps \"" + secondTitle
+                            + "\". Move one of the blocks to a different time.";
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Validate a new or edited candidate without comparing it with the old version of itself. */
+    private String scheduleValidationErrorWithCandidate(
+            List<Block> existing, Block candidate, Block editedBlock) {
+        ArrayList<Block> proposed = new ArrayList<>();
+        for (Block block : existing) {
+            if (block != editedBlock) proposed.add(block);
+        }
+        proposed.add(candidate);
+        return scheduleValidationError(proposed);
+    }
+
 
     private int currentMinutes() {
         Calendar c = Calendar.getInstance();
@@ -9001,8 +9082,15 @@ public class MainActivity extends Activity {
                         title.requestFocus();
                         return false;
                     }
-                    if (end[0] <= start[0]) {
-                        Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+                    if (!DayFlowScheduleRules.isValidInterval(start[0], end[0])) {
+                        Toast.makeText(this, "End time must be after start time and before midnight.", Toast.LENGTH_SHORT).show();
+                        return false;
+                    }
+                    Block candidate = new Block(b.id, toTime(start[0]), toTime(end[0]),
+                            name, selectedPriority[0], selectedRigidity[0], b.status);
+                    String validationError = scheduleValidationErrorWithCandidate(blocks, candidate, b);
+                    if (validationError != null) {
+                        Toast.makeText(this, validationError, Toast.LENGTH_LONG).show();
                         return false;
                     }
                     stopFocusForBlock(b, System.currentTimeMillis());
@@ -9558,6 +9646,11 @@ public class MainActivity extends Activity {
         if (!editingDate.equals(selectedDateKey)) {
             Toast.makeText(this, "The selected date changed. Reopen the editor to save safely.",
                     Toast.LENGTH_LONG).show();
+            return;
+        }
+        String validationError = scheduleValidationError(draft);
+        if (validationError != null) {
+            Toast.makeText(this, validationError, Toast.LENGTH_LONG).show();
             return;
         }
         long now = System.currentTimeMillis();
@@ -11122,13 +11215,20 @@ public class MainActivity extends Activity {
                         title.setError("Give this block a name");
                         return false;
                     }
-                    if (end[0] <= start[0]) {
-                        Toast.makeText(this, "End time must be after start time.", Toast.LENGTH_SHORT).show();
+                    if (!DayFlowScheduleRules.isValidInterval(start[0], end[0])) {
+                        Toast.makeText(this, "End time must be after start time and before midnight.", Toast.LENGTH_SHORT).show();
+                        return false;
+                    }
+                    Block candidate = new Block(adding ? System.currentTimeMillis() : original.id,
+                            toTime(start[0]), toTime(end[0]), name,
+                            selectedPriority[0], selectedRigidity[0], "pending");
+                    String templateValidationError =
+                            scheduleValidationErrorWithCandidate(template, candidate, adding ? null : original);
+                    if (templateValidationError != null) {
+                        Toast.makeText(this, templateValidationError, Toast.LENGTH_LONG).show();
                         return false;
                     }
                     if (!"common".equals(key)) {
-                        Block candidate = new Block(0L, toTime(start[0]), toTime(end[0]),
-                                name, selectedPriority[0], selectedRigidity[0], "pending");
                         if (hasProtectedSharedConflict(candidate)) {
                             Toast.makeText(this,
                                     "That time or activity is protected by the Shared routine. Choose a non-conflicting slot or activity.",
