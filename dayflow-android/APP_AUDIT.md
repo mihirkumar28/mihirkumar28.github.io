@@ -20,7 +20,7 @@
 
 ## Phase 2 — scheduling and data integrity
 
-- [ ] Add explicit invariant tests for non-overlapping blocks, valid start/end times, fixed anchors, and behavior when work will not fit in the remaining day.
+- [~] Add explicit interval/overlap rules and enforce them across one-off adds, edits, recurring adds, date-only drafts, and reusable-template edits. Fixed-anchor reflow/capacity invariants remain open.
 - [ ] Test recurrence scope (single occurrence vs future occurrences vs template) and ensure generated blocks are idempotent.
 - [x] Validate every imported backup completely before mutating preferences; reject malformed/oversized files before clearing saved data. (Automatic rollback snapshot remains open.)
 - [ ] Test attendance edits across multiple sessions, open sessions, invalid historical intervals, and date boundaries.
@@ -228,3 +228,12 @@ Source changes on `fix/today-tab-usability`:
 - [x] Model new-regime FY 2026–27 slabs, standard deduction, resident rebate / marginal relief, surcharge / surcharge marginal relief and cess; expose payroll-dependent lease and reimbursement assumptions.
 - [x] Show current monthly bank take-home, annual tax, fixed CTC and the annual base / fixed CTC needed for a target monthly take-home.
 - [ ] Run CI tests, lint and APK build; visually verify the calculator on a physical Android device.
+
+## Schedule overlap guards — 2026-11-22
+
+- [x] Add a shared, Android-independent half-open interval rule: adjacent blocks are allowed; partial, contained and identical overlaps are rejected.
+- [x] Apply validation before mutation in one-off additions, block edits, recurring additions, date-only routine saves and reusable-template edits.
+- [x] Make recurring additions skip only the dates that conflict with existing blocks and report the number skipped instead of writing invalid schedules.
+- [x] Add JVM tests for interval bounds, zero-length/reversed ranges, adjacency and overlap cases.
+- [ ] Run CI lint/unit tests and verify add/edit/recurrence/template flows on a physical Android device.
+- [ ] Extend schedule invariants to fixed-anchor reflow, unscheduled-capacity handling and older imported schedules.
