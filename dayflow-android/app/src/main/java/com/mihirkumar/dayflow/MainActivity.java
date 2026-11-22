@@ -9441,10 +9441,22 @@ public class MainActivity extends Activity {
         String editorTitle = editingDate.equals(todayKey())
                 ? "Modify & Save Today's Routine"
                 : "Modify & Save This Date's Routine";
-        showFullScreenViewer("DATE-ONLY EDITOR", editorTitle,
+        showFullScreenEditor("DATE-ONLY EDITOR", editorTitle,
                 "Edit, add or remove blocks. Nothing is committed until you tap Save, and no reusable template is modified.",
-                content, editingDate.equals(todayKey()) ? "Save Today's Routine" : "Save This Date's Routine",
-                () -> saveTodayRoutineDraft(draft, editingDate));
+                content, () -> {
+                    if (!editingDate.equals(selectedDateKey)) {
+                        Toast.makeText(this, "The selected date changed. Reopen the editor to save safely.",
+                                Toast.LENGTH_LONG).show();
+                        return false;
+                    }
+                    String validationError = scheduleValidationError(draft);
+                    if (validationError != null) {
+                        Toast.makeText(this, validationError, Toast.LENGTH_LONG).show();
+                        return false;
+                    }
+                    saveTodayRoutineDraft(draft, editingDate);
+                    return true;
+                });
         renderTodayRoutineDraftRows(draftRows, draft);
     }
 
